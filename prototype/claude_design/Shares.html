@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Shares — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const SHARES = [
+  { name: 'photos',    type: 'SMB', path: 'tank/photos',    access: ['tjstkm:rw', 'family:r'], clients: 3, traffic: 12.4, size: '4.1 TB' },
+  { name: 'documents', type: 'SMB', path: 'tank/docs',      access: ['tjstkm:rw'], clients: 1, traffic: 0.2, size: '342 GB' },
+  { name: 'media',     type: 'NFS', path: 'tank/media',     access: ['family:rw'], clients: 2, traffic: 34.8, size: '9.8 TB' },
+  { name: 'backups',   type: 'SMB', path: 'tank/backups',   access: ['tjstkm:rw'], clients: 0, traffic: 0, size: '4.0 TB' },
+  { name: 'archive',   type: 'NFS', path: 'tank/archive',   access: ['admin:rw'], clients: 1, traffic: 0.8, size: '1.2 TB' },
+  { name: 'reports',   type: 'SMB', path: 'tank/docs/reports', access: ['family:r'], clients: 0, traffic: 0, size: '12 GB' },
+];
+
+function App() {
+  const { t } = useLang();
+  const [selected, setSelected] = useState('photos');
+  const [protoFilter, setProtoFilter] = useState('all');
+  const cur = SHARES.find(s => s.name === selected);
+  const trafficSeries = useMemo(() => genSeries(60, 8, 14, 17), []);
+  return (
+    <Shell
+      active="shares"
+      crumbs={['KuraOS', t('nav_shares')]}
+      headerActions={
+        <div className="search">
+          <Icon name="search" size={14} />
+          <input placeholder="共有を検索" />
+        </div>
+      }
+    >
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_shares')}</h1>
+          <p className="page-sub">SMB / NFS の共有を一元管理。プロトコル設定はベストデフォルトを自動適用。</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon name="settings" size={14} />SMB 詳細設定</button>
+          <button className="btn btn-primary"><Icon name="plus" size={14} />{t('new_share')}</button>
+        </div>
+      </div>
+
+      <div className="row" style={{marginBottom: 16}}>
+        <div className="icon-toggle">
+          <button data-on={protoFilter === 'all'} onClick={() => setProtoFilter('all')}>ALL</button>
+          <button data-on={protoFilter === 'smb'} onClick={() => setProtoFilter('smb')}>SMB</button>
+          <button data-on={protoFilter === 'nfs'} onClick={() => setProtoFilter('nfs')}>NFS</button>
+        </div>
+      </div>
+
+      <div className="grid" style={{gridTemplateColumns: '1.4fr 1fr', alignItems: 'flex-start'}}>
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>名前</th><th>プロトコル</th><th>パス</th><th>アクセス</th>
+              <th className="td-num">接続中</th><th className="td-num">使用量</th>
+            </tr></thead>
+            <tbody>
+              {SHARES.filter(s => protoFilter === 'all' || s.type.toLowerCase() === protoFilter).map(s => (
+                <tr key={s.name} onClick={() => setSelected(s.name)} style={{cursor: 'pointer', background: s.name === selected ? 'var(--bg)' : ''}}>
+                  <td>
+                    <span className="row center" style={{gap: 8}}>
+                      <Icon name="folder" size={14} />
+                      <span style={{fontWeight: s.name === selected ? 600 : 500}}>{s.name}</span>
+                    </span>
+                  </td>
+                  <td><span className="badge">{s.type}</span></td>
+                  <td className="td-mono">{s.path}</td>
+                  <td>
+                    <div style={{display: 'flex', gap: 4, flexWrap: 'wrap'}}>
+                      {s.access.map(a => <span key={a} className="badge mono">{a}</span>)}
+                    </div>
+                  </td>
+                  <td className="td-num">{s.clients > 0 ? <span style={{color: 'var(--ok)'}}>● {s.clients}</span> : <span className="muted">—</span>}</td>
+                  <td className="td-num">{s.size}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">{cur.name}</h3>
+              <p className="card-sub mono">{cur.path}</p>
+            </div>
+            <span className="badge ok"><span className="badge-dot" />active</span>
+          </div>
+          <div className="card-body col">
+            <div className="row gap-lg">
+              <div className="stat" style={{flex: 1}}>
+                <div className="stat-label">接続中</div>
+                <div className="stat-value">{cur.clients}<span className="unit">clients</span></div>
+              </div>
+              <div className="stat" style={{flex: 1}}>
+                <div className="stat-label">スループット</div>
+                <div className="stat-value">{cur.traffic}<span className="unit">MB/s</span></div>
+              </div>
+            </div>
+            <div>
+              <div className="stat-label" style={{marginBottom: 8}}>過去 24h トラフィック</div>
+              <Sparkline data={trafficSeries} width={300} height={48} color="info" />
+            </div>
+          </div>
+          <div style={{padding: '0 18px 18px'}}>
+            <div className="stat-label" style={{marginBottom: 10}}>アクセス権限</div>
+            <div className="col gap-sm">
+              {cur.access.map(a => {
+                const [who, lvl] = a.split(':');
+                return (
+                  <div key={a} className="row center between" style={{padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)'}}>
+                    <span className="row center" style={{gap: 8}}>
+                      <Icon name={who === 'family' ? 'users' : 'users'} size={14} />
+                      <span className="mono" style={{fontSize: 13}}>{who}</span>
+                    </span>
+                    <select className="select" defaultValue={lvl} style={{width: 'auto', padding: '4px 8px'}}>
+                      <option value="rw">読み書き</option>
+                      <option value="r">読み取りのみ</option>
+                      <option value="none">アクセス不可</option>
+                    </select>
+                  </div>
+                );
+              })}
+              <button className="btn btn-sm" style={{alignSelf: 'flex-start'}}><Icon name="plus" size={12} />ユーザー/グループ追加</button>
+            </div>
+          </div>
+          <div className="card-foot">
+            <span className="mono" style={{fontSize: 11}}>smb://tjstkm-nas.local/{cur.name}</span>
+            <button className="btn btn-sm btn-danger">削除</button>
+          </div>
+        </div>
+      </div>
+
+      <div style={{marginTop: 24}} className="card">
+        <div className="card-head">
+          <h3 className="card-title">SMB 詳細設定</h3>
+          <span className="badge"><span className="badge-dot" />best defaults applied</span>
+        </div>
+        <table className="tbl">
+          <thead><tr><th>オプション</th><th>値</th><th>説明</th><th></th></tr></thead>
+          <tbody>
+            {[
+              ['multi channel support', 'yes',   '複数 NIC で並列転送'],
+              ['use sendfile',          'yes',   'ゼロコピー転送'],
+              ['aio read/write size',   '1',     '非同期 I/O'],
+              ['vfs objects',           'catia fruit streams_xattr', 'macOS 互換'],
+              ['fruit:metadata',        'stream', 'macOS 互換'],
+            ].map(([k, v, desc]) => (
+              <tr key={k}>
+                <td className="td-mono">{k}</td>
+                <td className="td-mono"><span className="badge">{v}</span></td>
+                <td className="muted">{desc}</td>
+                <td style={{textAlign: 'right'}}><button className="btn btn-ghost btn-sm">上書き</button></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

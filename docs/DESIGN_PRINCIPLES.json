@@ -1,0 +1,109 @@
+{
+  "$comment": "KuraOS の設計原則。autopilot/sprint auto が自律判断する際の優先順位と禁則。priority_rules が最優先、forbidden は絶対遵守。",
+  "priority_rules": [
+    {
+      "priority": 1,
+      "rule": "宣言的設定 (config.json) > UI 実装 — SSOT は config.json",
+      "detail": "新機能を追加するときは config.json スキーマと import/export/diff/apply での扱いを先に設計する。SQLite はランタイム状態のキャッシュであり、export で必ず config.json に戻せる構造を保つ。UI から設定変更しても、再び export → apply で同じ状態が再現できなければ設計バグ。"
+    },
+    {
+      "priority": 2,
+      "rule": "賢いデフォルト > 設定項目を増やす",
+      "detail": "ユーザーに見せる設定項目は徹底的に減らす。SMB の multichannel/sendfile/Fruit、recordsize/compression、ZFS chunk/special vdev の small_block_threshold 等は、ストレージ知見に基づく推奨値をデフォルトにし、UI には『詳細設定』として畳んで隠す。アプリも setup.required は share_picker 1 個に収まることを目指す。"
+    },
+    {
+      "priority": 3,
+      "rule": "Phase 1 で捨てない設計 > Phase 2 を見越したオーバーエンジニアリング",
+      "detail": "Phase 1 (ansible-nas + Go バイナリ) 上で構築する UI / API / Engine は、Phase 2/3 (NixOS or 独自ディストロ) でもそのまま再利用するのが大前提。逆に Phase 1 限定のもの (apt ベース更新管理、ロールバック実装等) は Phase 2 で破棄する前提で『最小限のベストエフォート』に留める。"
+    },
+    {
+      "priority": 4,
+      "rule": "シンプルなモジュラーモノリス > マイクロサービス分割",
+      "detail": "Phase 1 では全コンポーネントを単一 Go バイナリ (kura) に収める。プロセス分離やサービス間通信を持ち込まない。インターフェース境界は明確にしつつ、デプロイ単位は 1 つに保つ。"
+    },
+    {
+      "priority": 5,
+      "rule": "信頼性 > 機能 — データ破壊につながる操作は安全側に倒す",
+      "detail": "single SSD での special vdev 構成は冗長性なしのため UI/バリデーションで拒否 (warning ではなく error)。Force import や強制操作は CLI フラグでのみ可能、UI からは到達できない。バックアップ無しのデータ削除を許さない。pre-upgrade スナップショット作成失敗時は upgrade 自体を中止。"
+    },
+    {
+      "priority": 6,
+      "rule": "既存ライブラリ活用 > 自前実装 (ただし重要箇所は内製)",
+      "detail": "OIDC Provider は zitadel/oidc、ACME は go-acme/lego、Docker は公式 SDK を使う。一方、メトリクスストア (Ring Buffer)、i18n、宣言的設定の diff/apply、アプリマニフェスト処理など、KuraOS の core ロジックは依存を最小に自前で書く。判断軸は『この処理が KuraOS の差別化要因か』。"
+    },
+    {
+      "priority": 7,
+      "rule": "段階的実装 > 完璧な初期実装",
+      "detail": "ドライバモデルは v1 で post_install のみ、v1.5 で stage:any を追加。i18n は v1 で ja のみ、en は v1.x。MFA / デバイスフロー / WebAuthn は v1 では実装しない。各機能のスコープを設計ドキュメントの『v1 のスコープ』『v1.x で対応』『v2+』マーカーに従って厳守する。"
+    },
+    {
+      "priority": 8,
+      "rule": "明示的 > 暗黙的 — マジックや暗黙の規約を避ける",
+      "detail": "config.json と SQLite のスキーマで全て表現する。エラーは早期リターンと明示的な型で返す。Go template の変数展開も { { .KuraOS.X } } のように KuraOS namespace で限定する。i18n キーは MessageID 定数で集中管理し、コード中の生文字列を避ける。"
+    },
+    {
+      "priority": 9,
+      "rule": "テスタビリティ > 直接呼び出し — 副作用は interface の裏に隠す",
+      "detail": "ZFS / Docker / SMB / systemd / lego / 外部 IdP など、副作用を持つ依存は必ず interface 経由 (CmdExecutor, DockerClient, DNSProvider, BackupBackend 等)。テストではモック実装を差し込めるようにする。"
+    }
+  ],
+  "coding_conventions": [
+    "Go の標準的なディレクトリ構造に従う (cmd/, internal/, pkg/ は使い分けを明確に)",
+    "エラーは fmt.Errorf(\"...: %w\", err) で wrap、context を持って返す。エラーメッセージはユーザー向け文字列ではなく、開発者向けのまま英語で書く (ユーザー向け表記は i18n.T() 経由)",
+    "context.Context を全 IO 関数の第 1 引数に渡す",
+    "テーブルドリブンテストを基本にする。t.Run でケース名を付ける",
+    "ハードコードされた日本語 / 英語のユーザー向け文字列を残さない。必ず i18n.T(MessageID, args...) 経由",
+    "コメントは『なぜ』を書く。『何を』はコードと関数名で表現する。コメントを書かないのが基本",
+    "interface は使う側のパッケージで定義する (Go 流のダックタイピング)",
+    "依存注入はコンストラクタ引数で。グローバル変数 / init() による副作用は避ける (registry.Register のような明示的なものは可)",
+    "JSON tag は snake_case、Go フィールド名は CamelCase",
+    "TODO/FIXME を残す場合は GitHub Issue 番号を必ず付ける"
+  ],
+  "ui_ux": [
+    "視覚デザインの SSOT は prototype/claude_design/。実装の見た目はここに準拠する。design tokens (Fog palette / 余白 / 角丸 / フォント) と CSS class 名 (.card, .btn, .tbl, .badge, .stat 等) はプロトタイプの shared.css をそのまま流用",
+    "デザイン哲学は Linear / Vercel ライクなミニマル product UI。情報密度を保ちつつ余白で読みやすさを確保。装飾を増やさない",
+    "デスクトップメタファーを採用しない。左サイドバー固定 (232px) + sticky ヘッダ (56px) + content (max 1320px) の 3 領域構成",
+    "全ページが htmx + サーバサイドレンダリングで動く。SPA フレームワークは使わない (prototype の React 部分は htmx に置換する)",
+    "Tailwind CSS で実装。Fog palette と spacing/radius token は Tailwind config の theme.extend に移植する。独自 CSS は最小限に",
+    "ライト / ダーク両対応を v1 から実装する。`<html data-theme>` 切替で CSS 変数が入れ替わる構造をプロトタイプから踏襲。テーマ設定はユーザー単位で SQLite に保存",
+    "アクセントカラーは jade (kura/storehouse の屋根を象徴) 1 色のみ。他は Fog palette のグレースケール + ステータス色 (ok/warn/crit/info)",
+    "タイポグラフィは IBM Plex Sans (本文) + IBM Plex Mono (パス・SN・サイズ・cron 式・温度等の technical fields)",
+    "アクション後は即座にフィードバックを返す。長時間処理は SSE/polling で進捗を表示",
+    "エラーメッセージは具体的に (どのリソースで、何が、なぜ失敗したか)。『エラーが発生しました』のような汎用メッセージは禁止",
+    "破壊的操作は確認ダイアログを必ず挟み、リソース名の手入力を要求する場合がある (zpool destroy 等)",
+    "アプリストアのインストールフォームは、setup.required 1〜2 項目で完結することを目指す",
+    "管理 UI と ユーザーポータルは画面構成を完全に分ける (admin は /ui/admin/、user は /ui/)",
+    "ログ・メトリクスのライブビューは SSE。WebSocket は使わない (Gateway 経由の認証を単純に保つ)",
+    "アイコンは 1-stroke の SVG (currentColor)。size は 12/14/16/18 のうちから選ぶ。prototype shared.jsx の Icon 定義をそのまま流用"
+  ],
+  "architecture": [
+    "Phase 1 は単一 Go バイナリ (kura) のモジュラーモノリス。バイナリ構成は engine/{storage,share,app,user,auth,monitor,notify,backup,network,logging} で分割",
+    "config.json が SSOT。SQLite はランタイム状態。export → apply で完全に再現できる事を不変条件とする",
+    "全エンジンは interface を公開し、実装はサブパッケージに置く (StorageEngine の ZFS 実装、ShareEngine の SMB/NFS 実装、BackupBackend の zfs_send/restic/rclone 実装等)",
+    "Gateway がルーティング・認証・TLS 終端を担当。認証情報は内部ヘッダ (X-Kura-User, X-Kura-Token HMAC) で各エンジンへ渡す",
+    "アプリは2種類: native (File API + OIDC) と legacy (bind mount + forward_auth)。アプリマニフェストの type で区別",
+    "外部プラグインローディング (Go plugin / 別プロセス) は採用しない。DNS プロバイダ / バックアップバックエンド / ドライバ型はコード内モジュールとして実装し、registry.Register で集中登録",
+    "アプリレジストリは GitHub Releases ベース。署名検証は cosign keyless (--certificate-identity-regexp で GitHub identity 確認)、ハッシュ検証 + 署名検証の二重チェック",
+    "メトリクスは自前バイナリ Ring Buffer。Prometheus 等の外部依存は持ち込まず、本格運用が必要な場合は monitoring-stack アプリ (Grafana + Prometheus) をユーザーがインストール",
+    "イベント Bus は Go の channel ベース。各エンジンが Event を publish、NotificationEngine が subscribe してチャネルへルーティング",
+    "API バージョニングは URL パスで (/api/v1/...)。v1 では URL に v1 を入れない場合は将来の互換破壊を許容する",
+    "アプリの DB / cache 等のデータセットは tank/apps/{name}/{role} の階層に分けて作成する。ユーザー Share は tank/shares/ 配下"
+  ],
+  "forbidden": [
+    "config.json export で復元できないランタイム状態を SQLite に作らない (SSOT 違反)",
+    "ハードコードされた日本語 / 英語のユーザー向け文字列をコード中に残さない",
+    "single SSD での special vdev 作成を UI / API から許可しない (CLI で --force-no-redundancy を付けた場合のみ可)",
+    "デスクトップメタファー型 UI / Synology DSM 風のウィンドウマネージャを実装しない",
+    "アプリ UI からの設定変更を自動的に config.json に吸い上げない (state drift 地獄になる)",
+    "MFA / WebAuthn / パスキー / SAML / LDAP / SCIM を v1 で実装しない (外部 IdP federation で委譲)",
+    "WebDAV / CalDAV / CardDAV / 共有リンクを実装しない (Nextcloud の役割)",
+    "ZFS dedup / SLOG / L2ARC / ネイティブ暗号化を UI から有効化させない (CLI で構成したものを import するのは可だが KuraOS UI からは触らない)",
+    "外部プラグインローディング (Go plugin パッケージ / 別プロセス) を採用しない (registry.Register の中央登録に集約)",
+    "ワンクリック OS ロールバック UI を v1 で実装しない (CLI 手動復旧手順を README に記載)",
+    "アプリレジストリの署名検証 / ハッシュ検証をスキップする経路を作らない (検証失敗時はインストール / 更新を即停止)",
+    "管理 UI からの破壊的操作 (zpool destroy 等) を確認なしで実行しない",
+    "Docker / ZFS / SMB の CLI 出力を直接画面に表示しない (i18n 経由で構造化メッセージに変換)",
+    ".env / リポジトリ内に本番シークレットをコミットしない",
+    "アプリの内部パスワード / DB password / OIDC client secret を config.json export 時に平文で含めない (env 参照のみを記録)"
+  ]
+}

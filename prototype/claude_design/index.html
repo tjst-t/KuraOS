@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>KuraOS — Prototype Index</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  body { background: var(--bg); }
+  .index-shell { max-width: 1180px; margin: 0 auto; padding: 64px 32px 96px; }
+  .index-head { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  .index-title { font-size: 36px; font-weight: 600; letter-spacing: -0.03em; margin: 0; }
+  .index-tag { font-size: 12px; color: var(--text-3); border: 1px solid var(--border); border-radius: 999px; padding: 3px 10px; font-family: var(--mono); }
+  .index-lead { color: var(--text-2); font-size: 16px; line-height: 1.6; max-width: 720px; margin: 0 0 8px; }
+  .index-meta { color: var(--text-3); font-size: 13px; margin: 0 0 48px; }
+  .group-label {
+    text-transform: uppercase; letter-spacing: 0.08em; font-size: 11px;
+    color: var(--text-3); font-weight: 600; margin: 40px 0 14px;
+    padding-bottom: 10px; border-bottom: 1px solid var(--border);
+  }
+  .screen-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+  @media (max-width: 920px) { .screen-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 600px) { .screen-grid { grid-template-columns: 1fr; } }
+
+  .screen-card {
+    display: block; text-decoration: none; color: inherit;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px;
+    transition: border-color .15s, transform .15s;
+  }
+  .screen-card:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .screen-card-num { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+  .screen-card-name { font-size: 17px; font-weight: 600; letter-spacing: -0.01em; margin: 4px 0 6px; }
+  .screen-card-desc { color: var(--text-2); font-size: 13px; line-height: 1.55; margin: 0; }
+  .screen-card-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border); }
+  .screen-card-tag { font-family: var(--mono); font-size: 11px; color: var(--text-3); }
+
+  .top-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 32px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+
+const ADMIN = [
+  { n: '01', file: 'Dashboard.html', title: 'Dashboard', desc: 'システム全体の状態とトレンドの確認', tag: 'admin · home' },
+  { n: '02', file: 'Storage.html',   title: 'Storage',   desc: 'プール、ディスク、スナップショット、SMART', tag: 'admin · zfs' },
+  { n: '03', file: 'Shares.html',    title: 'Shares',    desc: 'SMB / NFS 共有、ACL、アクセス権', tag: 'admin · sharing' },
+  { n: '04', file: 'Users.html',     title: 'Users',     desc: 'ユーザー、グループ、SSH キー、クォータ', tag: 'admin · iam' },
+  { n: '05', file: 'Network.html',   title: 'Network',   desc: 'インターフェース、ボンディング、Tailscale', tag: 'admin · network' },
+  { n: '06', file: 'Apps.html',      title: 'Apps',      desc: 'インストール済み + アプリストア', tag: 'admin · containers' },
+  { n: '07', file: 'Settings.html',  title: 'Settings',  desc: '通知、バックアップ、TLS、更新、ログ', tag: 'admin · system' },
+];
+const USER = [
+  { n: '08', file: 'Portal.html',    title: 'Portal',    desc: 'ユーザー向けのアプリランチャーと最近の活動', tag: 'user · home' },
+];
+const ONBOARDING = [
+  { n: '09', file: 'Setup.html',     title: 'Initial Setup', desc: '初回ブート時のウィザード (6 ステップ)', tag: 'onboarding' },
+];
+
+function Card({ s }) {
+  return (
+    <a className="screen-card" href={s.file}>
+      <div className="screen-card-num">SCREEN {s.n}</div>
+      <div className="screen-card-name">{s.title}</div>
+      <p className="screen-card-desc">{s.desc}</p>
+      <div className="screen-card-foot">
+        <span className="screen-card-tag">{s.tag}</span>
+        <Icon name="chevron_right" size={14} />
+      </div>
+    </a>
+  );
+}
+
+function App() {
+  const { lang, setLang } = useLang();
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <div className="index-shell">
+      <div className="top-bar">
+        <div style={{flex: 1}} />
+        <div className="icon-toggle">
+          <button data-on={lang === 'ja'} onClick={() => setLang('ja')}>JA</button>
+          <button data-on={lang === 'en'} onClick={() => setLang('en')}>EN</button>
+        </div>
+        <button className="btn btn-icon btn-ghost" onClick={toggleTheme}>
+          <Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} />
+        </button>
+      </div>
+
+      <div className="index-head">
+        <div className="brand-mark"><BrandMark size={42} /></div>
+        <div>
+          <h1 className="index-title">KuraOS</h1>
+          <span className="index-tag">prototype · v0.1</span>
+        </div>
+      </div>
+      <p className="index-lead">
+        Linear / Vercel ライクなミニマルさで再考した、家庭・SOHO 向けの NAS 管理 UI。
+        賢いデフォルトを採用し、初期セットアップを最小ステップに、
+        日常のオペレーションを自然言語に近い表現で表現することを目指したプロトタイプです。
+      </p>
+      <p className="index-meta">日本語 / English 両対応 · ライト / ダーク両対応 · 9 画面</p>
+
+      <div className="group-label">管理者向け / Administration</div>
+      <div className="screen-grid">{ADMIN.map(s => <Card key={s.n} s={s} />)}</div>
+
+      <div className="group-label">ユーザー向け / End user</div>
+      <div className="screen-grid">{USER.map(s => <Card key={s.n} s={s} />)}</div>
+
+      <div className="group-label">オンボーディング / Onboarding</div>
+      <div className="screen-grid">{ONBOARDING.map(s => <Card key={s.n} s={s} />)}</div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,1144 @@
+{
+  "$comment": "KuraOS Phase 1 ロードマップ。docs/initial-input/Kuraos-design.md と docs/VISION.json をもとに生成。Phase 2/3 (NixOS / 独自ディストロ移行) はこのロードマップの範囲外。",
+  "project": "KuraOS",
+  "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
+  "progress": {
+    "current_sprint": "S0ff37f",
+    "total": 14,
+    "done": 0,
+    "in_progress": 0,
+    "remaining": 14,
+    "percentage": 0
+  },
+  "execution_order": [
+    "S0ff37f",
+    "S464e47",
+    "S1e7eeb",
+    "Se3b190",
+    "S9db742",
+    "Sd64f38",
+    "S1bccf5",
+    "S65b510",
+    "S822961",
+    "S8a756d",
+    "Se1e7a6",
+    "Sf92666",
+    "S0eedaa",
+    "S99702c"
+  ],
+  "sprints": {
+    "S0ff37f": {
+      "title": "kura バイナリ ブートストラップ",
+      "status": "pending",
+      "description": "Go モジュール初期化、単一バイナリのスケルトン、Gateway の最小ルーティング、SQLite ストア、embed.FS によるロケール埋め込みの土台、make serve で起動できるところまで。",
+      "milestone": false,
+      "stories": {
+        "S0ff37f-1": {
+          "title": "Go モジュールとバイナリスケルトン",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、make build と make serve で kura バイナリを起動できるようにしたい。なぜなら、以降の機能実装の土台が必要だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S0ff37f-1-1",
+              "description": "make build で bin/kura が生成される",
+              "test": "[AC-S0ff37f-1-1] in tests/acceptance/bootstrap.sh",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S0ff37f-1-2",
+              "description": "make serve で portman が割当てたポートで kura が起動し、/healthz に 200 を返す",
+              "test": "[AC-S0ff37f-1-2] in tests/acceptance/bootstrap.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S0ff37f-1-1": {"title": "go mod init", "description": "github.com/kuraos-org/kura で go.mod を初期化、Go 1.22 以上をピン", "status": "pending"},
+            "S0ff37f-1-2": {"title": "cmd/kura/main.go", "description": "エントリポイントを作成。env KURA_PORT で listen、context+signal でグレースフル shutdown", "status": "pending"},
+            "S0ff37f-1-3": {"title": "/healthz エンドポイント", "description": "Gateway 雛形に /healthz を追加し、起動時間と version を JSON 返却", "status": "pending"}
+          }
+        },
+        "S0ff37f-2": {
+          "title": "SQLite ストアと マイグレーション",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、SQLite を起動時に初期化しスキーマ migration が自動適用されるようにしたい。なぜなら、ランタイム状態を永続化する基盤が必要だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S0ff37f-2-1",
+              "description": "kura 起動時に /var/lib/kura/state.db が無ければ作成され、空のテーブル群が用意される",
+              "test": "[AC-S0ff37f-2-1] in tests/acceptance/store.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S0ff37f-2-1": {"title": "store パッケージ", "description": "modernc.org/sqlite を採用 (CGo 不要)。store.Open(path) を提供", "status": "pending"},
+            "S0ff37f-2-2": {"title": "migration 機構", "description": "embed.FS の SQL ファイル群を順序適用。schema_version テーブルで管理", "status": "pending"}
+          }
+        },
+        "S0ff37f-3": {
+          "title": "ロケール埋め込みの基盤",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、ja.json を embed.FS でバイナリに同梱できる仕組みを作りたい。なぜなら、ユーザー向け文字列をハードコードせず i18n 経由で出力するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S0ff37f-3-1",
+              "description": "i18n/locales/ja.json が embed.FS で同梱され、起動時にロード成功する",
+              "test": "[AC-S0ff37f-3-1] in i18n/translator_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S0ff37f-3-1": {"title": "i18n パッケージのスケルトン", "description": "MessageID 型、Translator 構造体、T(id, args...) 関数を最小実装", "status": "pending"},
+            "S0ff37f-3-2": {"title": "ja.json 雛形", "description": "i18n/locales/ja.json に system.startup, system.healthy 等の最小キーを用意", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S464e47": {
+      "title": "UI シェル と config.json import/export 雛形",
+      "status": "pending",
+      "description": "htmx + Tailwind の管理 UI スケルトン (左サイドバー固定)、ダッシュボード placeholder、config.json import/export/diff/apply の枠組みを Engine 抜きで先に作る。視覚仕様は prototype/claude_design/index.html, Dashboard.html, shared/shared.css 準拠。Fog palette と IBM Plex を Tailwind config に移植し、ライト/ダーク両対応をこの sprint で完成させる。",
+      "milestone": false,
+      "stories": {
+        "S464e47-1": {
+          "title": "管理 UI のレイアウトとサイドバー",
+          "status": "pending",
+          "user_story": "管理者として、左サイドバーから Storage/Shares/Users/Network/Apps/Settings へ遷移できる UI シェルを使いたい。なぜなら、機能を順次組み込んでいく土台が必要だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S464e47-1-1",
+              "description": "/ui/admin にアクセスすると Tailwind ベースのレイアウトが表示され、サイドバーの 7 項目をクリックできる",
+              "test": "[AC-S464e47-1-1] in tests/e2e/admin-shell.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S464e47-1-2",
+              "description": "全 UI 文字列が i18n.T 経由で出力されており、ja.json にキーが存在する",
+              "test": "[AC-S464e47-1-2] in tests/acceptance/i18n-coverage.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S464e47-1-1": {"title": "html/template + embed.FS UI 構成", "description": "ui/templates/ にレイアウト・パーシャルを配置、embed で配信", "status": "pending"},
+            "S464e47-1-2": {"title": "Tailwind 統合", "description": "Tailwind CLI でビルドし ui/dist/ に出力、make build から自動実行", "status": "pending"},
+            "S464e47-1-3": {"title": "Fog パレットの token 化", "description": "Tailwind config に Fog パレット相当のカラーを定義", "status": "pending"},
+            "S464e47-1-4": {"title": "Dashboard placeholder", "description": "サイドバーから到達可能な空のダッシュボードページを置く", "status": "pending"}
+          }
+        },
+        "S464e47-2": {
+          "title": "config.json import/export/diff/apply の枠組み",
+          "status": "pending",
+          "user_story": "管理者として、kura config export と kura config apply --dry-run が空状態で動くようにしたい。なぜなら、SSOT を config.json に置く設計を最初から徹底するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S464e47-2-1",
+              "description": "kura config export を実行すると、現在の SQLite 状態を反映した config.json が標準出力に出る (空 SQLite なら空セクションのまま)",
+              "test": "[AC-S464e47-2-1] in tests/acceptance/config-roundtrip.sh",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S464e47-2-2",
+              "description": "kura config apply <file> --dry-run で diff が表示される",
+              "test": "[AC-S464e47-2-2] in tests/acceptance/config-roundtrip.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S464e47-2-1": {"title": "config パッケージのスキーマ型定義", "description": "design.md §3.1 の config.json 全体構造を Go 構造体にする (空フィールドのまま)", "status": "pending"},
+            "S464e47-2-2": {"title": "import/export の round-trip テスト", "description": "Go 構造体 ↔ JSON が損失なくラウンドトリップすることをテーブルドリブンテストで担保", "status": "pending"},
+            "S464e47-2-3": {"title": "Engine ApplyAdapter interface", "description": "各 Engine が後で実装する Apply(ctx, oldCfg, newCfg) Diff interface を定義", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S1e7eeb": {
+      "title": "認証基盤 (ローカルユーザー + セッション + 初期管理者ウィザード)",
+      "status": "pending",
+      "description": "ローカル認証、ブラウザセッション、Gateway 認証ミドルウェア、admin/user ロール、初期管理者作成ウィザードまで。OIDC Provider と外部 IdP federation はスプリント 9 で扱う。ウィザード視覚仕様は prototype/claude_design/Setup.html (Step 1-2 のみ)。",
+      "milestone": true,
+      "stories": {
+        "S1e7eeb-1": {
+          "title": "ローカルユーザー / グループモデルとパスワードハッシュ",
+          "status": "pending",
+          "user_story": "管理者として、ユーザーとグループを SQLite に永続化したい。なぜなら、後続の Share / アプリ公開制御の前提だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1e7eeb-1-1",
+              "description": "User / Group / AuthMethod テーブルが migration で作られ、admin/user ロールが扱える",
+              "test": "[AC-S1e7eeb-1-1] in engine/user/store_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1e7eeb-1-2",
+              "description": "パスワードは argon2id でハッシュ化され平文で保存されない",
+              "test": "[AC-S1e7eeb-1-2] in engine/user/password_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1e7eeb-1-1": {"title": "engine/user パッケージ", "description": "User / Group / AuthMethod / Role の構造体と SQLite store", "status": "pending"},
+            "S1e7eeb-1-2": {"title": "argon2id パスワードハッシュ", "description": "golang.org/x/crypto/argon2 ベースの hash/verify", "status": "pending"}
+          }
+        },
+        "S1e7eeb-2": {
+          "title": "ブラウザセッション と Gateway 認証ミドルウェア",
+          "status": "pending",
+          "user_story": "管理者として、/ui/admin にログイン後アクセスし、未認証時はログインページにリダイレクトされるようにしたい。なぜなら、管理 UI を不正アクセスから守るため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1e7eeb-2-1",
+              "description": "/login で username+password を送信するとセッション cookie が発行され、admin ロールがあれば /ui/admin にアクセスできる",
+              "test": "[AC-S1e7eeb-2-1] in tests/e2e/login.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1e7eeb-2-2",
+              "description": "未認証で /ui/admin にアクセスすると /login にリダイレクトされる",
+              "test": "[AC-S1e7eeb-2-2] in tests/e2e/login.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1e7eeb-2-3",
+              "description": "user ロールでは /ui/admin に 403、/ui には 200",
+              "test": "[AC-S1e7eeb-2-3] in tests/e2e/login.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1e7eeb-2-1": {"title": "engine/auth/session", "description": "セッション cookie の発行/検証、SQLite に sessions テーブル", "status": "pending"},
+            "S1e7eeb-2-2": {"title": "Gateway 認証ミドルウェア", "description": "ロールベースのルーティング (/ui/admin → admin、/ui → user 以上)", "status": "pending"},
+            "S1e7eeb-2-3": {"title": "Login UI", "description": "htmx で POST /login → cookie 発行 → /ui/admin リダイレクト", "status": "pending"}
+          }
+        },
+        "S1e7eeb-3": {
+          "title": "初期管理者作成ウィザード (最小版)",
+          "status": "pending",
+          "user_story": "新規 NAS オーナーとして、初回ブラウザアクセス時に管理者アカウントを作成して管理 UI に入れるようにしたい。なぜなら、誰でも入れる状態を初期に作らないため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1e7eeb-3-1",
+              "description": "管理者が未作成の状態で / にアクセスすると /setup にリダイレクトされ、admin 作成フォームが表示される",
+              "test": "[AC-S1e7eeb-3-1] in tests/e2e/setup-wizard.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1e7eeb-3-2",
+              "description": "管理者作成後 /setup には到達できない (作成済みなら login にリダイレクト)",
+              "test": "[AC-S1e7eeb-3-2] in tests/e2e/setup-wizard.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1e7eeb-3-1": {"title": "/setup ウィザードページ (Step1: admin 作成)", "description": "ストレージ・Share の追加ステップは S99702c で拡張予定", "status": "pending"},
+            "S1e7eeb-3-2": {"title": "admin 未作成判定ミドルウェア", "description": "User テーブルに admin が無いときだけ /setup を許可", "status": "pending"}
+          }
+        }
+      }
+    },
+    "Se3b190": {
+      "title": "StorageEngine 読み取り (pools / disks / SMART / import scan)",
+      "status": "pending",
+      "description": "ZFS CLI ラッパー (CmdExecutor 経由) で pools / disks / SMART / インポート可能プールの一覧取得を実装。Storage 画面の読み取り系 UI とともに提供。書き込み系 (CreatePool 等) は次スプリント。視覚仕様は prototype/claude_design/Storage.html (PoolCard / ディスク table / インポート banner)。",
+      "milestone": false,
+      "stories": {
+        "Se3b190-1": {
+          "title": "CmdExecutor 抽象化と zpool/zfs CLI ラッパー",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、ZFS CLI 出力をパースする処理をテストでモック差し替えできるようにしたい。なぜなら、CI で実 ZFS が動かない環境でもユニットテストを通すため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se3b190-1-1",
+              "description": "engine/storage がモック CmdExecutor で zpool list / zpool status / zfs list / zpool import の出力をパースし構造体に変換できる",
+              "test": "[AC-Se3b190-1-1] in engine/storage/zfs_parse_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se3b190-1-1": {"title": "internal/cmd.Executor interface", "description": "Run(ctx, name, args...) (stdout, stderr, error) を返す抽象", "status": "pending"},
+            "Se3b190-1-2": {"title": "zpool list / status のパーサ", "description": "テーブルドリブンテストでサンプル出力を fixtures に置き検証", "status": "pending"},
+            "Se3b190-1-3": {"title": "zpool import スキャンのパーサ", "description": "ScanImportable で GUID/Status/Disks/Datasets を抽出", "status": "pending"}
+          }
+        },
+        "Se3b190-2": {
+          "title": "Disk 一覧と SMART 取得",
+          "status": "pending",
+          "user_story": "管理者として、Storage 画面で接続中の物理ディスクと SMART 値を確認したい。なぜなら、故障兆候を早期に把握するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se3b190-2-1",
+              "description": "/ui/admin/storage にアクセスすると物理ディスク一覧 (型番・容量・温度・SMART 健康度) が表示される",
+              "test": "[AC-Se3b190-2-1] in tests/e2e/storage-disks.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se3b190-2-1": {"title": "ListDisks 実装", "description": "lsblk + smartctl の出力をマージ", "status": "pending"},
+            "Se3b190-2-2": {"title": "GetSMART 実装", "description": "smartctl -A -j で JSON 取得 → SMARTInfo 構造体", "status": "pending"},
+            "Se3b190-2-3": {"title": "Storage 画面の Disk セクション", "description": "htmx でリスト表示、HTMX-Refresh で 30s 自動更新", "status": "pending"}
+          }
+        },
+        "Se3b190-3": {
+          "title": "インポート可能プール検出 UI",
+          "status": "pending",
+          "user_story": "管理者として、別マシンから持ち込んだディスク群のプールが自動検出されるようにしたい。なぜなら、ansible-nas からの移行や物理機材の引っ越しを楽にするため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se3b190-3-1",
+              "description": "Storage 画面に『インポート可能なプール』セクションがあり、検出されたプールの GUID/状態/ディスクが表示される (実 import は次スプリント)",
+              "test": "[AC-Se3b190-3-1] in tests/e2e/storage-import.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se3b190-3-1": {"title": "ScanImportable 実装", "description": "zpool import のドライランで候補一覧を取得", "status": "pending"},
+            "Se3b190-3-2": {"title": "UI セクション追加", "description": "ボタンは置くが import 実装は Sprint 5 で完成させる旨の表示", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S9db742": {
+      "title": "StorageEngine 書き込み (CreatePool/Volume/Snapshot, special vdev バリデーション)",
+      "status": "pending",
+      "description": "Pool/Volume/Snapshot/spare の作成とプリセット (general/media/database)、special vdev の冗長必須バリデーション (single SSD はエラー)、既存プールの実 import を実装。",
+      "milestone": false,
+      "stories": {
+        "S9db742-1": {
+          "title": "Pool 作成と推奨構成バリデーション",
+          "status": "pending",
+          "user_story": "管理者として、Storage 画面から ZFS プールを作成し、危険な構成 (single SSD special vdev 等) は事前に拒否されるようにしたい。なぜなら、誤設定でデータを失わないため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9db742-1-1",
+              "description": "RAIDZ1 / RAIDZ2 / mirror / single の topology で Pool を作成できる",
+              "test": "[AC-S9db742-1-1] in tests/e2e/storage-create-pool.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9db742-1-2",
+              "description": "single SSD で special vdev を指定すると UI/API がエラーで拒否する (warning ではなく error)",
+              "test": "[AC-S9db742-1-2] in tests/e2e/storage-create-pool.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9db742-1-1": {"title": "CreatePool 実装", "description": "PoolConfig → zpool create コマンド組み立て", "status": "pending"},
+            "S9db742-1-2": {"title": "special vdev / spares のサポート", "description": "small_block_threshold パラメータ含む", "status": "pending"},
+            "S9db742-1-3": {"title": "推奨構成ロジック", "description": "design.md §18.2 の推奨表に基づく『推奨』表示", "status": "pending"},
+            "S9db742-1-4": {"title": "破壊的操作の確認モーダル", "description": "プール名手入力で confirm", "status": "pending"}
+          }
+        },
+        "S9db742-2": {
+          "title": "Volume / プリセット / Snapshot",
+          "status": "pending",
+          "user_story": "管理者として、用途プリセットからデータセットを作成し定期スナップショットを設定できるようにしたい。なぜなら、recordsize/compression の最適値を意識せず安全な構成を組むため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9db742-2-1",
+              "description": "general/media/database プリセットから Volume を作成すると、対応する recordsize と compression=zstd が適用される",
+              "test": "[AC-S9db742-2-1] in tests/acceptance/storage-presets.sh",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9db742-2-2",
+              "description": "Volume の手動スナップショット作成・一覧・rollback が UI から実行できる",
+              "test": "[AC-S9db742-2-2] in tests/e2e/storage-snapshots.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9db742-2-1": {"title": "CreateVolume + プリセット適用", "description": "VolumeOpts.Preset → zfs プロパティに展開", "status": "pending"},
+            "S9db742-2-2": {"title": "Snapshot CRUD + Rollback", "description": "CreateSnapshot/ListSnapshots/Rollback の実装と UI", "status": "pending"},
+            "S9db742-2-3": {"title": "Quota 設定", "description": "SetQuota の実装と UI フィールド", "status": "pending"}
+          }
+        },
+        "S9db742-3": {
+          "title": "既存プールの実 import",
+          "status": "pending",
+          "user_story": "管理者として、検出されたプールをワンクリックで import し、その内部のデータセットがそのまま見えるようにしたい。なぜなら、移行作業を最小化するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9db742-3-1",
+              "description": "Storage 画面の『インポート可能なプール』からクリックするとプールが import され、Volume 一覧に現れる",
+              "test": "[AC-S9db742-3-1] in tests/e2e/storage-import-apply.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9db742-3-2",
+              "description": "force import はチェックボックスを ON にしないと実行できず、警告が表示される",
+              "test": "[AC-S9db742-3-2] in tests/e2e/storage-import-apply.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9db742-3-1": {"title": "ImportPool 実装", "description": "ImportOpts (Force/ReadOnly/AltRoot) の zpool import への変換", "status": "pending"},
+            "S9db742-3-2": {"title": "config.json apply 経由の import", "description": "mode: import / auto_share / share_map に対応", "status": "pending"}
+          }
+        }
+      }
+    },
+    "Sd64f38": {
+      "title": "Share 管理 (SMB/NFS) と smb.conf テンプレート",
+      "status": "pending",
+      "description": "ShareEngine、SMB/NFS の設定を SQLite からテンプレート生成し常に冪等に再生成。multichannel/sendfile/Fruit 等のパフォーマンスデフォルトを内部で適用、UI は最小化。視覚仕様は prototype/claude_design/Shares.html。",
+      "milestone": true,
+      "stories": {
+        "Sd64f38-1": {
+          "title": "ShareEngine と SMB/NFS テンプレート生成",
+          "status": "pending",
+          "user_story": "管理者として、Volume 内のサブパスに SMB/NFS Share を作成し、ユーザー/グループ単位でアクセス権を設定したい。なぜなら、家族で写真や書類を共有するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sd64f38-1-1",
+              "description": "Shares 画面から SMB/NFS Share を作成すると smb.conf / exports が再生成され、smbd / nfsd に reload される",
+              "test": "[AC-Sd64f38-1-1] in tests/e2e/shares-create.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Sd64f38-1-2",
+              "description": "smb.conf に server multi channel support / use sendfile / fruit:* の推奨設定が含まれている",
+              "test": "[AC-Sd64f38-1-2] in engine/share/smbconf_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sd64f38-1-1": {"title": "ShareEngine interface と SQLite store", "description": "shares テーブル + access テーブル", "status": "pending"},
+            "Sd64f38-1-2": {"title": "smb.conf テンプレート", "description": "design.md §5.3 のパフォーマンスデフォルトを含むテンプレート", "status": "pending"},
+            "Sd64f38-1-3": {"title": "/etc/exports テンプレート", "description": "NFS 4.2 デフォルト", "status": "pending"},
+            "Sd64f38-1-4": {"title": "smbd / nfsd reload 抽象化", "description": "CmdExecutor 経由で systemctl reload", "status": "pending"},
+            "Sd64f38-1-5": {"title": "共有パス重複/入れ子バリデーション", "description": "登録時に検出して warning 表示", "status": "pending"}
+          }
+        },
+        "Sd64f38-2": {
+          "title": "Share の用途プリセット UI",
+          "status": "pending",
+          "user_story": "管理者として、Share 作成時に『写真』『書類』『動画』のような用途を選ぶだけで適切な dataset プリセットが選ばれるようにしたい。なぜなら、recordsize や compression を意識したくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sd64f38-2-1",
+              "description": "Share 作成フォームに用途プリセット選択肢があり、選ぶと自動で対応する Volume プリセットが提案される",
+              "test": "[AC-Sd64f38-2-1] in tests/e2e/shares-presets.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sd64f38-2-1": {"title": "用途 → dataset プリセットマッピング", "description": "media→media, docs→general, など", "status": "pending"},
+            "Sd64f38-2-2": {"title": "share 作成フォーム", "description": "share_picker UX に近い 1 ステップ完結", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S1bccf5": {
+      "title": "アプリマニフェストと レジストリ (cosign keyless 検証)",
+      "status": "pending",
+      "description": "アプリマニフェスト (YAML) のスキーマ定義とパーサ、GitHub Releases ベースの RegistryClient、registry.json と manifest.yaml の cosign keyless 署名検証 + ハッシュ二重チェック。アプリ用 dataset の自動作成 (pool_hint)、ポート/内部パスワードの自動生成。",
+      "milestone": false,
+      "stories": {
+        "S1bccf5-1": {
+          "title": "マニフェスト構造とバリデーション",
+          "status": "pending",
+          "user_story": "アプリ作者として、design.md §7.2 の YAML スキーマでマニフェストを書けば KuraOS にロードできるようにしたい。なぜなら、新しいアプリを追加する時に毎回コードを書きたくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1bccf5-1-1",
+              "description": "サンプル immich マニフェスト YAML がパースされ、setup.required / containers / shares / storage / routing / auth 等が構造体に取り込まれる",
+              "test": "[AC-S1bccf5-1-1] in engine/app/manifest_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1bccf5-1-2",
+              "description": "必須フィールドの欠落・unknown ドライバ型・互換しない routing.mode の組合せはバリデーションエラーとなる",
+              "test": "[AC-S1bccf5-1-2] in engine/app/manifest_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1bccf5-1-1": {"title": "Manifest 型と YAML タグ", "description": "containers / shares / storage / setup / settings / routing / auth / health / backup / configs", "status": "pending"},
+            "S1bccf5-1-2": {"title": "バリデータ", "description": "テーブルドリブンで成功/失敗ケースを網羅", "status": "pending"}
+          }
+        },
+        "S1bccf5-2": {
+          "title": "RegistryClient と cosign keyless 検証",
+          "status": "pending",
+          "user_story": "KuraOS ユーザーとして、official レジストリから安全にマニフェストを取得したい。なぜなら、改ざんされたマニフェストでマシンが乗っ取られたら困るから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1bccf5-2-1",
+              "description": "registry.json と manifest.yaml が、cosign keyless で identity_regex に一致する場合のみ受理される",
+              "test": "[AC-S1bccf5-2-1] in engine/app/registry_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1bccf5-2-2",
+              "description": "manifest_sha256 がレジストリ記載値と不一致の場合、明確なエラーで停止する",
+              "test": "[AC-S1bccf5-2-2] in engine/app/registry_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1bccf5-2-1": {"title": "RegistryClient interface", "description": "FetchRegistry / FetchManifest", "status": "pending"},
+            "S1bccf5-2-2": {"title": "cosign keyless ライブラリ統合", "description": "sigstore-go を採用、verify-blob 相当", "status": "pending"},
+            "S1bccf5-2-3": {"title": "ハッシュ + 署名の二重チェック", "description": "片方失敗で即停止", "status": "pending"},
+            "S1bccf5-2-4": {"title": "app_registries 設定", "description": "config.json で official 以外を追加可能、明示的 trust 設定", "status": "pending"}
+          }
+        },
+        "S1bccf5-3": {
+          "title": "アプリ用 dataset / ポート / 内部パスワード自動割当",
+          "status": "pending",
+          "user_story": "管理者として、アプリインストール時にデータセット / ポート / DB パスワードを意識せずに済むようにしたい。なぜなら、これらをユーザーに考えさせると複雑さが漏れ出すから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S1bccf5-3-1",
+              "description": "pool_hint:ssd の dataset は SSD プールがあれば fast/apps 配下、無ければ tank/apps 配下に作成される",
+              "test": "[AC-S1bccf5-3-1] in engine/app/dataset_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S1bccf5-3-2",
+              "description": "ポート割当と内部パスワード生成は決定論的に追跡可能で、再起動を跨いで保持される",
+              "test": "[AC-S1bccf5-3-2] in engine/app/allocator_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S1bccf5-3-1": {"title": "Dataset プランナー", "description": "pool_hint + フォールバックロジック", "status": "pending"},
+            "S1bccf5-3-2": {"title": "ポートアロケータ", "description": "SQLite に予約レコード", "status": "pending"},
+            "S1bccf5-3-3": {"title": "内部 secrets ストア", "description": "config.json export 時は env 参照のみ、平文を含めない", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S65b510": {
+      "title": "アプリのインストール / 更新 / 削除 と アプリストア UI",
+      "status": "pending",
+      "description": "Docker compose 動的生成、install/update/uninstall フロー、Gateway へのルーティング登録 (path/strip_prefix/port/subdomain)、configs テンプレート展開、アプリストア UI、ヘルスチェック。視覚仕様は prototype/claude_design/Apps.html (Installed / Store トグル、カテゴリフィルタ、カードグリッド、install モーダル)。",
+      "milestone": false,
+      "stories": {
+        "S65b510-1": {
+          "title": "Docker compose 動的生成と install フロー",
+          "status": "pending",
+          "user_story": "管理者として、アプリをワンクリックでインストールしヘルスチェック通過後に『利用可能』表示されるようにしたい。なぜなら、Docker Compose を手動編集する手間を省きたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S65b510-1-1",
+              "description": "アプリストアの『インストール』を押し share_picker を選ぶだけで、compose YAML 生成 → docker compose up → ヘルスチェック通過まで自動進行する",
+              "test": "[AC-S65b510-1-1] in tests/e2e/app-install.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S65b510-1-2",
+              "description": "ヘルスチェック失敗時はインストールが ロールバックされ、原因がログに残る",
+              "test": "[AC-S65b510-1-2] in tests/e2e/app-install.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S65b510-1-1": {"title": "Docker SDK 統合", "description": "docker/docker クライアント + compose-spec パーサ", "status": "pending"},
+            "S65b510-1-2": {"title": "compose YAML テンプレート", "description": "manifest → compose 変換、bind mount / network / env を反映", "status": "pending"},
+            "S65b510-1-3": {"title": "configs テンプレート展開", "description": "Go template + .KuraOS namespace", "status": "pending"},
+            "S65b510-1-4": {"title": "ヘルスチェック待ちと UI 進捗", "description": "SSE で進捗をストリーム", "status": "pending"}
+          }
+        },
+        "S65b510-2": {
+          "title": "Gateway ルーティング登録 (path/strip_prefix/port/subdomain)",
+          "status": "pending",
+          "user_story": "ユーザーとして、ポータルからアプリをクリックするだけでアプリにアクセスできるようにしたい。なぜなら、ポート番号や FQDN を覚えるのは家族向け体験を壊すから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S65b510-2-1",
+              "description": "manifest の routing.mode (path / port / subdomain) が Gateway に動的反映され、対応する URL でアプリへ到達できる",
+              "test": "[AC-S65b510-2-1] in tests/e2e/app-routing.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S65b510-2-1": {"title": "ルーティング動的更新", "description": "アプリ install/uninstall に追従", "status": "pending"},
+            "S65b510-2-2": {"title": "strip_prefix / base_path_env 対応", "description": "path 方式の 2 種類", "status": "pending"}
+          }
+        },
+        "S65b510-3": {
+          "title": "Update / Uninstall とアプリストア UI",
+          "status": "pending",
+          "user_story": "管理者として、アプリ更新時に backup.datasets のスナップショットが自動作成され、失敗時に旧バージョンへ自動ロールバックされるようにしたい。なぜなら、更新でデータが壊れるリスクを減らしたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S65b510-3-1",
+              "description": "update 時に backup:true の dataset のスナップショットが作成され、ヘルスチェック失敗時に自動ロールバックされる",
+              "test": "[AC-S65b510-3-1] in tests/e2e/app-update.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S65b510-3-2",
+              "description": "uninstall は deleteData=false がデフォルトで、再インストール時にデータが復元される",
+              "test": "[AC-S65b510-3-2] in tests/e2e/app-uninstall.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S65b510-3-1": {"title": "Update フロー", "description": "snapshot → pull → up → healthcheck → ロールバック分岐", "status": "pending"},
+            "S65b510-3-2": {"title": "Uninstall フロー", "description": "container 削除 / dataset は残す", "status": "pending"},
+            "S65b510-3-3": {"title": "アプリストア UI", "description": "カテゴリ表示・1〜2 ステップのインストールフォーム", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S822961": {
+      "title": "OIDC Provider と forward_auth と 外部 IdP federation",
+      "status": "pending",
+      "description": "zitadel/oidc を SQLite-backed Storage で組み込み、アプリ install 時の OIDC client 自動登録、auth.mode = oidc / forward_auth / none の 3 モードを実装。Google フェデレーションを最小サポート。Users 画面の視覚仕様は prototype/claude_design/Users.html。",
+      "milestone": true,
+      "stories": {
+        "S822961-1": {
+          "title": "zitadel/oidc を SQLite-backed Storage で組み込み",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、OIDC Provider のエンドポイント (.well-known, authorize, token, userinfo, jwks, end_session) を持つ kura が動くようにしたい。なぜなら、対応アプリが KuraOS の OIDC とだけ通信すれば SSO が完結する設計だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S822961-1-1",
+              "description": "/oidc/.well-known/openid-configuration が 200 を返し、issuer が KuraOS のホスト名と一致する",
+              "test": "[AC-S822961-1-1] in engine/auth/oidc/op_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S822961-1-2",
+              "description": "標準 RP からの authorization_code フローが完了し、id_token が検証できる",
+              "test": "[AC-S822961-1-2] in tests/e2e/oidc-flow.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S822961-1-1": {"title": "zitadel/oidc Storage 実装", "description": "AuthRequest / Client / Token / UserInfo の SQLite 永続化", "status": "pending"},
+            "S822961-1-2": {"title": "op の組み込みと Gateway 連携", "description": "/oidc/* を OP にバインド", "status": "pending"}
+          }
+        },
+        "S822961-2": {
+          "title": "auth モード (oidc / forward_auth / none) と client 自動登録",
+          "status": "pending",
+          "user_story": "管理者として、アプリインストール時に auth.mode に従って OIDC client が自動登録または forward_auth が自動設定されるようにしたい。なぜなら、SSO のセットアップを毎回手動でやりたくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S822961-2-1",
+              "description": "auth.mode=oidc のアプリ install 時に client_id/secret が自動生成・注入される",
+              "test": "[AC-S822961-2-1] in engine/app/oidc_register_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S822961-2-2",
+              "description": "auth.mode=forward_auth のアプリは Gateway が認証してから X-Forwarded-User をアップストリームに送る",
+              "test": "[AC-S822961-2-2] in tests/e2e/app-forward-auth.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S822961-2-1": {"title": "OIDC client 動的登録", "description": "auth.mode=oidc 時の client 作成 + secret 注入", "status": "pending"},
+            "S822961-2-2": {"title": "forward_auth ミドルウェア", "description": "header_user 設定で X-Forwarded-User を付与", "status": "pending"}
+          }
+        },
+        "S822961-3": {
+          "title": "外部 IdP federation (Google) とユーザー紐付け",
+          "status": "pending",
+          "user_story": "ユーザーとして、Google アカウントで KuraOS にログインしたい。なぜなら、新しいパスワードを覚えたくないし MFA も Google 側で済ませたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S822961-3-1",
+              "description": "管理者が Users 画面で『Google を紐付け』を選ぶと、ユーザーが Google ログインで KuraOS にログインできる",
+              "test": "[AC-S822961-3-1] in tests/e2e/google-federation.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S822961-3-2",
+              "description": "auto_provision: false の状態では未紐付けユーザーは拒否される",
+              "test": "[AC-S822961-3-2] in tests/e2e/google-federation.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S822961-3-1": {"title": "engine/auth/federation", "description": "Google OIDC RP として動作", "status": "pending"},
+            "S822961-3-2": {"title": "AuthMethod 紐付け UI", "description": "Users 画面で external IdP 紐付けのトグル", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S8a756d": {
+      "title": "Monitoring (Ring Buffer) と Notification (Event Bus + ntfy/webhook)",
+      "status": "pending",
+      "description": "メトリクス収集 (storage/system/apps)、Ring Buffer ファイル、アラート評価、Event Bus、ntfy / webhook / smtp 通知チャネル、event_log テーブル、/metrics OpenMetrics 出力、Dashboard ウィジェット。視覚仕様は prototype/claude_design/Dashboard.html (Stat / Sparkline / EventRow) と Settings.html の通知タブ。",
+      "milestone": false,
+      "stories": {
+        "S8a756d-1": {
+          "title": "メトリクス Ring Buffer と /metrics エンドポイント",
+          "status": "pending",
+          "user_story": "管理者として、Dashboard でプール容量・CPU・メモリ・ディスク温度のトレンドを見たい。なぜなら、本格運用は monitoring-stack に任せるとしてもビルトインで最低限の状況把握をしたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S8a756d-1-1",
+              "description": "30 秒間隔の収集が動き、raw.bin が固定サイズで自動上書きされる",
+              "test": "[AC-S8a756d-1-1] in engine/monitor/ringbuf_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S8a756d-1-2",
+              "description": "/metrics エンドポイントが OpenMetrics (Prometheus) 形式で現在値を返す",
+              "test": "[AC-S8a756d-1-2] in tests/acceptance/metrics-endpoint.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S8a756d-1-1": {"title": "Ring Buffer 実装", "description": "16 バイト/エントリの固定サイズファイル", "status": "pending"},
+            "S8a756d-1-2": {"title": "5 分 / 1 時間集約タスク", "description": "別 goroutine で集約", "status": "pending"},
+            "S8a756d-1-3": {"title": "/metrics 出力", "description": "OpenMetrics 形式", "status": "pending"},
+            "S8a756d-1-4": {"title": "Dashboard ウィジェット", "description": "プール容量 / CPU / メモリ", "status": "pending"}
+          }
+        },
+        "S8a756d-2": {
+          "title": "アラートルールと Event Bus",
+          "status": "pending",
+          "user_story": "管理者として、プール容量や ディスク温度の閾値超過で通知を受け取りたい。なぜなら、障害の前兆を見逃したくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S8a756d-2-1",
+              "description": "config.json の alerts ルールが評価され、超過時に Event Bus にイベントが publish される",
+              "test": "[AC-S8a756d-2-1] in engine/monitor/alert_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S8a756d-2-1": {"title": "AlertEvaluator", "description": "metric ワイルドカード対応 (pool.*.used_percent)", "status": "pending"},
+            "S8a756d-2-2": {"title": "EventBus", "description": "Go channel ベース、subscriber 登録", "status": "pending"},
+            "S8a756d-2-3": {"title": "event_log テーブル", "description": "全イベントを永続化", "status": "pending"}
+          }
+        },
+        "S8a756d-3": {
+          "title": "通知チャネル (ntfy / webhook / smtp / line_notify / gotify)",
+          "status": "pending",
+          "user_story": "管理者として、ntfy / Discord webhook / メール等で通知を受けたい。なぜなら、通知先は人によって違うから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S8a756d-3-1",
+              "description": "Settings 画面の通知設定で channel を追加し、severity / category フィルタが反映される",
+              "test": "[AC-S8a756d-3-1] in tests/e2e/notify-channels.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S8a756d-3-2",
+              "description": "『テスト送信』ボタンで実際に各 channel にテスト通知が届く",
+              "test": "[AC-S8a756d-3-2] in tests/e2e/notify-channels.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S8a756d-3-1": {"title": "Channel interface と 5 種実装", "description": "ntfy / webhook / smtp / line_notify / gotify", "status": "pending"},
+            "S8a756d-3-2": {"title": "テスト送信機能", "description": "UI ボタン + 即時送信", "status": "pending"},
+            "S8a756d-3-3": {"title": "イベントログビューア", "description": "event_log のフィルタ UI", "status": "pending"}
+          }
+        }
+      }
+    },
+    "Se1e7a6": {
+      "title": "バックアップ (ZFS スナップショット + zfs_send / restic / rclone)",
+      "status": "pending",
+      "description": "ローカルスナップショット (cron + retention)、リモートバックエンド (zfs_send / restic / rclone)、フルリストアの動作確認、pre-upgrade スナップショット (rootfs + アプリ DB)。",
+      "milestone": false,
+      "stories": {
+        "Se1e7a6-1": {
+          "title": "ローカルスナップショットスケジューラと retention",
+          "status": "pending",
+          "user_story": "管理者として、cron スケジュールでスナップショットを取り hourly/daily/monthly の retention で自動管理したい。なぜなら、誤削除や ランサムウェアからの復旧手段を確保するため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se1e7a6-1-1",
+              "description": "config.json の snapshots.schedule に従い定期スナップショットが作成され、retention で古いものが削除される",
+              "test": "[AC-Se1e7a6-1-1] in engine/backup/snapshot_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se1e7a6-1-1": {"title": "cron 風スケジューラ", "description": "robfig/cron v3 を採用", "status": "pending"},
+            "Se1e7a6-1-2": {"title": "retention ロジック", "description": "hourly/daily/monthly の保持数で削除", "status": "pending"}
+          }
+        },
+        "Se1e7a6-2": {
+          "title": "BackupBackend interface と zfs_send / restic / rclone",
+          "status": "pending",
+          "user_story": "管理者として、別 NAS や S3 等にオフサイトバックアップを設定したい。なぜなら、自宅が火事になってもデータを失わないため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se1e7a6-2-1",
+              "description": "zfs_send / restic / rclone の 3 種類の backend 設定が config.json に書け、Settings 画面から編集できる",
+              "test": "[AC-Se1e7a6-2-1] in tests/e2e/backup-config.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Se1e7a6-2-2",
+              "description": "各 backend で 1 回のバックアップ送信と List / Restore が動作する (CI ではモック化)",
+              "test": "[AC-Se1e7a6-2-2] in engine/backup/backend_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se1e7a6-2-1": {"title": "BackupBackend interface", "description": "Send / Restore / List", "status": "pending"},
+            "Se1e7a6-2-2": {"title": "zfs_send 実装", "description": "ssh + zfs send | zfs receive のラッパー", "status": "pending"},
+            "Se1e7a6-2-3": {"title": "restic 実装", "description": "restic CLI ラッパー", "status": "pending"},
+            "Se1e7a6-2-4": {"title": "rclone 実装", "description": "rclone CLI ラッパー", "status": "pending"}
+          }
+        },
+        "Se1e7a6-3": {
+          "title": "pre-upgrade スナップショット (rootfs + アプリ DB)",
+          "status": "pending",
+          "user_story": "管理者として、apt upgrade 実行前に rootfs と アプリ DB のスナップショットが自動作成されるようにしたい。なぜなら、更新失敗時に CLI で手動ロールバックできる退路を確保したいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Se1e7a6-3-1",
+              "description": "Settings から『今すぐ更新』を押すと、全アプリ graceful stop → 同名スナップショット作成 → apt upgrade → アプリ起動 の順で進む",
+              "test": "[AC-Se1e7a6-3-1] in tests/e2e/system-upgrade.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Se1e7a6-3-2",
+              "description": "v1 ではワンクリックロールバック UI は提供しない (CLI 手順を README に記載)",
+              "test": "[AC-Se1e7a6-3-2] in tests/acceptance/no-rollback-ui.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Se1e7a6-3-1": {"title": "graceful stop シーケンス", "description": "アプリの停止順序とタイムアウト", "status": "pending"},
+            "Se1e7a6-3-2": {"title": "対象 dataset 列挙", "description": "rootfs + backup:true の dataset", "status": "pending"},
+            "Se1e7a6-3-3": {"title": "復旧手順を README に記載", "description": "design.md §17.2 の手順をコピー", "status": "pending"}
+          }
+        }
+      }
+    },
+    "Sf92666": {
+      "title": "TLS (self_signed + ACME Cloudflare) と Network と Logging と kura 自身の更新",
+      "status": "pending",
+      "description": "self_signed CA モードを既定、ACME (lego) で Cloudflare DNS-01 をサポート、ネットワーク (IP / DNS / hostname) UI、JSONL ログ収集 + SSE ライブビューア、kura バイナリのアトミック更新。Network 画面の視覚仕様は prototype/claude_design/Network.html、TLS / 更新 / ログタブは Settings.html。",
+      "milestone": false,
+      "stories": {
+        "Sf92666-1": {
+          "title": "self_signed CA と ACME (Cloudflare) DNS-01",
+          "status": "pending",
+          "user_story": "管理者として、初期は self_signed で運用し、外部公開する時は ACME に切り替えたい。なぜなら、LAN 専用なら自己署名で十分だが公開時は信頼された証明書が要るから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sf92666-1-1",
+              "description": "tls.mode=self_signed でローカル CA が生成され、サーバ証明書が自動更新される",
+              "test": "[AC-Sf92666-1-1] in engine/network/tls_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Sf92666-1-2",
+              "description": "tls.mode=acme + provider=cloudflare で staging directory に対する DNS-01 チャレンジが成功する (CI では lego pebble を利用)",
+              "test": "[AC-Sf92666-1-2] in engine/network/acme_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Sf92666-1-3",
+              "description": "DNSProvider レジストリに新プロバイダを追加してもUI 側コードを変更せずに UI 一覧に反映される",
+              "test": "[AC-Sf92666-1-3] in engine/network/acme/registry_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sf92666-1-1": {"title": "self_signed CA 生成と保管", "description": "CA + leaf cert、ブラウザインストール案内", "status": "pending"},
+            "Sf92666-1-2": {"title": "engine/network/acme/ レジストリと Cloudflare 実装", "description": "design.md §15.2 のモジュール構造に準拠", "status": "pending"},
+            "Sf92666-1-3": {"title": "lego ラッパー", "description": "DNSProvider の NewLegoProvider 経由で challenge.Provider を取得", "status": "pending"}
+          }
+        },
+        "Sf92666-2": {
+          "title": "ネットワーク設定 UI (IP / DNS / hostname)",
+          "status": "pending",
+          "user_story": "管理者として、固定 IP やホスト名を UI から設定したい。なぜなら、毎回 OS の設定ファイルを直接編集したくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sf92666-2-1",
+              "description": "Network 画面から hostname / 静的 IP / DNS サーバを設定し、apply で /etc/hostname や netplan に反映される",
+              "test": "[AC-Sf92666-2-1] in tests/e2e/network-config.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sf92666-2-1": {"title": "engine/network", "description": "netplan 設定ファイル生成", "status": "pending"},
+            "Sf92666-2-2": {"title": "Network UI", "description": "現在の状態 + 編集フォーム", "status": "pending"}
+          }
+        },
+        "Sf92666-3": {
+          "title": "Logging (JSONL + SSE ライブビューア)",
+          "status": "pending",
+          "user_story": "管理者として、KuraOS / Docker / journald のログをまとめて検索 + ライブストリームで見たい。なぜなら、障害時に複数のログ源を行き来するのは時間がもったいないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sf92666-3-1",
+              "description": "ログが JSONL に日次ローテーションで書き込まれ、retention 超過で自動削除される",
+              "test": "[AC-Sf92666-3-1] in engine/logging/store_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Sf92666-3-2",
+              "description": "Settings の ログビューアで Source/Level/テキストフィルタが効き、『ライブ』モードで SSE リアルタイムストリームが流れる",
+              "test": "[AC-Sf92666-3-2] in tests/e2e/log-viewer.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sf92666-3-1": {"title": "JSONL ストア + ローテーション", "description": "日次ローテ + retention", "status": "pending"},
+            "Sf92666-3-2": {"title": "Docker ログ ingester", "description": "goroutine で全コンテナを tail", "status": "pending"},
+            "Sf92666-3-3": {"title": "journald ingester", "description": "systemd-journal-gatewayd 経由 or sd_journal", "status": "pending"},
+            "Sf92666-3-4": {"title": "SSE ライブビューア", "description": "filter 適用後ストリーム", "status": "pending"}
+          }
+        },
+        "Sf92666-4": {
+          "title": "kura バイナリのアトミック更新",
+          "status": "pending",
+          "user_story": "管理者として、kura のリリースが出たら UI から検出 + 適用し、失敗時に自動で旧バイナリに戻れるようにしたい。なぜなら、更新で再ログインできなくなったら家族の生活が止まるから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sf92666-4-1",
+              "description": "Settings の更新タブで新バージョンが検出され、SHA256 + cosign 検証 → アトミック置換 → systemctl restart の順に進む",
+              "test": "[AC-Sf92666-4-1] in tests/e2e/kura-self-update.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Sf92666-4-2",
+              "description": "起動後セルフチェックが失敗すると kura.bak に自動ロールバックされる",
+              "test": "[AC-Sf92666-4-2] in tests/acceptance/kura-update-rollback.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "Sf92666-4-1": {"title": "GitHub Releases から検出", "description": "auto_check / auto_apply 設定の反映", "status": "pending"},
+            "Sf92666-4-2": {"title": "署名検証 + アトミック置換", "description": "kura.new → kura のリネーム", "status": "pending"},
+            "Sf92666-4-3": {"title": "セルフチェックとロールバック", "description": "起動 5 秒で /healthz 200 を確認", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S0eedaa": {
+      "title": "File API と native filebrowser アプリ",
+      "status": "pending",
+      "description": "File API (Range / メタデータ / ディレクトリ一覧 / アップロード / コピー / 移動)、アプリスコープ評価、内部ヘッダ X-Kura-User の HMAC、native アプリ用 SDK 雛形、ビルトインの filebrowser 兼ファイルマネージャ。",
+      "milestone": false,
+      "stories": {
+        "S0eedaa-1": {
+          "title": "File API エンドポイントとアプリスコープ評価",
+          "status": "pending",
+          "user_story": "native アプリ作者として、File API 経由で安全にユーザーのファイルにアクセスしたい。なぜなら、bind mount より細かい権限制御 + 監査ログが必要なケースがあるから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S0eedaa-1-1",
+              "description": "GET / PUT / DELETE / list / mkdir / copy / move の各 API が仕様通りに動作する",
+              "test": "[AC-S0eedaa-1-1] in fileapi/handlers_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S0eedaa-1-2",
+              "description": "アプリスコープの share allowlist と path_deny に違反するアクセスは 403",
+              "test": "[AC-S0eedaa-1-2] in fileapi/scope_test.go",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S0eedaa-1-3",
+              "description": "Range request でメディアのシークと部分読み取りが行える",
+              "test": "[AC-S0eedaa-1-3] in tests/e2e/file-api-range.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S0eedaa-1-1": {"title": "endpoints 実装", "description": "全 8 エンドポイント (design.md §6.4)", "status": "pending"},
+            "S0eedaa-1-2": {"title": "X-Kura-Token HMAC 検証", "description": "Gateway 発行のトークンを検証", "status": "pending"},
+            "S0eedaa-1-3": {"title": "アプリスコープ評価", "description": "scopes 構造に基づく allow/deny", "status": "pending"},
+            "S0eedaa-1-4": {"title": "Range / streaming サポート", "description": "io.Copy + sendfile が効く実装", "status": "pending"}
+          }
+        },
+        "S0eedaa-2": {
+          "title": "ビルトイン filebrowser (native アプリ)",
+          "status": "pending",
+          "user_story": "ユーザーとして、ポータルの『Files』からブラウザでファイルを操作したい。なぜなら、SMB をマウントできない端末でも自分のファイルにアクセスしたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S0eedaa-2-1",
+              "description": "/ui/files でディレクトリ一覧 / ダウンロード / アップロード / 削除 / 名前変更ができる",
+              "test": "[AC-S0eedaa-2-1] in tests/e2e/files-ui.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S0eedaa-2-2",
+              "description": "アクセス権のない Share は表示されない",
+              "test": "[AC-S0eedaa-2-2] in tests/e2e/files-ui.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S0eedaa-2-1": {"title": "Files UI", "description": "htmx でリスト + 操作", "status": "pending"},
+            "S0eedaa-2-2": {"title": "アップロード進捗", "description": "fetch + Progress イベント", "status": "pending"}
+          }
+        }
+      }
+    },
+    "S99702c": {
+      "title": "ユーザーポータル と 完全な初期セットアップウィザード と 仕上げ",
+      "status": "pending",
+      "description": "/ui/* のユーザーポータル (利用可能アプリ / Files / 最近のファイル / 自分のストレージ使用量)、初期セットアップウィザード (storage 推奨構成 + 初 Share + アプリ 1 つ)、Settings の言語選択 / config export-import、ドキュメント整備、Phase 2 への引き継ぎメモ。視覚仕様は prototype/claude_design/Portal.html (ユーザーポータル) と Setup.html 全 6 ステップ。",
+      "milestone": true,
+      "stories": {
+        "S99702c-1": {
+          "title": "ユーザーポータル",
+          "status": "pending",
+          "user_story": "家族のユーザーとして、ログインしたら使えるアプリと Files が並んでいるシンプルな画面に出迎えてほしい。なぜなら、管理 UI のような専門的な画面では迷うから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S99702c-1-1",
+              "description": "/ui に利用可能アプリ / Files / 最近のファイル / 自分のストレージ使用量が並ぶ",
+              "test": "[AC-S99702c-1-1] in tests/e2e/user-portal.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S99702c-1-2",
+              "description": "アプリの可視性が visibility.groups で制御される (権限ない user には表示されない)",
+              "test": "[AC-S99702c-1-2] in tests/e2e/user-portal.e2e.spec.ts",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S99702c-1-1": {"title": "/ui ポータル UI", "description": "ランチャー風", "status": "pending"},
+            "S99702c-1-2": {"title": "可視性フィルタ", "description": "visibility.users / groups の評価", "status": "pending"}
+          }
+        },
+        "S99702c-2": {
+          "title": "完全な初期セットアップウィザード",
+          "status": "pending",
+          "user_story": "新規 NAS オーナーとして、初回ブラウザアクセスから 30 分以内に: 管理者作成 / 推奨ストレージ構成適用 / 最初の Share 作成 / 1 つの OSS アプリ (immich 等) の install までたどり着きたい。なぜなら、NAS の価値を最初の体験で実感したいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S99702c-2-1",
+              "description": "ウィザードが admin 作成 → ディスク検出 → 推奨構成提案 (design.md §18.2) → Share 作成 → Dashboard 表示 を 1 フローで完走する",
+              "test": "[AC-S99702c-2-1] in tests/e2e/setup-wizard-full.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S99702c-2-2",
+              "description": "/etc/kura/config.json が存在する状態で起動するとウィザードがスキップされ kura init に従う",
+              "test": "[AC-S99702c-2-2] in tests/acceptance/headless-init.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S99702c-2-1": {"title": "推奨構成エンジン", "description": "ディスク数/種類 → topology + special vdev の判定", "status": "pending"},
+            "S99702c-2-2": {"title": "ウィザード UI Step2-Step5", "description": "S1e7eeb の Step1 を拡張", "status": "pending"},
+            "S99702c-2-3": {"title": "kura init CLI", "description": "config.json をストリームから流し込み", "status": "pending"}
+          }
+        },
+        "S99702c-3": {
+          "title": "言語選択 / config export-import / ドキュメント整備",
+          "status": "pending",
+          "user_story": "管理者として、Settings から言語を選び config を export して別マシンに import できることを確認したい。なぜなら、復旧訓練と引き継ぎのため。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S99702c-3-1",
+              "description": "Settings に言語切替があり (v1 は ja のみ可、en は disabled) ユーザー単位の選択が SQLite に保存される",
+              "test": "[AC-S99702c-3-1] in tests/e2e/lang-switch.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S99702c-3-2",
+              "description": "Settings から config.json を export → 別 KuraOS インスタンスで import すると pools/volumes/shares/apps/auth/backup/tls が再現される",
+              "test": "[AC-S99702c-3-2] in tests/e2e/config-replicate.e2e.spec.ts",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S99702c-3-3",
+              "description": "README に Phase 1 のスコープ / 既知の制限 / Phase 2 への移行戦略が記載される",
+              "test": "[AC-S99702c-3-3] in tests/acceptance/docs-presence.sh",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S99702c-3-1": {"title": "言語選択 UI", "description": "Settings の Language タブ", "status": "pending"},
+            "S99702c-3-2": {"title": "config export-import の e2e 動作確認", "description": "全 Engine が apply に追従しているか最終確認", "status": "pending"},
+            "S99702c-3-3": {"title": "README / docs/RELEASE_NOTES.md", "description": "Phase 1 の総括", "status": "pending"}
+          }
+        }
+      }
+    }
+  },
+  "dependencies": {
+    "S464e47": {"depends_on": ["S0ff37f"], "reason": "UI シェルと config パッケージは Go モジュール / SQLite ストア / i18n の土台に依存"},
+    "S1e7eeb": {"depends_on": ["S464e47"], "reason": "ログイン UI は UI シェルが必要、admin 作成ウィザードは config import の枠組みを利用"},
+    "Se3b190": {"depends_on": ["S1e7eeb"], "reason": "管理 UI の Storage 画面は admin ロールのログインを前提にする"},
+    "S9db742": {"depends_on": ["Se3b190"], "reason": "書き込み系は読み取り系のパーサと CmdExecutor を再利用"},
+    "Sd64f38": {"depends_on": ["S9db742"], "reason": "Share は Volume が存在することを前提"},
+    "S1bccf5": {"depends_on": ["Sd64f38"], "reason": "アプリ install は Share への bind mount と dataset プールが利用可能であることを前提"},
+    "S65b510": {"depends_on": ["S1bccf5"], "reason": "compose 生成と install/update/uninstall フローはマニフェスト + dataset / port allocator に依存"},
+    "S822961": {"depends_on": ["S65b510"], "reason": "OIDC client 自動登録と forward_auth はアプリの install フローに組み込まれる"},
+    "S8a756d": {"depends_on": ["S822961"], "reason": "監視は OS / ストレージ / アプリの全コンポーネントが立ち上がってから収集対象を持つ"},
+    "Se1e7a6": {"depends_on": ["S8a756d"], "reason": "バックアップは Event Bus にイベントを流し、通知チャネルを再利用する"},
+    "Sf92666": {"depends_on": ["Se1e7a6"], "reason": "TLS / Network / Logging / kura 自身の更新は基盤完成後に追加するクロスカット機能"},
+    "S0eedaa": {"depends_on": ["Sf92666"], "reason": "File API はアプリ + 認証 + Share + ロギングが揃った後に最も価値が出る"},
+    "S99702c": {"depends_on": ["S0eedaa"], "reason": "完全なウィザードと総仕上げは全 Engine 揃い後に実施"}
+  },
+  "backlog": [
+    {
+      "title": "英語ロケール (en.json) の追加",
+      "description": "v1 では ja のみリリース。i18n フレームワーク自体は v1 で完成しているので、文字列翻訳のみ追加する作業。",
+      "added_in": "S99702c",
+      "reason": "v1 のスコープ外。v1.x で対応。"
+    },
+    {
+      "title": "ドライバモデル stage:any (継続的再適用)",
+      "description": "v1 は post_install のみ。stage:any にすると継続的に config.json から アプリ設定を上書きできる。",
+      "added_in": "S65b510",
+      "reason": "design.md §7.11 で v1.5 と明記。drift 管理の複雑さが顕在化するため段階的に。"
+    },
+    {
+      "title": "ドライバモデル scope:user 初期値提供 (v2+)",
+      "description": "ユーザー管轄設定の初期値を config.json から提供する仕組み。",
+      "added_in": "S65b510",
+      "reason": "v2+ の機能。"
+    },
+    {
+      "title": "DNS プロバイダ追加 (Route 53 / Sakura DNS / お名前.com)",
+      "description": "engine/network/acme/providers/ にファイルを追加するだけ。レジストリパターンが整っているので低コスト。",
+      "added_in": "Sf92666",
+      "reason": "v1 は Cloudflare のみ。需要に応じて追加。"
+    },
+    {
+      "title": "WebDAV gateway (第三者統合用)",
+      "description": "サードパーティのファイルマネージャからマウントできるようにする。",
+      "added_in": "S0eedaa",
+      "reason": "v1 のスコープ外。File API は KuraOS native アプリ専用。需要が出れば別エンドポイントとして追加。"
+    },
+    {
+      "title": "デバイスフロー (CLI ログイン用)",
+      "description": "OAuth 2.0 Device Authorization Grant。CLI ツールから KuraOS にログインする際に必要。",
+      "added_in": "S822961",
+      "reason": "v1 のスコープ外。zitadel/oidc は機能を持つが UI 側の対応が必要。"
+    },
+    {
+      "title": "バージョンロールバック攻撃対策",
+      "description": "registry.json の updated_at と ローカルキャッシュを比較して古い registry を渡されたら警告。",
+      "added_in": "S1bccf5",
+      "reason": "design.md §7.9 で v1.x で対応と明記。"
+    },
+    {
+      "title": "UPS 連携 (NUT) と ディスクスピンダウン",
+      "description": "電源管理機能 (design.md §19)。",
+      "added_in": "Sf92666",
+      "reason": "Phase 1 のコア体験には不要。バッテリーシャットダウンは家庭用 NAS としては重要だが、Phase 1 v1 のスコープを集中させる。"
+    },
+    {
+      "title": "monitoring-stack アプリ (Grafana + Prometheus)",
+      "description": "configs テンプレートで scrape 先 / datasource / NAS ダッシュボードを自動設定するアプリパッケージ。",
+      "added_in": "S8a756d",
+      "reason": "アプリレジストリ側の作業。kura 本体の機能ではない。"
+    },
+    {
+      "title": "Cloudflare Tunnel / WireGuard サポート (外部アクセス)",
+      "description": "remote_access モードに cloudflare_tunnel と wireguard を追加。",
+      "added_in": "Sf92666",
+      "reason": "v1 は tailscale のみで足りる。需要に応じて追加。"
+    },
+    {
+      "title": "Phase 2 移行 (NixOS or 独自イメージ化)",
+      "description": "ansible-nas + apt から、宣言的構成 (NixOS) または mkosi/systemd-sysext によるイメージベースに移行。UI/API/Engine はそのまま流用。",
+      "added_in": "S99702c",
+      "reason": "Phase 2 の課題。Phase 1 の運用が辛くなったタイミングで開始。"
+    }
+  ]
+}

@@ -1,0 +1,294 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Initial Setup — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+const STEPS = [
+  { id: 'welcome',  label: 'ようこそ' },
+  { id: 'admin',    label: '管理者アカウント' },
+  { id: 'storage',  label: 'ストレージ構成' },
+  { id: 'share',    label: '最初の共有' },
+  { id: 'remote',   label: '外部アクセス' },
+  { id: 'done',     label: '完了' },
+];
+
+const DETECTED_DISKS = [
+  { dev: 'sda', model: 'WDC WD80EFZZ',  size: '8 TB',  type: 'HDD' },
+  { dev: 'sdb', model: 'WDC WD80EFZZ',  size: '8 TB',  type: 'HDD' },
+  { dev: 'sdc', model: 'TOSHIBA HDWG480', size: '8 TB', type: 'HDD' },
+  { dev: 'sdd', model: 'TOSHIBA HDWG480', size: '8 TB', type: 'HDD' },
+  { dev: 'nvme0n1', model: 'Samsung SSD 980', size: '1 TB', type: 'NVMe' },
+  { dev: 'nvme1n1', model: 'Samsung SSD 980', size: '1 TB', type: 'NVMe' },
+];
+
+function App() {
+  const { lang, setLang, t } = useLang();
+  const { theme, toggleTheme } = useTheme();
+  const [stepIdx, setStepIdx] = useState(0);
+  const step = STEPS[stepIdx];
+  const next = () => setStepIdx(i => Math.min(STEPS.length - 1, i + 1));
+  const back = () => setStepIdx(i => Math.max(0, i - 1));
+
+  return (
+    <div className="wizard-shell">
+      <aside className="wizard-aside">
+        <div className="row center" style={{gap: 10, marginBottom: 8}}>
+          <div className="brand-mark"><BrandMark size={28} /></div>
+          <div>
+            <div className="brand-name">KuraOS</div>
+            <div className="brand-sub">初期セットアップ</div>
+          </div>
+        </div>
+        <h2>セットアップ</h2>
+        <div className="col" style={{gap: 0}}>
+          {STEPS.map((s, i) => (
+            <div key={s.id} className="wizard-step" data-state={i === stepIdx ? 'active' : i < stepIdx ? 'done' : 'todo'}>
+              <span className="num">{i < stepIdx ? <Icon name="check" size={12} /> : i + 1}</span>
+              <span>{s.label}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{flex: 1}} />
+        <div className="row" style={{gap: 8}}>
+          <div className="icon-toggle">
+            <button data-on={lang === 'ja'} onClick={() => setLang('ja')}>JA</button>
+            <button data-on={lang === 'en'} onClick={() => setLang('en')}>EN</button>
+          </div>
+          <button className="btn btn-icon btn-ghost" onClick={toggleTheme}>
+            <Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} />
+          </button>
+        </div>
+      </aside>
+
+      <main className="wizard-main">
+        <div className="wizard-eyebrow">STEP {stepIdx + 1} / {STEPS.length}</div>
+
+        {step.id === 'welcome' && (
+          <>
+            <h1 className="wizard-title">KuraOS へようこそ</h1>
+            <p className="wizard-lead">
+              数ステップで NAS の準備が整います。賢いデフォルトを採用しているので、
+              細かいプロトコル設定や ZFS の知識は不要です。
+            </p>
+            <div className="card">
+              <div className="card-body col">
+                <div className="row center" style={{gap: 12}}>
+                  <Icon name="storage" size={20} />
+                  <div>
+                    <div style={{fontWeight: 550}}>ハードウェアを検出済み</div>
+                    <div className="muted" style={{fontSize: 12}}>{DETECTED_DISKS.length} 個のディスク · 64 GB RAM · 12 cores</div>
+                  </div>
+                </div>
+                <div className="row center" style={{gap: 12}}>
+                  <Icon name="network" size={20} />
+                  <div>
+                    <div style={{fontWeight: 550}}>ネットワーク接続済み</div>
+                    <div className="muted mono" style={{fontSize: 12}}>192.168.10.4/24 · eno1 (2.5 GbE)</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {step.id === 'admin' && (
+          <>
+            <h1 className="wizard-title">管理者アカウント</h1>
+            <p className="wizard-lead">この NAS の最初の管理者アカウントを作成します。あとから追加・変更できます。</p>
+            <div className="col">
+              <div className="field"><label>ユーザー名</label><input className="input mono" defaultValue="tjstkm" /></div>
+              <div className="field"><label>表示名</label><input className="input" defaultValue="" placeholder="任意" /></div>
+              <div className="field"><label>パスワード</label><input className="input mono" type="password" defaultValue="••••••••••••" /></div>
+              <div className="field"><label>パスワード (確認)</label><input className="input mono" type="password" defaultValue="••••••••••••" /></div>
+              <div className="hr" />
+              <div className="row between center">
+                <div>
+                  <div style={{fontSize: 13, fontWeight: 550}}>Google アカウントを連携</div>
+                  <div className="muted" style={{fontSize: 12}}>パスワードに加えて Google でもログイン可能になります</div>
+                </div>
+                <button className="btn"><Icon name="cloud" size={14}/>連携</button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {step.id === 'storage' && (
+          <>
+            <h1 className="wizard-title">ストレージ構成</h1>
+            <p className="wizard-lead">検出したディスクから推奨構成を提案しました。そのまま進むか、調整できます。</p>
+
+            <div className="banner ok" style={{marginBottom: 20}}>
+              <Icon name="check" size={16} className="banner-icon" />
+              <div>
+                <strong>推奨構成</strong>: HDD 4 本で <span className="mono">RAIDZ2</span> プール (tank) +
+                NVMe 2 本で <span className="mono">mirror</span> プール (fast) を作成
+              </div>
+            </div>
+
+            <div className="grid grid-2" style={{marginBottom: 20}}>
+              <div className="card" style={{borderColor: 'var(--accent)'}}>
+                <div className="card-head">
+                  <div>
+                    <h3 className="card-title">tank</h3>
+                    <p className="card-sub mono">raidz2 · 4 disks · 16 TB usable</p>
+                  </div>
+                  <span className="badge ok"><span className="badge-dot"/>data</span>
+                </div>
+                <div className="card-body col gap-sm">
+                  {DETECTED_DISKS.filter(d => d.type === 'HDD').map(d => (
+                    <div key={d.dev} className="row center" style={{padding: '6px 10px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12}}>
+                      <Icon name="disk" size={14} />
+                      <span className="mono" style={{marginLeft: 8, flex: 1}}>{d.dev}</span>
+                      <span className="muted">{d.model}</span>
+                      <span className="mono" style={{marginLeft: 8}}>{d.size}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="card" style={{borderColor: 'var(--accent)'}}>
+                <div className="card-head">
+                  <div>
+                    <h3 className="card-title">fast</h3>
+                    <p className="card-sub mono">mirror · 2 NVMe · 1 TB usable</p>
+                  </div>
+                  <span className="badge info"><span className="badge-dot"/>apps</span>
+                </div>
+                <div className="card-body col gap-sm">
+                  {DETECTED_DISKS.filter(d => d.type === 'NVMe').map(d => (
+                    <div key={d.dev} className="row center" style={{padding: '6px 10px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)', fontSize: 12}}>
+                      <Icon name="disk" size={14} />
+                      <span className="mono" style={{marginLeft: 8, flex: 1}}>{d.dev}</span>
+                      <span className="muted">{d.model}</span>
+                      <span className="mono" style={{marginLeft: 8}}>{d.size}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <details>
+              <summary className="muted" style={{fontSize: 12, cursor: 'pointer'}}>手動で構成を変更</summary>
+            </details>
+          </>
+        )}
+
+        {step.id === 'share' && (
+          <>
+            <h1 className="wizard-title">最初の共有</h1>
+            <p className="wizard-lead">よくある用途のプリセットから選んでください。あとから自由に追加できます。</p>
+
+            <div className="grid grid-2">
+              {[
+                { n: 'photos',    p: 'media',    d: '写真・動画 (大きなファイル向け)', on: true },
+                { n: 'documents', p: 'general',  d: 'ドキュメント・書類', on: true },
+                { n: 'media',     p: 'media',    d: '映画・テレビ番組', on: false },
+                { n: 'backups',   p: 'general',  d: 'クライアント PC のバックアップ', on: false },
+              ].map(s => (
+                <div key={s.n} className="card" style={{borderColor: s.on ? 'var(--accent)' : ''}}>
+                  <div className="card-head">
+                    <div className="row center" style={{gap: 8}}>
+                      <Icon name="folder" size={16} />
+                      <h3 className="card-title">{s.n}</h3>
+                    </div>
+                    <div className="switch" data-on={String(s.on)} />
+                  </div>
+                  <div className="card-body">
+                    <p style={{margin: 0, fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5}}>{s.d}</p>
+                    <div className="row" style={{gap: 6, marginTop: 10}}>
+                      <span className="badge mono">SMB</span>
+                      <span className="badge mono">{s.p}</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="banner" style={{marginTop: 16}}>
+              <Icon name="info" size={16} className="banner-icon" />
+              <div>マルチチャネル · macOS Fruit · sendfile などの SMB ベストデフォルトが自動で適用されます。</div>
+            </div>
+          </>
+        )}
+
+        {step.id === 'remote' && (
+          <>
+            <h1 className="wizard-title">外部アクセス (オプション)</h1>
+            <p className="wizard-lead">家の外から NAS にアクセスする場合の方法を選んでください。あとから設定もできます。</p>
+            <div className="grid">
+              {[
+                { n: 'tailscale',  d: '最も簡単。auth key を入れるだけで世界中からアクセス可能。',  rec: true },
+                { n: 'cloudflare_tunnel', d: 'FQDN での公開向け。Cloudflare アカウントが必要。', rec: false },
+                { n: 'wireguard',  d: '上級者向け。ピアの公開鍵を手動で設定。', rec: false },
+                { n: '何もしない',  d: 'LAN 内でのみ利用。あとから設定できます。', rec: false },
+              ].map((m, i) => (
+                <label key={i} className="card" style={{cursor: 'pointer', display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 14, padding: 16}}>
+                  <input type="radio" name="remote" defaultChecked={i === 0} style={{marginTop: 4}} />
+                  <div style={{flex: 1}}>
+                    <div className="row center" style={{gap: 8}}>
+                      <strong>{m.n}</strong>
+                      {m.rec && <span className="badge ok"><span className="badge-dot"/>推奨</span>}
+                    </div>
+                    <div className="muted" style={{fontSize: 12, marginTop: 4}}>{m.d}</div>
+                  </div>
+                </label>
+              ))}
+            </div>
+          </>
+        )}
+
+        {step.id === 'done' && (
+          <>
+            <div style={{display: 'grid', placeItems: 'center', padding: '40px 0 20px'}}>
+              <div style={{width: 64, height: 64, borderRadius: '50%', background: 'var(--accent-soft)', color: 'var(--accent-text)', display: 'grid', placeItems: 'center', marginBottom: 24}}>
+                <Icon name="check" size={32} />
+              </div>
+            </div>
+            <h1 className="wizard-title" style={{textAlign: 'center'}}>セットアップ完了</h1>
+            <p className="wizard-lead" style={{textAlign: 'center'}}>
+              KuraOS の準備が整いました。Dashboard でシステムの状態を確認できます。
+            </p>
+            <div className="card">
+              <div className="card-body col">
+                <div className="row center between"><span className="muted">アクセス URL</span><span className="mono">https://tjstkm-nas.local</span></div>
+                <div className="row center between"><span className="muted">管理者</span><span className="mono">tjstkm</span></div>
+                <div className="row center between"><span className="muted">プール</span><span className="mono">tank (16 TB) + fast (1 TB)</span></div>
+                <div className="row center between"><span className="muted">共有</span><span className="mono">photos, documents</span></div>
+                <div className="row center between"><span className="muted">外部アクセス</span><span className="mono">tailscale</span></div>
+              </div>
+              <div className="card-foot">
+                <span className="muted">構成は <span className="mono">/etc/kura/config.json</span> にエクスポート可能</span>
+                <a className="btn btn-accent" href="Dashboard.html">Dashboard を開く<Icon name="chevron_right" size={14}/></a>
+              </div>
+            </div>
+          </>
+        )}
+
+        <div className="wizard-foot">
+          <button className="btn" onClick={back} disabled={stepIdx === 0}><Icon name="chevron_left" size={14}/>{t('btn_back')}</button>
+          <div className="muted mono" style={{fontSize: 12}}>{stepIdx + 1} / {STEPS.length}</div>
+          {stepIdx < STEPS.length - 1
+            ? <button className="btn btn-primary" onClick={next}>{t('btn_next')}<Icon name="chevron_right" size={14}/></button>
+            : <a className="btn btn-accent" href="Dashboard.html">{t('btn_finish')}<Icon name="check" size={14}/></a>
+          }
+        </div>
+      </main>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

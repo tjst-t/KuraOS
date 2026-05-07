@@ -1,0 +1,114 @@
+{
+  "$comment": "KuraOS のプロダクトビジョン。autopilot/sprint auto の自律判断のガイド。スコープ判定が 3 軸 (永久に対象外 / 別フェーズで対応 / 後続バージョンで対応) に明確に分かれていることが重要。",
+  "summary": "Linux ベースの自作 NAS OS。シンプルな管理 UI と、ワンクリックでインストールできるアプリエコシステムを備え、ストレージ知見に基づく賢いデフォルトでユーザーに複雑さを見せない。",
+  "target_users": [
+    "自宅 NAS を運用する個人ユーザー (家族で写真・動画・書類を共有したい人)",
+    "Synology より自由度がほしいが、TrueNAS のフル CLI/専門知識は持ちたくない中級者",
+    "ansible-nas や自作 Docker Compose 環境からの移行を検討しているユーザー",
+    "ZFS や Docker の運用知識はあるが、UI 経由で素早く構成・復元したい人"
+  ],
+  "problem": "既存の自宅 NAS ソリューションには問題がある: Synology はベンダロックインで OSS の選択肢が乏しい / TrueNAS は機能は豊富だが UI が複雑で家族向けの体験設計が弱い / Nextcloud は協調編集等を背負いすぎて NAS としての本分から外れている / ansible-nas は強力だが宣言的設定の差分適用や UI が無く運用コストが高い。賢いデフォルトと宣言的設定 (IaC ネイティブ) を両立した、家庭向けの NAS OS が存在しない。",
+
+  "current_phase": "Phase 1",
+  "phase_overview": {
+    "phase_1": {
+      "goal": "ansible-nas 上で動く Go 単一バイナリ kura (UI / API / Engine 層) を完成させ、KuraOS としての機能セットと UX を確立する",
+      "scope": "全 Engine の機能 (Storage / Share / App / Auth / Monitor / Notify / Backup / Network / Logging)、UI、Core/File API、SQLite ランタイム状態、宣言的 config.json、自前メトリクス Ring Buffer、JSONL ログ、apt ベース OS 更新管理、kura バイナリ自身のアトミック更新まで",
+      "non_goals_until_phase_2": [
+        "ワンクリック OS ロールバック UI — Phase 1 では復旧は CLI 手動 (README に手順)。Phase 2 の A/B パーティション or イメージスワップで構造的に解決される",
+        "アトミックな OS 更新 — Phase 1 は apt + ZFS pre-upgrade snapshot のベストエフォート。Phase 2 でアトミック更新になる",
+        "ベース OS の宣言的構成 — Phase 1 は Ubuntu + apt のピン留め。Phase 2 で NixOS or mkosi で OS 全体が宣言的になる"
+      ],
+      "rationale_for_non_goals": "Phase 1 で頑張って実装するコードは Phase 2 で構造的に置き換わるため、捨てる前提のコードに時間を使わない。Phase 1 は UI / API / Engine 層 (= Phase 2 でもそのまま流用される層) の完成度を最優先する"
+    },
+    "phase_2_3": {
+      "goal": "ベース OS とディストロ配布形態を NixOS or mkosi+systemd-sysext などのイメージベースに置き換え、アトミック更新と宣言的 OS 構成を実現する",
+      "carry_over_principle": "Phase 1 で構築した UI / Core API / File API / Engine 群 / config.json スキーマは Phase 2/3 でもそのまま流用される。置き換わるのはベース OS 管理層 (apt → Nix or イメージ) と更新の仕組みだけ",
+      "out_of_current_roadmap": "Phase 2/3 のタスクは docs/ROADMAP.json には含めない (backlog に Phase 2 移行マーカーのみ記録)。Phase 1 の運用が辛くなったタイミングで別途計画する"
+    }
+  },
+
+  "success_criteria_phase_1": [
+    "管理者が初回セットアップウィザードで 30 分以内に: ZFS プール作成・Share 公開・ユーザー作成・1 つの OSS アプリ (immich 等) インストールまで到達できる",
+    "config.json をエクスポート → 別マシンに apply するだけで、プール構成 / Share / アプリ / 認証 / バックアップが完全に再現できる",
+    "アプリのインストール時、ユーザーに見える設定項目が大半のアプリで 1〜2 個 (share_picker 中心) に収まる",
+    "管理 UI が日本語で完結する (i18n フレームワーク経由、ハードコード日本語ゼロ)",
+    "ZFS / Docker / SMB の専門知識がなくても、推奨構成ロジックに従えば壊れない構成になる",
+    "kura バイナリのアトミック更新が UI から行え、失敗時に旧バイナリへ自動ロールバックする"
+  ],
+  "success_criteria_long_term": [
+    "Phase 2/3 への移行時、Phase 1 で構築した UI / API / Engine が再実装なしでそのまま動く (ベース OS 管理層だけ差し替え)",
+    "サードパーティアプリレジストリを homebrew tap 方式で受け入れ可能 (Phase 1 で署名検証の仕組みを完成させているため拡張で対応可能)"
+  ],
+
+  "out_of_scope_permanent": {
+    "$comment": "KuraOS の本分 (NAS OS = ストレージ + Share + アプリホスティング + ユーザー管理) から外れるため、Phase 1 でも Phase 2 でも追加しない。これらが必要なユーザーは Nextcloud 等の統合プラットフォームを使うべき。",
+    "items": [
+      "ドキュメント協調編集 (Collabora / OnlyOffice) — Nextcloud 系の役割",
+      "カレンダー / 連絡先同期 (CalDAV / CardDAV) — グループウェアの役割",
+      "共有リンク (外部公開 URL) による不特定多数へのファイル共有",
+      "メールサーバ / チャット / グループウェア機能",
+      "エンタープライズ機能 (SAML / LDAP / SCIM / クラスタリング)",
+      "MFA / WebAuthn / パスキーの自前実装 — 必要なら外部 IdP federation で委譲する設計",
+      "デスクトップメタファー型 UI (Synology DSM 風のウィンドウマネージャ)",
+      "ZFS dedup / SLOG / L2ARC / ネイティブ暗号化の UI からの管理 — 誤設定リスクと UX 設計コストが高い",
+      "アプリ UI 変更の自動吸い上げ / config.json への双方向継続同期 — state drift 地獄を避けるため"
+    ]
+  },
+
+  "deferred_to_later_versions": {
+    "$comment": "Phase 1 内で実装するが v1 リリースには間に合わせない、もしくは Phase 1 のアーキテクチャ上は実現可能だが優先度を下げて v1.x / v2 で追加する項目。具体的なバックログ項目は docs/ROADMAP.json の backlog を参照。これらは out_of_scope_permanent と異なり、いずれ追加される。",
+    "items": [
+      {"target": "v1.x", "feature": "英語ロケール (en.json) — i18n フレームワーク自体は v1 で完成済み"},
+      {"target": "v1.x", "feature": "追加 DNS プロバイダ (Route 53 / Sakura DNS / お名前.com 等) — DNSProvider レジストリは v1 で完成済み"},
+      {"target": "v1.x", "feature": "サードパーティアプリ統合用 WebDAV gateway — File API とは別エンドポイントとして追加検討"},
+      {"target": "v1.x", "feature": "OAuth Device Flow (CLI ログイン用) — zitadel/oidc は機能を持つが UI 対応が必要"},
+      {"target": "v1.x", "feature": "アプリレジストリのバージョンロールバック攻撃対策 (registry.json updated_at 比較)"},
+      {"target": "v1.5", "feature": "ドライバモデル stage:any (継続的再適用) — drift 管理の複雑さを段階的に解決"},
+      {"target": "v1.x", "feature": "外部アクセスモード追加 (cloudflare_tunnel / wireguard) — v1 は tailscale のみ"},
+      {"target": "v1.x", "feature": "UPS 連携 (NUT) と ディスクスピンダウン"},
+      {"target": "v2+", "feature": "ドライバモデル scope:user (ユーザー管轄設定の初期値提供)"}
+    ]
+  },
+
+  "tech_constraints_phase_1": [
+    "バックエンド: Go 単一バイナリ / モジュラーモノリス構成 (kura というバイナリ名)",
+    "フロントエンド: htmx + Tailwind CSS によるサーバーサイドレンダリング (SPA フレームワークは使わない)",
+    "設定ストア: SQLite (ランタイム状態のキャッシュ。SSOT は config.json)",
+    "メトリクス: 自前バイナリ Ring Buffer (Prometheus 等の外部依存を避ける)",
+    "ログ: JSONL ファイル (日次ローテーション)",
+    "アプリ管理: Docker API + 自動生成した compose YAML",
+    "ストレージ: ZFS CLI ラッパー経由 (libzfs_core CGo は使わない、ビルド依存最小化)",
+    "OIDC Provider: github.com/zitadel/oidc/v3 を組み込み",
+    "ACME: github.com/go-acme/lego ベース、DNS プロバイダはコード内モジュール (外部プラグインは使わない)",
+    "i18n: 自前実装、embed.FS でロケール埋め込み (v1 は ja のみリリース)",
+    "ベース OS: Ubuntu + ansible-nas プロビジョニング、apt パッケージのバージョンピン留め",
+    "DB バインディング: 標準 database/sql + SQLite ドライバ (重い ORM を避ける)",
+    "認証はセッション (UI 用) + JWT (API 用) のハイブリッド、Gateway で終端"
+  ],
+
+  "design_references": [
+    "TrueNAS SCALE: シンプルな管理 UI のレベル感 (デスクトップメタファーは持たない)",
+    "Synology DSM: ワンクリックインストール体験とアプリストアの UX を参考にする (デスクトップ風 UI は採用しない)",
+    "Unraid: アプリエコシステム (Community Apps) の使いやすさを参考",
+    "Tailscale: 設定が極小 (auth key だけ) で動く UX 哲学",
+    "Terraform: plan/apply による宣言的設定の差分適用",
+    "Homebrew tap: 将来サードパーティアプリレジストリを許可する場合の信頼モデル",
+    "GitHub Actions cosign keyless: 鍵管理レスの署名検証フロー",
+    "Linear / Vercel: ミニマル product UI、ぎっしり詰めず余白を活かす情報密度",
+    "IBM Plex Sans / Mono: タイポグラフィ。technical fields (パス・SN・サイズ) は mono、本文は sans",
+    "Fog palette + jade accent: oklch ベースの低彩度ニュートラル + 蔵 (kura) を象徴する翠 (jade) のアクセント 1 色"
+  ],
+  "visual_spec_source": {
+    "$comment": "UI の視覚的・構造的なデザインの SSOT。実装時は prototype の HTML/CSS をそのまま参照する。React で書かれているが production は htmx に置換し、CSS と HTML 構造は流用する。",
+    "path": "prototype/claude_design/",
+    "summary_doc": "docs/UI_DESIGN.md",
+    "screens": [
+      "index.html (画面インデックス)",
+      "Dashboard.html / Storage.html / Shares.html / Users.html / Network.html / Apps.html / Settings.html (管理 UI 7 画面)",
+      "Portal.html (ユーザーポータル)",
+      "Setup.html (初期セットアップ 6 ステップ)"
+    ],
+    "implementation_note": "本実装は htmx + Tailwind CSS + html/template。prototype の React 部分は htmx の hx-get/hx-post に置換するが、shared.css の class 名 / トークン (Fog palette / 余白 / 角丸) / コンポーネント語彙 / 画面構造はそのまま使う"
+  }
+}

@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Settings — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  .settings-layout { display: grid; grid-template-columns: 220px 1fr; gap: 32px; align-items: flex-start; }
+  .settings-nav { position: sticky; top: 80px; display: flex; flex-direction: column; gap: 2px; }
+  .settings-nav button {
+    text-align: left; padding: 7px 12px; font-size: 13px; border-radius: 6px;
+    background: transparent; border: none; color: var(--text-3); font-weight: 500; cursor: pointer;
+  }
+  .settings-nav button[data-on="true"] { background: var(--surface-2); color: var(--text); }
+  .settings-nav button:hover { color: var(--text); }
+  .section-title { font-size: 16px; font-weight: 600; margin: 0 0 6px; letter-spacing: -0.01em; }
+  .section-sub { font-size: 13px; color: var(--text-3); margin: 0 0 16px; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+const SECTIONS = [
+  { id: 'general',   label: '一般' },
+  { id: 'notify',    label: '通知' },
+  { id: 'backup',    label: 'バックアップ' },
+  { id: 'tls',       label: 'TLS 証明書' },
+  { id: 'update',    label: 'アップデート' },
+  { id: 'monitor',   label: 'モニタリング' },
+  { id: 'logs',      label: 'ログ' },
+  { id: 'config',    label: 'config.json' },
+  { id: 'power',     label: '電源 / UPS' },
+];
+
+function App() {
+  const { t } = useLang();
+  const [sec, setSec] = useState('notify');
+  return (
+    <Shell active="settings" crumbs={['KuraOS', t('nav_settings')]}>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_settings')}</h1>
+          <p className="page-sub">システム全般・通知・バックアップ・更新</p>
+        </div>
+      </div>
+
+      <div className="settings-layout">
+        <nav className="settings-nav">
+          {SECTIONS.map(s => (
+            <button key={s.id} data-on={sec === s.id} onClick={() => setSec(s.id)}>{s.label}</button>
+          ))}
+        </nav>
+
+        <div className="col" style={{minWidth: 0}}>
+
+        {sec === 'general' && (
+          <>
+            <h2 className="section-title">一般</h2>
+            <p className="section-sub">サーバー名・タイムゾーン・地域</p>
+            <div className="card"><div className="card-body col">
+              <div className="field"><label>サーバー名</label><input className="input mono" defaultValue="tjstkm-nas" /></div>
+              <div className="field"><label>タイムゾーン</label><select className="select"><option>Asia/Tokyo</option><option>UTC</option></select></div>
+              <div className="field"><label>UI 言語</label><select className="select"><option>日本語</option><option>English</option></select></div>
+            </div></div>
+          </>
+        )}
+
+        {sec === 'notify' && (
+          <>
+            <h2 className="section-title">通知</h2>
+            <p className="section-sub">障害・異常時の通知チャネル</p>
+            <div className="card" style={{marginBottom: 16}}>
+              <div className="card-head"><h3 className="card-title">通知チャネル</h3><button className="btn btn-sm"><Icon name="plus" size={12} />追加</button></div>
+              <table className="tbl">
+                <thead><tr><th>名前</th><th>タイプ</th><th>対象</th><th>状態</th><th></th></tr></thead>
+                <tbody>
+                  {[
+                    {n:'my-ntfy',     t:'ntfy',     ev:['critical','warning'], st:'active'},
+                    {n:'discord-ops', t:'webhook',  ev:['critical'],            st:'active'},
+                    {n:'admin-mail',  t:'smtp',     ev:['critical','warning','info'], st:'active'},
+                    {n:'home-line',   t:'line_notify', ev:['critical'],         st:'paused'},
+                  ].map(c => (
+                    <tr key={c.n}>
+                      <td className="td-mono">{c.n}</td>
+                      <td><span className="badge">{c.t}</span></td>
+                      <td><div style={{display:'flex',gap:4,flexWrap:'wrap'}}>{c.ev.map(e=><span key={e} className={"badge "+(e==='critical'?'crit':e==='warning'?'warn':'info')}><span className="badge-dot"/>{e}</span>)}</div></td>
+                      <td><span className={"badge "+(c.st==='active'?'ok':'')}><span className="badge-dot"/>{c.st}</span></td>
+                      <td style={{textAlign:'right'}}><button className="btn btn-ghost btn-sm">テスト送信</button><button className="btn btn-ghost btn-sm">編集</button></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="card">
+              <div className="card-head"><h3 className="card-title">最近のイベント</h3><div className="search" style={{width: 200}}><Icon name="search" size={12}/><input placeholder="フィルター"/></div></div>
+              <table className="tbl">
+                <thead><tr><th>時刻</th><th>重要度</th><th>カテゴリ</th><th>メッセージ</th></tr></thead>
+                <tbody>
+                  {[
+                    ['今日 14:21', 'warning',  'storage', 'pool tank の使用量が 75% を超えました'],
+                    ['今日 03:00', 'info',     'backup',  'スナップショット tank/docs@auto-2026-04-27 を作成'],
+                    ['昨日 23:14', 'info',     'apps',    'immich を v1.111.0 → v1.112.0 に更新'],
+                    ['昨日 04:12', 'info',     'backup',  'offsite-nas へのレプリケーション完了 (2.4 TB, 4h 12m)'],
+                    ['4/24 04:48','info',      'storage', 'scrub tank: 12.4 TB scanned, 0 errors'],
+                  ].map((r, i) => (
+                    <tr key={i}>
+                      <td className="td-mono">{r[0]}</td>
+                      <td><span className={"badge "+(r[1]==='critical'?'crit':r[1]==='warning'?'warn':'info')}><span className="badge-dot"/>{r[1]}</span></td>
+                      <td><span className="badge">{r[2]}</span></td>
+                      <td>{r[3]}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {sec === 'backup' && (
+          <>
+            <h2 className="section-title">バックアップ</h2>
+            <p className="section-sub">ローカルスナップショット + リモートレプリケーション</p>
+            <div className="card" style={{marginBottom: 16}}>
+              <div className="card-head"><h3 className="card-title">スナップショットスケジュール</h3></div>
+              <div className="card-body col">
+                <div className="field"><label>cron 式</label><input className="input mono" defaultValue="0 3 * * *"/></div>
+                <div className="row">
+                  <div className="field flex-1"><label>Hourly</label><input className="input mono" defaultValue="24"/></div>
+                  <div className="field flex-1"><label>Daily</label><input className="input mono" defaultValue="30"/></div>
+                  <div className="field flex-1"><label>Monthly</label><input className="input mono" defaultValue="12"/></div>
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-head"><h3 className="card-title">リモートバックアップ</h3><button className="btn btn-sm"><Icon name="plus" size={12}/>追加</button></div>
+              <table className="tbl">
+                <thead><tr><th>名前</th><th>タイプ</th><th>ターゲット</th><th>スケジュール</th><th>最終</th><th>状態</th></tr></thead>
+                <tbody>
+                  <tr><td className="td-mono">offsite-nas</td><td><span className="badge">zfs_send</span></td><td className="td-mono">ssh://backup@remote-nas/tank/backup</td><td className="td-mono">0 4 * * *</td><td>昨日 04:12</td><td><span className="badge ok"><span className="badge-dot"/>ok</span></td></tr>
+                  <tr><td className="td-mono">b2-photos</td><td><span className="badge">restic</span></td><td className="td-mono">b2:my-bucket/photos</td><td className="td-mono">0 5 * * 0</td><td>4 日前</td><td><span className="badge ok"><span className="badge-dot"/>ok</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {sec === 'tls' && (
+          <>
+            <h2 className="section-title">TLS 証明書</h2>
+            <p className="section-sub">自己署名 / Let's Encrypt / 手動アップロード</p>
+            <div className="grid grid-3">
+              {[
+                {n:'self_signed', d:'LAN 内利用（推奨）', on: true},
+                {n:'acme',        d:'Let\'s Encrypt / ZeroSSL', on: false},
+                {n:'manual',      d:'独自証明書をアップロード', on: false},
+              ].map(m => (
+                <div key={m.n} className="card" style={{borderColor: m.on ? 'var(--accent)' : ''}}>
+                  <div className="card-head"><h3 className="card-title mono">{m.n}</h3>{m.on && <span className="badge ok"><span className="badge-dot"/>active</span>}</div>
+                  <div className="card-body"><p className="muted" style={{fontSize: 13, margin: 0}}>{m.d}</p></div>
+                </div>
+              ))}
+            </div>
+            <div className="card" style={{marginTop: 16}}>
+              <div className="card-head"><h3 className="card-title">現在の証明書</h3></div>
+              <div className="card-body" style={{fontSize: 13, lineHeight: 1.7}}>
+                <div>CN: <span className="mono">tjstkm-nas.local</span></div>
+                <div>Issuer: <span className="mono">KuraOS Local CA</span></div>
+                <div>有効期限: <span className="mono">2027-04-27 (365 日)</span></div>
+                <div className="muted" style={{marginTop: 8, fontSize: 12}}>ブラウザに CA をインストールするには <a className="mono">/ca.crt</a> をダウンロード</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {sec === 'update' && (
+          <>
+            <h2 className="section-title">アップデート</h2>
+            <p className="section-sub">kura バイナリ + ベース OS パッケージ</p>
+            <div className="banner ok" style={{marginBottom: 16}}>
+              <Icon name="check" size={16} className="banner-icon"/>
+              <div><strong>v0.4.2</strong> 最新です。次回チェック: 今日 18:00</div>
+            </div>
+            <div className="card" style={{marginBottom: 16}}>
+              <div className="card-head"><h3 className="card-title">kura</h3></div>
+              <div className="card-body col">
+                <div className="row between center"><label>チャネル</label>
+                  <select className="select" defaultValue="stable" style={{width: 'auto'}}><option>stable</option><option>beta</option></select>
+                </div>
+                <div className="row between center"><label>自動チェック</label><div className="switch" data-on="true"/></div>
+                <div className="row between center"><label>パッチ自動適用 (v0.4.x)</label><div className="switch" data-on="false"/></div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-head"><h3 className="card-title">ベース OS パッケージ</h3><button className="btn btn-sm"><Icon name="refresh" size={12}/>更新を確認</button></div>
+              <div className="card-body col">
+                <div className="row between center"><label>セキュリティパッチを自動適用</label><div className="switch" data-on="true"/></div>
+                <div>
+                  <label style={{fontSize: 12, color: 'var(--text-2)', fontWeight: 500}}>ピン留めパッケージ</label>
+                  <table className="tbl" style={{marginTop: 8}}>
+                    <thead><tr><th>パッケージ</th><th>ピン</th></tr></thead>
+                    <tbody>
+                      <tr><td className="td-mono">zfs-dkms</td><td className="td-mono">2.2.*</td></tr>
+                      <tr><td className="td-mono">samba</td><td className="td-mono">4.19.*</td></tr>
+                      <tr><td className="td-mono">docker-ce</td><td className="td-mono">5:26.*</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {sec === 'monitor' && (
+          <>
+            <h2 className="section-title">モニタリング</h2>
+            <p className="section-sub">メトリクス収集 · アラートルール</p>
+            <div className="card" style={{marginBottom: 16}}>
+              <div className="card-head"><h3 className="card-title">収集設定</h3></div>
+              <div className="card-body col">
+                <div className="field"><label>サンプリング間隔</label><input className="input mono" defaultValue="30s"/></div>
+                <div className="row">
+                  <div className="field flex-1"><label>raw</label><input className="input mono" defaultValue="24h"/></div>
+                  <div className="field flex-1"><label>5min</label><input className="input mono" defaultValue="7d"/></div>
+                  <div className="field flex-1"><label>1hour</label><input className="input mono" defaultValue="90d"/></div>
+                </div>
+                <div className="banner">
+                  <Icon name="info" size={16} className="banner-icon"/>
+                  <div>本格運用は <span className="mono">monitoring-stack</span> アプリ (Grafana + Prometheus) を推奨。<a>インストール</a></div>
+                </div>
+              </div>
+            </div>
+            <div className="card">
+              <div className="card-head"><h3 className="card-title">アラートルール</h3><button className="btn btn-sm"><Icon name="plus" size={12}/>追加</button></div>
+              <table className="tbl">
+                <thead><tr><th>名前</th><th>メトリクス</th><th>条件</th><th>重要度</th></tr></thead>
+                <tbody>
+                  {[
+                    ['pool_capacity_warning',  'pool.*.used_percent', '> 80', 'warning'],
+                    ['pool_capacity_critical', 'pool.*.used_percent', '> 90', 'critical'],
+                    ['disk_temp_high',         'disk.*.temperature',  '> 55', 'warning'],
+                    ['load_high',              'system.load.5m',      '> 8',  'warning'],
+                  ].map(r => (
+                    <tr key={r[0]}>
+                      <td className="td-mono">{r[0]}</td>
+                      <td className="td-mono">{r[1]}</td>
+                      <td className="td-mono">{r[2]}</td>
+                      <td><span className={"badge "+(r[3]==='critical'?'crit':'warn')}><span className="badge-dot"/>{r[3]}</span></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+
+        {sec === 'logs' && (
+          <>
+            <h2 className="section-title">ログ</h2>
+            <p className="section-sub">JSONL ファイル · 日次ローテーション</p>
+            <div className="card">
+              <div className="card-head">
+                <div className="row gap-sm">
+                  <select className="select" style={{width: 'auto'}}><option>すべてのソース</option><option>kura</option><option>docker:immich</option><option>system</option></select>
+                  <select className="select" style={{width: 'auto'}}><option>ALL</option><option>ERROR</option><option>WARN</option><option>INFO</option></select>
+                  <div className="search" style={{width: 240}}><Icon name="search" size={12}/><input placeholder="テキスト検索"/></div>
+                </div>
+                <span className="badge ok"><span className="badge-dot pulse"/>live</span>
+              </div>
+              <div style={{padding: '8px 0', maxHeight: 360, overflow: 'auto', background: 'var(--bg)'}}>
+                {[
+                  ['14:24:01', 'INFO',  'kura',           'GET /api/storage/pools 200 14ms'],
+                  ['14:24:02', 'INFO',  'docker:immich',  'photo asset uploaded id=ph_8f2'],
+                  ['14:24:05', 'WARN',  'kura.storage',   'pool tank used_percent=76.3'],
+                  ['14:24:11', 'INFO',  'docker:jellyfin','client tjstkm playing media id=movie/12'],
+                  ['14:24:24', 'INFO',  'kura.metrics',   'flush ring buffer (50 metrics, 1.2 MB)'],
+                  ['14:24:31', 'ERROR', 'docker:syncthing','cannot bind 22000: address already in use'],
+                  ['14:24:48', 'INFO',  'kura.gateway',   'session refresh user=hanako'],
+                ].map((l, i) => (
+                  <div key={i} className="mono" style={{padding: '3px 18px', fontSize: 11, lineHeight: 1.6, color: 'var(--text-2)'}}>
+                    <span style={{color: 'var(--text-3)'}}>{l[0]}</span>{' '}
+                    <span style={{color: l[2]==='ERROR'?'var(--crit)':l[2]==='WARN'?'var(--warn)':'var(--text-3)'}}>[{l[1]}]</span>{' '}
+                    <span style={{color: 'var(--info)'}}>{l[2]}</span>{' '}
+                    {l[3]}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        {sec === 'config' && (
+          <>
+            <h2 className="section-title">config.json</h2>
+            <p className="section-sub">宣言的構成のエクスポート / インポート / 差分適用</p>
+            <div className="row gap-sm" style={{marginBottom: 16}}>
+              <button className="btn"><Icon name="download" size={14}/>config をエクスポート</button>
+              <button className="btn"><Icon name="upload" size={14}/>ファイルから取込</button>
+              <button className="btn btn-primary">変更を適用 (dry-run)</button>
+            </div>
+            <div className="card">
+              <div className="card-head"><h3 className="card-title">差分プレビュー</h3><span className="badge"><span className="badge-dot"/>2 changes</span></div>
+              <div style={{padding: 16, fontFamily: 'var(--font-mono)', fontSize: 12, lineHeight: 1.7, background: 'var(--bg)'}}>
+                <div style={{color: 'var(--warn)'}}>~ volume tank/docs: quota 500G → 1T</div>
+                <div style={{color: 'var(--ok)'}}>+ share "reports" (smb, tank/docs/reports)</div>
+                <div className="muted" style={{marginTop: 8}}>$ kura config apply current.json</div>
+              </div>
+            </div>
+          </>
+        )}
+
+        {sec === 'power' && (
+          <>
+            <h2 className="section-title">電源 / UPS</h2>
+            <p className="section-sub">UPS 連携 (NUT) · ディスクスピンダウン · 再起動</p>
+            <div className="grid grid-2">
+              <div className="card">
+                <div className="card-head"><h3 className="card-title">UPS 状態</h3><span className="badge ok"><span className="badge-dot pulse"/>OL</span></div>
+                <div className="card-body" style={{fontSize: 13, lineHeight: 1.8}}>
+                  <div>モデル: <span className="mono">CyberPower CP1500PFCLCD</span></div>
+                  <div>バッテリー: <span className="mono">100%</span></div>
+                  <div>負荷: <span className="mono">22%</span></div>
+                  <div>残り時間: <span className="mono">42 min</span></div>
+                </div>
+              </div>
+              <div className="card">
+                <div className="card-head"><h3 className="card-title">シャットダウン閾値</h3></div>
+                <div className="card-body col">
+                  <div className="field"><label>バッテリー残量 ≤</label><input className="input mono" defaultValue="20%"/></div>
+                  <div className="field"><label>残り時間 ≤</label><input className="input mono" defaultValue="5 min"/></div>
+                </div>
+              </div>
+              <div className="card">
+                <div className="card-head"><h3 className="card-title">操作</h3></div>
+                <div className="card-body row gap-sm" style={{flexWrap: 'wrap'}}>
+                  <button className="btn"><Icon name="refresh" size={14}/>再起動</button>
+                  <button className="btn btn-danger"><Icon name="power" size={14}/>シャットダウン</button>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

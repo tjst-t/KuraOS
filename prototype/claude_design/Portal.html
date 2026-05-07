@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Portal — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<style>
+  .portal-shell { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+  .portal-head {
+    height: 60px; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 32px; gap: 16px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .portal-content { max-width: 1080px; margin: 0 auto; padding: 48px 32px 80px; width: 100%; }
+  .portal-greet { font-size: 32px; font-weight: 600; letter-spacing: -0.025em; margin: 0 0 6px; }
+  .portal-sub { color: var(--text-3); font-size: 15px; margin: 0 0 36px; }
+  .app-tile {
+    display: flex; flex-direction: column; gap: 10px;
+    padding: 18px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+    cursor: pointer; transition: border-color .15s, transform .15s;
+    text-align: left;
+  }
+  .app-tile:hover { border-color: var(--border-strong); transform: translateY(-1px); }
+  .app-tile-icon {
+    width: 48px; height: 48px; border-radius: 12px;
+    background: linear-gradient(135deg, var(--surface-2), var(--bg));
+    border: 1px solid var(--border);
+    display: grid; place-items: center;
+    color: var(--text-2); font-weight: 600; font-size: 20px;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useMemo } = React;
+
+function App() {
+  const { lang, setLang, t } = useLang();
+  const { theme, toggleTheme } = useTheme();
+  const apps = [
+    { name: 'Photos',     sub: 'immich',     desc: '写真とビデオ' },
+    { name: 'Movies',     sub: 'jellyfin',   desc: 'メディアサーバー' },
+    { name: 'Files',      sub: 'nextcloud',  desc: 'ドキュメント' },
+    { name: 'Music',      sub: 'navidrome',  desc: '音楽ストリーミング' },
+    { name: 'Notes',      sub: 'paperless',  desc: '書類管理' },
+    { name: 'Passwords',  sub: 'vaultwarden',desc: 'パスワード' },
+  ];
+  const series = useMemo(() => genSeries(30, 1.2, 0.4, 31), []);
+  return (
+    <div className="portal-shell">
+      <header className="portal-head">
+        <div className="brand-mark"><BrandMark size={26} /></div>
+        <div>
+          <div className="brand-name">KuraOS</div>
+          <div className="brand-sub">tjstkm-nas.local</div>
+        </div>
+        <div style={{flex: 1}} />
+        <div className="icon-toggle">
+          <button data-on={lang === 'ja'} onClick={() => setLang('ja')}>JA</button>
+          <button data-on={lang === 'en'} onClick={() => setLang('en')}>EN</button>
+        </div>
+        <button className="btn btn-icon btn-ghost" onClick={toggleTheme}>
+          <Icon name={theme === 'light' ? 'moon' : 'sun'} size={16} />
+        </button>
+        <div className="row center" style={{gap: 10}}>
+          <span className="avatar" style={{width: 30, height: 30}}>HN</span>
+          <div>
+            <div style={{fontSize: 13, fontWeight: 550}}>hanako</div>
+            <div style={{fontSize: 11, color: 'var(--text-3)'}}>{t('role_user')}</div>
+          </div>
+        </div>
+      </header>
+
+      <div className="portal-content">
+        <h1 className="portal-greet">こんにちは、hanako</h1>
+        <p className="portal-sub">最近のアクティビティとアプリ</p>
+
+        <div className="grid grid-3" style={{marginBottom: 36}}>
+          <div className="card"><div className="card-body">
+            <div className="stat-label">あなたのストレージ</div>
+            <div className="stat-value" style={{margin: '8px 0'}}>248<span className="unit">GB / 500 GB</span></div>
+            <div className="bar"><span style={{width: '49.6%'}} /></div>
+            <div className="muted" style={{fontSize: 12, marginTop: 8}}>49.6% 使用中</div>
+          </div></div>
+          <div className="card"><div className="card-body">
+            <div className="stat-label">アクセス可能な共有</div>
+            <div className="stat-value" style={{margin: '8px 0'}}>4<span className="unit">shares</span></div>
+            <div className="muted" style={{fontSize: 12}}>photos · documents · media · backups</div>
+          </div></div>
+          <div className="card"><div className="card-body">
+            <div className="row between center" style={{marginBottom: 8}}>
+              <div className="stat-label">今月のアップロード</div>
+              <Sparkline data={series} width={88} height={26} color="ok" />
+            </div>
+            <div className="stat-value" style={{margin: '4px 0'}}>32.4<span className="unit">GB</span></div>
+            <div className="muted" style={{fontSize: 12}}>主に immich より</div>
+          </div></div>
+        </div>
+
+        <div className="row between center" style={{marginBottom: 16}}>
+          <h2 style={{fontSize: 18, fontWeight: 600, margin: 0}}>アプリ</h2>
+          <span className="muted" style={{fontSize: 13}}>{apps.length} 件利用可能</span>
+        </div>
+
+        <div className="grid" style={{gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', marginBottom: 36}}>
+          {apps.map(a => (
+            <div key={a.name} className="app-tile">
+              <div className="app-tile-icon">{a.name.slice(0, 1)}</div>
+              <div>
+                <div style={{fontWeight: 600, fontSize: 15}}>{a.name}</div>
+                <div className="mono" style={{fontSize: 11, color: 'var(--text-3)', marginTop: 2}}>{a.sub}</div>
+              </div>
+              <div className="muted" style={{fontSize: 12}}>{a.desc}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="row between center" style={{marginBottom: 16}}>
+          <h2 style={{fontSize: 18, fontWeight: 600, margin: 0}}>最近のアクティビティ</h2>
+        </div>
+
+        <div className="card">
+          {[
+            ['Photos',   '142 枚をアップロード',         '12 分前'],
+            ['Files',    'documents/reports に 3 件追加', '2 時間前'],
+            ['Movies',   '視聴: 「夏の空」EP 4',          '昨日 21:08'],
+            ['Photos',   'アルバム「家族 2026」を共有',    '4 月 24 日'],
+          ].map((r, i) => (
+            <div key={i} className="row center" style={{padding: '12px 18px', borderBottom: '1px solid var(--border)', gap: 14}}>
+              <div className="app-tile-icon" style={{width: 32, height: 32, fontSize: 14}}>{r[0].slice(0,1)}</div>
+              <div style={{flex: 1}}>
+                <div style={{fontSize: 13}}><strong>{r[0]}</strong> · {r[1]}</div>
+              </div>
+              <div className="muted" style={{fontSize: 12}}>{r[2]}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

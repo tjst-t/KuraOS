@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Users — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState } = React;
+
+const USERS = [
+  { id: 'tjstkm',  name: 'tjstkm',   role: 'admin', methods: ['local', 'google'], groups: ['admins', 'family'], lastLogin: '今日 09:24', shares: 8 },
+  { id: 'hanako',  name: 'hanako',   role: 'user',  methods: ['google'],          groups: ['family'],            lastLogin: '昨日 21:08', shares: 4 },
+  { id: 'taro',    name: 'taro',     role: 'user',  methods: ['local'],           groups: ['family'],            lastLogin: '3 日前',     shares: 4 },
+  { id: 'service', name: 'service',  role: 'user',  methods: ['local'],           groups: ['service'],           lastLogin: '常時',       shares: 1 },
+  { id: 'guest',   name: 'guest',    role: 'user',  methods: ['local'],           groups: [],                    lastLogin: '—',          shares: 0 },
+];
+
+const GROUPS = [
+  { name: 'admins',  members: 1, desc: 'システム管理者' },
+  { name: 'family',  members: 3, desc: '家族用' },
+  { name: 'service', members: 1, desc: 'サービスアカウント' },
+];
+
+function App() {
+  const { t } = useLang();
+  const [tab, setTab] = useState('users');
+  const [sel, setSel] = useState('tjstkm');
+  const u = USERS.find(x => x.id === sel);
+  return (
+    <Shell active="users" crumbs={['KuraOS', t('nav_users')]}>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_users')}</h1>
+          <p className="page-sub">ユーザー・グループ・認証方法の管理</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon name="plus" size={14} />新規グループ</button>
+          <button className="btn btn-primary"><Icon name="plus" size={14} />{t('new_user')}</button>
+        </div>
+      </div>
+
+      <div className="tabs">
+        <button className="tab" data-active={tab === 'users'}  onClick={() => setTab('users')}>ユーザー <span className="muted mono">({USERS.length})</span></button>
+        <button className="tab" data-active={tab === 'groups'} onClick={() => setTab('groups')}>グループ <span className="muted mono">({GROUPS.length})</span></button>
+        <button className="tab" data-active={tab === 'auth'}   onClick={() => setTab('auth')}>認証プロバイダ</button>
+        <button className="tab" data-active={tab === 'oidc'}   onClick={() => setTab('oidc')}>OIDC クライアント</button>
+      </div>
+
+      {tab === 'users' && (
+        <div className="grid" style={{gridTemplateColumns: '1.6fr 1fr', alignItems: 'flex-start'}}>
+          <div className="card">
+            <table className="tbl">
+              <thead><tr>
+                <th>ユーザー</th><th>役割</th><th>認証方法</th><th>グループ</th><th>最終ログイン</th>
+              </tr></thead>
+              <tbody>
+                {USERS.map(u => (
+                  <tr key={u.id} onClick={() => setSel(u.id)} style={{cursor: 'pointer', background: u.id === sel ? 'var(--bg)' : ''}}>
+                    <td>
+                      <span className="row center" style={{gap: 10}}>
+                        <span className="avatar" style={{width: 24, height: 24, fontSize: 10}}>{u.name.slice(0,2).toUpperCase()}</span>
+                        <span style={{fontWeight: u.id === sel ? 600 : 500}}>{u.name}</span>
+                      </span>
+                    </td>
+                    <td><span className={"badge " + (u.role === 'admin' ? 'info' : '')}>{u.role}</span></td>
+                    <td>
+                      <div style={{display: 'flex', gap: 4}}>
+                        {u.methods.map(m => <span key={m} className="badge mono">{m}</span>)}
+                      </div>
+                    </td>
+                    <td className="mono">{u.groups.join(', ') || '—'}</td>
+                    <td className="muted">{u.lastLogin}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 12}}>
+                <span className="avatar" style={{width: 36, height: 36, fontSize: 13}}>{u.name.slice(0,2).toUpperCase()}</span>
+                <div>
+                  <h3 className="card-title">{u.name}</h3>
+                  <p className="card-sub">{u.role === 'admin' ? '管理者アカウント' : '一般ユーザー'}</p>
+                </div>
+              </div>
+            </div>
+            <div className="card-body col">
+              <div className="field">
+                <label>表示名</label>
+                <input className="input" defaultValue={u.name} />
+              </div>
+              <div className="field">
+                <label>UID</label>
+                <input className="input mono" defaultValue="1001" disabled />
+              </div>
+              <div>
+                <label style={{fontSize: 12, color: 'var(--text-2)', fontWeight: 500}}>認証方法</label>
+                <div className="col gap-sm" style={{marginTop: 8}}>
+                  {u.methods.map(m => (
+                    <div key={m} className="row center between" style={{padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)'}}>
+                      <span className="row center" style={{gap: 8}}>
+                        <Icon name={m === 'google' ? 'cloud' : 'key'} size={14} />
+                        <span style={{fontSize: 13}}>{m === 'google' ? 'Google: ' + u.name + '@gmail.com' : 'ローカルパスワード'}</span>
+                      </span>
+                      <button className="btn btn-ghost btn-sm">解除</button>
+                    </div>
+                  ))}
+                  <button className="btn btn-sm" style={{alignSelf: 'flex-start'}}><Icon name="plus" size={12} />認証方法を追加</button>
+                </div>
+              </div>
+              <div>
+                <label style={{fontSize: 12, color: 'var(--text-2)', fontWeight: 500}}>グループ</label>
+                <div className="row wrap" style={{marginTop: 8, gap: 6}}>
+                  {u.groups.map(g => <span key={g} className="badge"><span className="badge-dot" />{g}</span>)}
+                  <button className="btn btn-sm btn-ghost"><Icon name="plus" size={12} /></button>
+                </div>
+              </div>
+            </div>
+            <div className="card-foot">
+              <span className="muted">アクセス可能な共有: {u.shares}</span>
+              <div className="row gap-sm">
+                <button className="btn btn-sm btn-danger">無効化</button>
+                <button className="btn btn-sm btn-primary">{t('btn_save')}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'groups' && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr><th>グループ</th><th className="td-num">メンバー</th><th>説明</th><th></th></tr></thead>
+            <tbody>
+              {GROUPS.map(g => (
+                <tr key={g.name}>
+                  <td className="td-mono">{g.name}</td>
+                  <td className="td-num">{g.members}</td>
+                  <td>{g.desc}</td>
+                  <td style={{textAlign: 'right'}}><button className="btn btn-ghost btn-sm">編集</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'auth' && (
+        <div className="grid grid-2">
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="key" /><h3 className="card-title">ローカル認証</h3></div>
+              <div className="switch" data-on="true" />
+            </div>
+            <div className="card-body">
+              <p className="muted" style={{margin: 0, fontSize: 13}}>username + password。常に有効。</p>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="cloud" /><h3 className="card-title">Google</h3></div>
+              <div className="switch" data-on="true" />
+            </div>
+            <div className="card-body col">
+              <div className="field">
+                <label>Client ID</label>
+                <input className="input mono" defaultValue="478291...apps.googleusercontent.com" />
+              </div>
+              <div className="field">
+                <label>Client Secret</label>
+                <input className="input mono" type="password" defaultValue="••••••••••••••" />
+                <div className="field-hint">環境変数 GOOGLE_CLIENT_SECRET から読み込み</div>
+              </div>
+              <div className="row between center">
+                <label style={{fontSize: 13}}>初回ログイン時に自動プロビジョン</label>
+                <div className="switch" data-on="false" />
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="cloud" /><h3 className="card-title">GitHub</h3></div>
+              <div className="switch" data-on="false" />
+            </div>
+            <div className="card-body"><p className="muted" style={{margin: 0, fontSize: 13}}>無効。Client ID を設定して有効化できます。</p></div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="cloud" /><h3 className="card-title">Microsoft</h3></div>
+              <div className="switch" data-on="false" />
+            </div>
+            <div className="card-body"><p className="muted" style={{margin: 0, fontSize: 13}}>無効。Client ID を設定して有効化できます。</p></div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'oidc' && (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">OIDC クライアント</h3>
+              <p className="card-sub">アプリインストール時に自動登録</p>
+            </div>
+          </div>
+          <table className="tbl">
+            <thead><tr><th>クライアント</th><th>Issuer</th><th>Redirect URIs</th><th>登録日</th></tr></thead>
+            <tbody>
+              {[
+                ['immich',     'auto-generated', '/apps/immich/auth/callback',     '4 月 12 日'],
+                ['nextcloud',  'auto-generated', '/apps/nextcloud/oidc/callback',  '3 月 28 日'],
+                ['gitea',      'auto-generated', '/apps/gitea/user/oauth2/kura/callback', '3 月 15 日'],
+              ].map(([c, iss, r, d]) => (
+                <tr key={c}>
+                  <td className="td-mono">{c}</td>
+                  <td><span className="badge">{iss}</span></td>
+                  <td className="td-mono">{r}</td>
+                  <td className="muted">{d}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,270 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Dashboard — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState, useEffect, useMemo } = React;
+
+function StatCard({ label, value, unit, sub, series, color }) {
+  return (
+    <div className="card">
+      <div className="card-body">
+        <div className="row between center" style={{marginBottom: 12}}>
+          <div className="stat-label">{label}</div>
+          {series && <Sparkline data={series} width={88} height={26} color={color} />}
+        </div>
+        <div className="stat-value">{value}{unit && <span className="unit">{unit}</span>}</div>
+        <div className="stat-meta" style={{marginTop: 6}}>{sub}</div>
+      </div>
+    </div>
+  );
+}
+
+function PoolRow({ name, type, used, total, health, series }) {
+  const pct = used / total;
+  const cls = pct > 0.9 ? 'crit' : pct > 0.8 ? 'warn' : 'ok';
+  return (
+    <div style={{padding: '14px 18px', borderBottom: '1px solid var(--border)'}}>
+      <div className="row between center" style={{marginBottom: 10}}>
+        <div>
+          <div style={{fontWeight: 550, fontSize: 13}}>{name}</div>
+          <div className="mono" style={{color: 'var(--text-3)', marginTop: 2}}>{type}</div>
+        </div>
+        <span className={"badge " + (health === 'ONLINE' ? 'ok' : 'warn')}>
+          <span className="badge-dot" />{health}
+        </span>
+      </div>
+      <div className={"bar " + cls}><span style={{width: (pct * 100) + '%'}} /></div>
+      <div className="row between" style={{marginTop: 8, fontSize: 12, color: 'var(--text-3)'}}>
+        <span>{(used).toFixed(1)} / {(total).toFixed(1)} TB</span>
+        <span className="mono">{(pct * 100).toFixed(1)}%</span>
+      </div>
+    </div>
+  );
+}
+
+function AppRow({ name, status, version, cpu, mem }) {
+  const cls = status === 'running' ? 'ok' : status === 'error' ? 'crit' : 'warn';
+  return (
+    <div className="row center" style={{padding: '10px 18px', borderBottom: '1px solid var(--border)', gap: 14}}>
+      <div className="placeholder" style={{width: 28, height: 28, padding: 0, fontSize: 0}} />
+      <div style={{flex: 1, minWidth: 0}}>
+        <div style={{fontSize: 13, fontWeight: 500}}>{name}</div>
+        <div className="mono" style={{color: 'var(--text-3)'}}>{version}</div>
+      </div>
+      <div style={{textAlign: 'right', minWidth: 60}}>
+        <div className="mono" style={{fontSize: 11, color: 'var(--text-3)'}}>CPU</div>
+        <div className="mono" style={{fontSize: 12}}>{cpu}%</div>
+      </div>
+      <div style={{textAlign: 'right', minWidth: 60}}>
+        <div className="mono" style={{fontSize: 11, color: 'var(--text-3)'}}>MEM</div>
+        <div className="mono" style={{fontSize: 12}}>{mem}M</div>
+      </div>
+      <span className={"badge " + cls}><span className="badge-dot" />{status}</span>
+    </div>
+  );
+}
+
+function EventRow({ severity, title, time, source }) {
+  return (
+    <div className="row center" style={{padding: '10px 18px', borderBottom: '1px solid var(--border)', gap: 12}}>
+      <span className={"dot " + severity} style={{flex: 'none', marginTop: 2}} />
+      <div style={{flex: 1, minWidth: 0}}>
+        <div style={{fontSize: 13}}>{title}</div>
+        <div style={{fontSize: 11, color: 'var(--text-3)', marginTop: 2}}>
+          <span className="mono">{source}</span> · {time}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const { t } = useLang();
+  const cpuSeries = useMemo(() => genSeries(60, 22, 18, 11), []);
+  const memSeries = useMemo(() => genSeries(60, 58, 12, 22), []);
+  const netSeries = useMemo(() => genSeries(60, 40, 60, 33), []);
+  const tempSeries = useMemo(() => genSeries(60, 38, 5, 44), []);
+
+  return (
+    <Shell
+      active="dashboard"
+      crumbs={['KuraOS', t('nav_dashboard')]}
+      headerActions={
+        <div className="search">
+          <Icon name="search" size={14} />
+          <input placeholder={t('search') + " (⌘K)"} />
+        </div>
+      }
+    >
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_dashboard')}</h1>
+          <p className="page-sub">tjstkm-nas.local · {t('last_updated')} {t('just_now')}</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon name="refresh" size={14} />更新</button>
+          <button className="btn btn-primary"><Icon name="plus" size={14} />{t('new_share')}</button>
+        </div>
+      </div>
+
+      <div className="banner warn" style={{marginBottom: 20}}>
+        <Icon name="alert" size={16} className="banner-icon" />
+        <div style={{flex: 1}}>
+          <div style={{fontWeight: 550}}>カーネル更新済み。再起動が必要です。</div>
+          <div style={{color: 'var(--text-3)', marginTop: 2, fontSize: 12}}>linux-image-6.8.0-52 がインストールされました。再起動でアクティブになります。</div>
+        </div>
+        <button className="btn btn-sm">スケジュール</button>
+        <button className="btn btn-primary btn-sm">今すぐ再起動</button>
+      </div>
+
+      <div className="grid grid-4" style={{marginBottom: 16}}>
+        <StatCard label="CPU" value="22.4" unit="%" sub={<><Icon name="cpu" size={12} /> 8 cores · load 1.84</>} series={cpuSeries} />
+        <StatCard label="Memory" value="9.3" unit="/ 16 GB" sub={<><Icon name="memory" size={12} /> swap 0.0 GB</>} series={memSeries} color="ok" />
+        <StatCard label="Network" value="42.1" unit="MB/s" sub={<><Icon name="activity" size={12} /> ↓ 38.4  ↑ 3.7</>} series={netSeries} color="info" />
+        <StatCard label="Avg Disk Temp" value="38" unit="°C" sub={<><Icon name="thermometer" size={12} /> max 42 °C (sda)</>} series={tempSeries} color="warn" />
+      </div>
+
+      <div className="grid" style={{gridTemplateColumns: '1.4fr 1fr', marginBottom: 16}}>
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">ストレージプール</h3>
+              <p className="card-sub">2 pools · 12 datasets</p>
+            </div>
+            <a href="Storage.html" className="btn btn-ghost btn-sm">詳細<Icon name="chevron_right" size={12} /></a>
+          </div>
+          <div className="card-body tight">
+            <PoolRow name="tank"  type="raidz2 · 4 × 8 TB HDD" used={18.3} total={24.0} health="ONLINE" />
+            <PoolRow name="fast"  type="mirror · 2 × 1 TB NVMe" used={0.42} total={0.95} health="ONLINE" />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">最近のイベント</h3>
+              <p className="card-sub">直近 24 時間</p>
+            </div>
+            <a href="Settings.html" className="btn btn-ghost btn-sm">すべて<Icon name="chevron_right" size={12} /></a>
+          </div>
+          <div className="card-body tight">
+            <EventRow severity="warn" title="Pool tank の使用量が 75% を超えました" source="storage" time="14 分前" />
+            <EventRow severity="ok"   title="スナップショット tank/docs@auto-2026-04-27 を作成"  source="backup"  time="2 時間前" />
+            <EventRow severity="ok"   title="immich を v1.111.0 → v1.112.0 に更新"                source="apps"    time="昨日 23:14" />
+            <EventRow severity="info" title="新しいユーザー hanako を追加"                          source="users"   time="昨日 17:02" />
+            <EventRow severity="ok"   title="scrub tank: 12.4 TB scanned, 0 errors"                source="storage" time="3 日前" />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid" style={{gridTemplateColumns: '1fr 1fr', marginBottom: 16}}>
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">アプリ</h3>
+              <p className="card-sub">12 installed · 11 running</p>
+            </div>
+            <a href="Apps.html" className="btn btn-ghost btn-sm">すべて<Icon name="chevron_right" size={12} /></a>
+          </div>
+          <div className="card-body tight">
+            <AppRow name="immich"      version="v1.112.0" status="running" cpu="3.2"  mem="412" />
+            <AppRow name="jellyfin"    version="v10.9.7"  status="running" cpu="12.4" mem="892" />
+            <AppRow name="nextcloud"   version="v29.0.4"  status="running" cpu="1.1"  mem="318" />
+            <AppRow name="paperless"   version="v2.10.2"  status="running" cpu="0.4"  mem="124" />
+            <AppRow name="syncthing"   version="v1.27.7"  status="error"   cpu="0.0"  mem="0" />
+          </div>
+        </div>
+
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">共有</h3>
+              <p className="card-sub">SMB · NFS · 接続中のクライアント</p>
+            </div>
+            <a href="Shares.html" className="btn btn-ghost btn-sm">すべて<Icon name="chevron_right" size={12} /></a>
+          </div>
+          <div className="card-body tight">
+            {[
+              {name: 'photos',    proto: 'SMB', clients: 3, traffic: '12.4 MB/s'},
+              {name: 'documents', proto: 'SMB', clients: 1, traffic: '0.2 MB/s'},
+              {name: 'media',     proto: 'NFS', clients: 2, traffic: '34.8 MB/s'},
+              {name: 'backups',   proto: 'SMB', clients: 0, traffic: '—'},
+              {name: 'archive',   proto: 'NFS', clients: 1, traffic: '0.8 MB/s'},
+            ].map(s => (
+              <div key={s.name} className="row center" style={{padding: '10px 18px', borderBottom: '1px solid var(--border)', gap: 14}}>
+                <Icon name="folder" size={16} />
+                <div style={{flex: 1}}>
+                  <div style={{fontSize: 13, fontWeight: 500}}>{s.name}</div>
+                  <div className="mono" style={{color: 'var(--text-3)'}}>tank/shares/{s.name}</div>
+                </div>
+                <span className="badge">{s.proto}</span>
+                <div style={{textAlign: 'right'}}>
+                  <div className="mono" style={{fontSize: 12}}>{s.clients} clients</div>
+                  <div className="mono" style={{fontSize: 11, color: 'var(--text-3)'}}>{s.traffic}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-3">
+        <div className="card">
+          <div className="card-body">
+            <div className="row between center" style={{marginBottom: 8}}>
+              <div className="stat-label">バックアップ</div>
+              <span className="badge ok"><span className="badge-dot" />OK</span>
+            </div>
+            <div style={{fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5}}>
+              最終: <span className="mono">offsite-nas</span> へ昨日 04:12 完了<br/>
+              次回: 今日 04:00<br/>
+              スナップショット: 30 daily / 12 monthly
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body">
+            <div className="row between center" style={{marginBottom: 8}}>
+              <div className="stat-label">Scrub</div>
+              <span className="badge"><span className="badge-dot" />idle</span>
+            </div>
+            <div style={{fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5}}>
+              最終: <span className="mono">3 日前</span> · 0 errors<br/>
+              次回: 4 月 30 日 02:00<br/>
+              スケジュール: 毎週日曜 02:00
+            </div>
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-body">
+            <div className="row between center" style={{marginBottom: 8}}>
+              <div className="stat-label">外部アクセス</div>
+              <span className="badge ok"><span className="badge-dot" />tailscale</span>
+            </div>
+            <div style={{fontSize: 13, color: 'var(--text-2)', lineHeight: 1.5}}>
+              <span className="mono">tjstkm-nas.tail-scale.ts.net</span><br/>
+              IP: <span className="mono">100.94.18.42</span><br/>
+              Funnel: 無効
+            </div>
+          </div>
+        </div>
+      </div>
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

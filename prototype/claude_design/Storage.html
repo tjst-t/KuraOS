@@ -1,0 +1,268 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Storage — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+const POOLS = [
+  { name: 'tank', topology: 'raidz2', disks: 4, size: 24.0, used: 18.3, frag: 12, scrubbed: '3 日前', status: 'ONLINE' },
+  { name: 'fast', topology: 'mirror', disks: 2, size: 0.95, used: 0.42, frag: 4, scrubbed: '6 日前', status: 'ONLINE' },
+];
+
+const DISKS = [
+  { dev: 'sda',     model: 'WDC WD80EFZZ-68BTXN0', serial: 'VLH8WMTL', pool: 'tank', size: 8.0,  temp: 38, hours: 14820, smart: 'PASSED', io: '24 MB/s' },
+  { dev: 'sdb',     model: 'WDC WD80EFZZ-68BTXN0', serial: 'VLHA8K1L', pool: 'tank', size: 8.0,  temp: 39, hours: 14820, smart: 'PASSED', io: '22 MB/s' },
+  { dev: 'sdc',     model: 'TOSHIBA HDWG480',       serial: 'X1U2A09L', pool: 'tank', size: 8.0,  temp: 41, hours: 9240,  smart: 'PASSED', io: '21 MB/s' },
+  { dev: 'sdd',     model: 'TOSHIBA HDWG480',       serial: 'X1U2A1KK', pool: 'tank', size: 8.0,  temp: 42, hours: 9240,  smart: 'WARN',   io: '20 MB/s' },
+  { dev: 'nvme0n1', model: 'Samsung SSD 980 1TB',   serial: 'S6BENG0R', pool: 'fast', size: 1.0,  temp: 44, hours: 4012,  smart: 'PASSED', io: '180 MB/s' },
+  { dev: 'nvme1n1', model: 'Samsung SSD 980 1TB',   serial: 'S6BENG0X', pool: 'fast', size: 1.0,  temp: 45, hours: 4012,  smart: 'PASSED', io: '178 MB/s' },
+];
+
+const VOLUMES = [
+  { path: 'tank/media',     used: 9.8, quota: '—',    preset: 'media',    snapshots: 24 },
+  { path: 'tank/docs',      used: 0.34, quota: '500G', preset: 'general', snapshots: 30 },
+  { path: 'tank/photos',    used: 4.1, quota: '—',    preset: 'media',    snapshots: 30 },
+  { path: 'tank/backups',   used: 4.0, quota: '8T',   preset: 'general', snapshots: 12 },
+  { path: 'tank/apps',      used: 0.06, quota: '—',   preset: 'general', snapshots: 8 },
+  { path: 'fast/apps/db',   used: 0.21, quota: '5G',  preset: 'database',snapshots: 12 },
+  { path: 'fast/apps/cache',used: 0.21, quota: '20G', preset: 'general', snapshots: 0 },
+];
+
+const SNAPSHOTS = [
+  { dataset: 'tank/docs',  name: 'auto-2026-04-27-03', when: '今日 03:00', size: '2.4 MB', kept: 'daily' },
+  { dataset: 'tank/photos',name: 'auto-2026-04-27-03', when: '今日 03:00', size: '128 KB', kept: 'daily' },
+  { dataset: 'tank/media', name: 'pre-upgrade-20260420', when: '4 月 20 日', size: '14.2 GB', kept: 'manual' },
+  { dataset: 'fast/apps/db', name: 'auto-2026-04-27-04', when: '今日 04:00', size: '184 MB', kept: 'daily' },
+  { dataset: 'tank/docs',  name: 'auto-2026-04-26-03', when: '昨日 03:00', size: '1.1 MB', kept: 'daily' },
+];
+
+function PoolCard({ p }) {
+  const series = useMemo(() => genSeries(40, p.used / p.size * 100, 4, p.name.length * 7), []);
+  const pct = p.used / p.size;
+  const cls = pct > 0.9 ? 'crit' : pct > 0.8 ? 'warn' : 'ok';
+  return (
+    <div className="card">
+      <div className="card-head">
+        <div className="row center" style={{gap: 12}}>
+          <Icon name="storage" size={18} />
+          <div>
+            <h3 className="card-title">{p.name}</h3>
+            <p className="card-sub mono">{p.topology} · {p.disks} disks</p>
+          </div>
+        </div>
+        <span className="badge ok"><span className="badge-dot" />{p.status}</span>
+      </div>
+      <div className="card-body">
+        <div className="row between center" style={{marginBottom: 8}}>
+          <span className="stat-value">{p.used.toFixed(1)}<span className="unit">/ {p.size.toFixed(1)} TB</span></span>
+          <Sparkline data={series} width={120} height={32} color={cls} />
+        </div>
+        <div className={"bar " + cls}><span style={{width: pct * 100 + '%'}} /></div>
+        <div className="row between" style={{marginTop: 8, fontSize: 12, color: 'var(--text-3)'}}>
+          <span>{(pct * 100).toFixed(1)}% used · frag {p.frag}%</span>
+          <span>scrub: {p.scrubbed}</span>
+        </div>
+      </div>
+      <div className="card-foot">
+        <span>data integrity: <span className="mono" style={{color: 'var(--ok)'}}>0 errors</span></span>
+        <div className="row gap-sm">
+          <button className="btn btn-sm">Scrub</button>
+          <button className="btn btn-sm">Snapshot</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const { t } = useLang();
+  const [tab, setTab] = useState('pools');
+  return (
+    <Shell
+      active="storage"
+      crumbs={['KuraOS', t('nav_storage')]}
+      headerActions={
+        <div className="search">
+          <Icon name="search" size={14} />
+          <input placeholder="ディスク・データセットを検索" />
+        </div>
+      }
+    >
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_storage')}</h1>
+          <p className="page-sub">2 pools · 6 disks · 7 datasets · 84 snapshots</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon name="download" size={14} />既存プールを取込</button>
+          <button className="btn btn-primary"><Icon name="plus" size={14} />{t('new_pool')}</button>
+        </div>
+      </div>
+
+      <div className="banner" style={{marginBottom: 20}}>
+        <Icon name="info" size={16} className="banner-icon" />
+        <div style={{flex: 1}}>
+          <div>インポート可能なプールを 1 件検出: <span className="mono">archive</span> (3 disks, online)</div>
+        </div>
+        <button className="btn btn-sm">確認</button>
+      </div>
+
+      <div className="grid grid-2" style={{marginBottom: 24}}>
+        {POOLS.map(p => <PoolCard key={p.name} p={p} />)}
+      </div>
+
+      <div className="tabs">
+        <button className="tab" data-active={tab === 'pools'}     onClick={() => setTab('pools')}>ボリューム</button>
+        <button className="tab" data-active={tab === 'disks'}     onClick={() => setTab('disks')}>ディスク</button>
+        <button className="tab" data-active={tab === 'snapshots'} onClick={() => setTab('snapshots')}>スナップショット</button>
+        <button className="tab" data-active={tab === 'scrub'}     onClick={() => setTab('scrub')}>Scrub & 整合性</button>
+      </div>
+
+      {tab === 'pools' && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>ボリューム</th><th>プリセット</th><th className="td-num">使用量</th><th>クォータ</th>
+              <th className="td-num">スナップショット</th><th></th>
+            </tr></thead>
+            <tbody>
+              {VOLUMES.map(v => (
+                <tr key={v.path}>
+                  <td><span className="mono">{v.path}</span></td>
+                  <td><span className="badge">{v.preset}</span></td>
+                  <td className="td-num">{v.used.toFixed(2)} TB</td>
+                  <td className="mono">{v.quota}</td>
+                  <td className="td-num">{v.snapshots}</td>
+                  <td style={{textAlign: 'right'}}><button className="btn btn-ghost btn-sm">{t('details')}<Icon name="chevron_right" size={12} /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'disks' && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>デバイス</th><th>モデル</th><th>プール</th>
+              <th className="td-num">サイズ</th><th className="td-num">温度</th>
+              <th className="td-num">稼働時間</th><th>SMART</th><th className="td-num">I/O</th>
+            </tr></thead>
+            <tbody>
+              {DISKS.map(d => (
+                <tr key={d.dev}>
+                  <td><span className="row center" style={{gap: 8}}><Icon name="disk" size={14} /><span className="mono">/dev/{d.dev}</span></span></td>
+                  <td>
+                    <div style={{fontSize: 13}}>{d.model}</div>
+                    <div className="mono" style={{fontSize: 11, color: 'var(--text-3)'}}>S/N {d.serial}</div>
+                  </td>
+                  <td><span className="badge">{d.pool}</span></td>
+                  <td className="td-num">{d.size.toFixed(1)} TB</td>
+                  <td className="td-num">
+                    <span style={{color: d.temp > 41 ? 'var(--warn)' : 'inherit'}}>{d.temp} °C</span>
+                  </td>
+                  <td className="td-num">{d.hours.toLocaleString()} h</td>
+                  <td><span className={"badge " + (d.smart === 'PASSED' ? 'ok' : 'warn')}><span className="badge-dot" />{d.smart}</span></td>
+                  <td className="td-num">{d.io}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'snapshots' && (
+        <div className="card">
+          <div className="card-head">
+            <div>
+              <h3 className="card-title">スナップショット</h3>
+              <p className="card-sub">直近: 84 件 · 自動 retention: hourly 24 / daily 30 / monthly 12</p>
+            </div>
+            <button className="btn btn-sm"><Icon name="plus" size={12} />手動スナップショット</button>
+          </div>
+          <table className="tbl">
+            <thead><tr>
+              <th>データセット</th><th>名前</th><th>作成</th><th className="td-num">サイズ</th><th>保持理由</th><th></th>
+            </tr></thead>
+            <tbody>
+              {SNAPSHOTS.map((s, i) => (
+                <tr key={i}>
+                  <td className="mono">{s.dataset}</td>
+                  <td className="mono">@{s.name}</td>
+                  <td>{s.when}</td>
+                  <td className="td-num">{s.size}</td>
+                  <td><span className="badge">{s.kept}</span></td>
+                  <td style={{textAlign: 'right'}}>
+                    <button className="btn btn-ghost btn-sm">復元</button>
+                    <button className="btn btn-ghost btn-sm">クローン</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'scrub' && (
+        <div className="grid grid-2">
+          <div className="card">
+            <div className="card-head"><h3 className="card-title">直近の Scrub</h3></div>
+            <div className="card-body">
+              <div className="row between" style={{marginBottom: 12}}>
+                <div>
+                  <div className="stat-label">tank</div>
+                  <div className="stat-value">0<span className="unit">errors</span></div>
+                </div>
+                <Sparkline data={genSeries(40, 0.1, 0.05, 9)} width={120} height={32} color="ok" />
+              </div>
+              <div style={{fontSize: 13, lineHeight: 1.6, color: 'var(--text-2)'}}>
+                完了: <span className="mono">2026-04-24 04:48</span><br/>
+                スキャン: <span className="mono">12.4 TB</span> · 4h 22m<br/>
+                修復: <span className="mono">0</span> · 永続エラー: <span className="mono">0</span>
+              </div>
+            </div>
+            <div className="card-foot">
+              <span>次回: 4 月 30 日 02:00</span>
+              <button className="btn btn-sm">今すぐ実行</button>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head"><h3 className="card-title">スケジュール</h3></div>
+            <div className="card-body col">
+              <div className="field">
+                <label>cron 式</label>
+                <input className="input mono" defaultValue="0 2 * * 0" />
+                <div className="field-hint">毎週日曜 02:00 に全プールで scrub</div>
+              </div>
+              <div className="row center between">
+                <label style={{fontSize: 13}}>エラー時に通知</label>
+                <div className="switch" data-on="true" />
+              </div>
+              <div className="row center between">
+                <label style={{fontSize: 13}}>完了時に通知</label>
+                <div className="switch" data-on="false" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

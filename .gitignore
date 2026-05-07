@@ -1,0 +1,44 @@
+# Build output
+/bin/
+*.exe
+*.test
+*.out
+
+# portman / dev runtime artifacts
+.env
+/tmp/
+*.pid
+
+# Local config
+/etc/kura/
+/var/lib/kura/
+
+# Go workspace / vendor
+/vendor/
+go.work
+go.work.sum
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Claude Code local state
+.claude/
+.kura.pid
+
+# Logs
+*.log
+/logs/
+
+# SQLite (dev)
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+# Coverage
+coverage.out
+coverage.html

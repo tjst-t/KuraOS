@@ -1,0 +1,201 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Network — KuraOS</title>
+<link rel="stylesheet" href="shared/shared.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel" src="shared/shared.jsx"></script>
+<script type="text/babel">
+const { useState, useMemo } = React;
+
+function App() {
+  const { t } = useLang();
+  const [tab, setTab] = useState('interfaces');
+  const rxSeries = useMemo(() => genSeries(60, 38, 24, 7), []);
+  const txSeries = useMemo(() => genSeries(60, 4, 8, 13), []);
+  return (
+    <Shell active="network" crumbs={['KuraOS', t('nav_network')]}>
+      <div className="page-head">
+        <div>
+          <h1 className="page-title">{t('nav_network')}</h1>
+          <p className="page-sub">ネットワークインターフェース・DNS・外部アクセス</p>
+        </div>
+        <div className="row gap-sm">
+          <button className="btn"><Icon name="refresh" size={14} />再スキャン</button>
+          <button className="btn btn-primary"><Icon name="plus" size={14} />ボンディング作成</button>
+        </div>
+      </div>
+
+      <div className="grid grid-2" style={{marginBottom: 20}}>
+        <div className="card">
+          <div className="card-head"><h3 className="card-title">受信 (RX)</h3><span className="badge ok"><span className="badge-dot pulse" />live</span></div>
+          <div className="card-body">
+            <div className="row between center" style={{marginBottom: 12}}>
+              <span className="stat-value">38.4<span className="unit">MB/s</span></span>
+              <span className="muted mono">peak 124 MB/s</span>
+            </div>
+            <Sparkline data={rxSeries} width={520} height={56} color="info" />
+          </div>
+        </div>
+        <div className="card">
+          <div className="card-head"><h3 className="card-title">送信 (TX)</h3><span className="badge ok"><span className="badge-dot pulse" />live</span></div>
+          <div className="card-body">
+            <div className="row between center" style={{marginBottom: 12}}>
+              <span className="stat-value">3.7<span className="unit">MB/s</span></span>
+              <span className="muted mono">peak 28 MB/s</span>
+            </div>
+            <Sparkline data={txSeries} width={520} height={56} color="ok" />
+          </div>
+        </div>
+      </div>
+
+      <div className="tabs">
+        <button className="tab" data-active={tab === 'interfaces'} onClick={() => setTab('interfaces')}>インターフェース</button>
+        <button className="tab" data-active={tab === 'dns'}        onClick={() => setTab('dns')}>DNS / ホスト名</button>
+        <button className="tab" data-active={tab === 'remote'}     onClick={() => setTab('remote')}>外部アクセス</button>
+        <button className="tab" data-active={tab === 'firewall'}   onClick={() => setTab('firewall')}>ファイアウォール</button>
+      </div>
+
+      {tab === 'interfaces' && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr>
+              <th>名前</th><th>タイプ</th><th>IPv4</th><th>IPv6</th><th>MAC</th><th>速度</th><th>状態</th>
+            </tr></thead>
+            <tbody>
+              {[
+                {n:'eno1', t:'Ethernet', v4:'192.168.10.4/24',     v6:'fe80::a236:bcff:fe44:1aa1', mac:'a0:36:bc:44:1a:a1', speed:'2.5 GbE', st:'up'},
+                {n:'eno2', t:'Ethernet', v4:'—',                    v6:'—',                          mac:'a0:36:bc:44:1a:a2', speed:'2.5 GbE', st:'down'},
+                {n:'bond0',t:'Bond (LACP)', v4:'192.168.10.5/24',  v6:'—',                          mac:'a0:36:bc:44:1a:b0', speed:'5 GbE',   st:'up'},
+                {n:'docker0', t:'Bridge', v4:'172.17.0.1/16',      v6:'—',                          mac:'02:42:f1:23:11:00', speed:'—',       st:'up'},
+                {n:'tailscale0', t:'WireGuard', v4:'100.94.18.42/32', v6:'fd7a:115c:a1e0::1/128',  mac:'—',                  speed:'—',       st:'up'},
+              ].map(r => (
+                <tr key={r.n}>
+                  <td><span className="row center" style={{gap: 8}}><Icon name="network" size={14} /><span className="mono">{r.n}</span></span></td>
+                  <td><span className="badge">{r.t}</span></td>
+                  <td className="td-mono">{r.v4}</td>
+                  <td className="td-mono" style={{fontSize: 11}}>{r.v6}</td>
+                  <td className="td-mono">{r.mac}</td>
+                  <td className="mono">{r.speed}</td>
+                  <td><span className={"badge " + (r.st === 'up' ? 'ok' : '')}><span className="badge-dot" />{r.st}</span></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {tab === 'dns' && (
+        <div className="grid grid-2">
+          <div className="card">
+            <div className="card-head"><h3 className="card-title">ホスト名</h3></div>
+            <div className="card-body col">
+              <div className="field">
+                <label>ホスト名</label>
+                <input className="input mono" defaultValue="tjstkm-nas" />
+              </div>
+              <div className="field">
+                <label>ドメイン</label>
+                <input className="input mono" defaultValue="local" />
+              </div>
+              <div className="field">
+                <label>FQDN</label>
+                <input className="input mono" defaultValue="tjstkm-nas.local" disabled />
+              </div>
+            </div>
+          </div>
+          <div className="card">
+            <div className="card-head"><h3 className="card-title">DNS サーバー</h3><button className="btn btn-sm"><Icon name="plus" size={12}/>追加</button></div>
+            <div className="card-body col gap-sm">
+              {['1.1.1.1', '1.0.0.1', '192.168.10.1'].map(d => (
+                <div key={d} className="row center between" style={{padding: '8px 12px', background: 'var(--bg)', borderRadius: 6, border: '1px solid var(--border)'}}>
+                  <span className="mono" style={{fontSize: 13}}>{d}</span>
+                  <button className="btn btn-ghost btn-sm">削除</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'remote' && (
+        <div className="grid grid-3">
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="cloud" /><h3 className="card-title">Tailscale</h3></div>
+              <span className="badge ok"><span className="badge-dot pulse"/>connected</span>
+            </div>
+            <div className="card-body col">
+              <div className="mono" style={{fontSize: 13}}>tjstkm-nas.tail-scale.ts.net</div>
+              <div className="muted" style={{fontSize: 12}}>IP: <span className="mono">100.94.18.42</span></div>
+              <div className="row between center">
+                <label style={{fontSize: 13}}>Funnel (公開)</label>
+                <div className="switch" data-on="false" />
+              </div>
+            </div>
+            <div className="card-foot"><span className="muted">推奨</span><button className="btn btn-sm">設定</button></div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="cloud" /><h3 className="card-title">Cloudflare Tunnel</h3></div>
+              <span className="badge"><span className="badge-dot"/>未設定</span>
+            </div>
+            <div className="card-body">
+              <p className="muted" style={{fontSize: 13, margin: 0}}>FQDN での公開向け。Tunnel トークンを入力して有効化。</p>
+            </div>
+            <div className="card-foot"><span></span><button className="btn btn-sm">設定</button></div>
+          </div>
+          <div className="card">
+            <div className="card-head">
+              <div className="row center" style={{gap: 10}}><Icon name="key" /><h3 className="card-title">WireGuard</h3></div>
+              <span className="badge"><span className="badge-dot"/>未設定</span>
+            </div>
+            <div className="card-body">
+              <p className="muted" style={{fontSize: 13, margin: 0}}>上級者向け。手動でピアを設定。</p>
+            </div>
+            <div className="card-foot"><span className="muted">advanced</span><button className="btn btn-sm">設定</button></div>
+          </div>
+        </div>
+      )}
+
+      {tab === 'firewall' && (
+        <div className="card">
+          <table className="tbl">
+            <thead><tr><th>ポート</th><th>プロトコル</th><th>サービス</th><th>ソース</th><th>状態</th><th></th></tr></thead>
+            <tbody>
+              {[
+                ['443',  'tcp', 'kura (HTTPS)',  'any',         'open'],
+                ['80',   'tcp', 'kura redirect', 'any',         'open'],
+                ['445',  'tcp', 'SMB',           'LAN only',    'open'],
+                ['2049', 'tcp', 'NFS',           'LAN only',    'open'],
+                ['22',   'tcp', 'SSH',           'admin subnet','open'],
+                ['9100', 'tcp', 'metrics',       'localhost',   'closed'],
+              ].map(([p, pr, s, src, st]) => (
+                <tr key={p}>
+                  <td className="td-mono">{p}</td>
+                  <td><span className="badge">{pr}</span></td>
+                  <td>{s}</td>
+                  <td className="muted">{src}</td>
+                  <td><span className={"badge " + (st === 'open' ? 'ok' : '')}><span className="badge-dot"/>{st}</span></td>
+                  <td style={{textAlign: 'right'}}><button className="btn btn-ghost btn-sm">編集</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Shell>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
