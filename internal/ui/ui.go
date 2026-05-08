@@ -42,6 +42,11 @@ type Renderer struct {
 	// under /ui/admin/storage/* without the read route ever being able to
 	// shadow it (specific paths win in the storage write mux).
 	storageWriteHandler http.Handler
+	// sharesHandler / sharesDeleteHandler — installed via SetSharesHandler.
+	// When unset, the route falls through to the generic "shares" placeholder
+	// (lets older acceptance tests keep passing while shares work lands).
+	sharesHandler       http.Handler
+	sharesDeleteHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -154,6 +159,14 @@ func (r *Renderer) SetStorageHandler(h http.Handler) { r.storageHandler = h }
 // routes are simply not registered.
 func (r *Renderer) SetStorageWriteHandler(h http.Handler) { r.storageWriteHandler = h }
 
+// SetSharesHandlers installs the GET/POST + delete handlers for /ui/admin/shares.
+// Must be called before Routes(). Optional — when nil the placeholder
+// handler is mounted, matching the behaviour of older sprints.
+func (r *Renderer) SetSharesHandlers(get, del http.Handler) {
+	r.sharesHandler = get
+	r.sharesDeleteHandler = del
+}
+
 // adminNavGroups returns the sidebar definition with the active item set.
 // IDs match the prototype's NAV_GROUPS so test fixtures and screen
 // references line up. The 7-item admin row (Dashboard / Storage / Shares /
@@ -200,7 +213,14 @@ func (r *Renderer) Routes() http.Handler {
 		mux.Handle("/ui/admin/storage/import", r.storageWriteHandler)
 		mux.Handle("/ui/admin/storage/snapshots", r.storageWriteHandler)
 	}
-	mux.HandleFunc("/ui/admin/shares", r.handlePlaceholder("shares", i18n.MsgNavShares))
+	if r.sharesHandler != nil {
+		mux.Handle("/ui/admin/shares", r.sharesHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/shares", r.handlePlaceholder("shares", i18n.MsgNavShares))
+	}
+	if r.sharesDeleteHandler != nil {
+		mux.Handle("/ui/admin/shares/delete", r.sharesDeleteHandler)
+	}
 	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
 	mux.HandleFunc("/ui/admin/apps", r.handlePlaceholder("apps", i18n.MsgNavApps))

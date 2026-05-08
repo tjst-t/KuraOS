@@ -1,0 +1,148 @@
+{
+  "sprint": "Sd64f38",
+  "title": "Share 管理 (SMB/NFS) と smb.conf テンプレート",
+  "milestone": true,
+  "branch": "autopilot/main/Sd64f38",
+  "mode": "auto",
+  "planning_decisions": [
+    {
+      "id": "PD-1",
+      "topic": "Story split / granularity",
+      "decision": "Keep the two existing Stories (Sd64f38-1 ShareEngine + templates, Sd64f38-2 preset UI). Sd64f38-1 covers SMB + NFS templates + reload + ApplyAdapter; that is one user-facing behavior (declare a share, both protocols regenerated idempotently).",
+      "rationale": "DESIGN_PRINCIPLES priority #2 (賢いデフォルト > 設定項目を増やす) — splitting SMB and NFS would push protocol selection onto the operator. Sprint description treats them as one engine. Sd64f38-2 is purely UI on top, distinct user-facing behavior."
+    },
+    {
+      "id": "PD-2",
+      "topic": "Performance defaults exposure",
+      "decision": "Bake server multi channel support, use sendfile, vfs objects (catia fruit streams_xattr), aio read/write size, fruit:metadata=stream, min protocol=SMB2 directly into engine/share/smb/templates/smb.conf.tmpl. UI surfaces ZERO knobs for these — the prototype Shares.html shows them in a read-only 'best defaults applied' card, not editable.",
+      "rationale": "DESIGN_PRINCIPLES priority #2 + sprint hint 'UI には《詳細設定》として畳んで隠す (or 全く出さない)'. CLAUDE.md priority #2 explicitly chooses defaults over knobs."
+    },
+    {
+      "id": "PD-3",
+      "topic": "Use-case preset surface",
+      "decision": "Implement four SMB usage presets: general, media, time_machine, database. Each preset locks vfs objects / oplocks / fruit:* / strict_locking / sync — UI shows preset name only, never raw smb.conf keys.",
+      "rationale": "Sprint hint enumerates these four. design.md SMB section + Apple Time Machine support justify time_machine preset. database preset disables oplocks + sets sync=always for sqlite/pgsql safety."
+    },
+    {
+      "id": "PD-4",
+      "topic": "Idempotent regeneration strategy",
+      "decision": "Each Apply rewrites /etc/samba/conf.d/kura.conf and /etc/exports.d/kura.exports COMPLETELY from SQLite state, then reloads. Hand edits are clobbered (documented). Path overrides via SamabaConfDir / ExportsDir options on ShareEngine for tests + dev (where /etc isn't writable).",
+      "rationale": "DESIGN_PRINCIPLES priority #1 (SSOT). 'config.json + SQLite is SSOT, smb.conf is regenerable artifact' is the canonical KuraOS stance. Storage Engine's Apply pattern reused."
+    },
+    {
+      "id": "PD-5",
+      "topic": "smb.conf single-file vs per-share",
+      "decision": "Single file /etc/samba/conf.d/kura.conf containing [global] + every [share] section. NFS uses single /etc/exports.d/kura.exports.",
+      "rationale": "Simpler diff for milestone demo (one file vs N), avoids stale-share leakage between Apply runs (no need to enumerate + delete previous files). [global] in conf.d is supported via Samba's `include` chain."
+    },
+    {
+      "id": "PD-6",
+      "topic": "Reload commands abstracted via CmdExecutor",
+      "decision": "Add ShareEngine.SystemctlBin defaulting to systemctl. Reload runs `systemctl reload smbd` and `systemctl reload nfs-server` through cmdexec.Executor (Fake injectable for tests). testparm validation runs `testparm -s --suppress-prompt /etc/samba/conf.d/kura.conf` BEFORE reload — failures abort and surface i18n error.",
+      "rationale": "CLAUDE.md hard rule '副作用を持つ依存は interface 経由'. Engine pattern matches storage/CLI."
+    },
+    {
+      "id": "PD-7",
+      "topic": "ACL representation in config.json",
+      "decision": "shares[].acl = [{principal: 'user:NAME' | 'group:NAME', mode: 'rw'|'r'|'none'}]. Principal is namespaced so future OIDC group sync stays compatible.",
+      "rationale": "DESIGN_PRINCIPLES 明示的 > 暗黙的. UserStore exists (engine/user) and provides lookup. SMB valid users / read list / write list lines emit accordingly."
+    },
+    {
+      "id": "PD-8",
+      "topic": "GUI spec — autonomous mode",
+      "decision": "Routes: GET /ui/admin/shares (list + selected detail card), POST /ui/admin/shares (create), POST /ui/admin/shares/delete (delete). htmx replaces React state. Form fields: name, path (free text — Volume picker is post-MVP), protocol (smb|nfs|both), preset, access_mode (rw|r), acl_principal_csv. AC tests use mock Engine.",
+      "rationale": "Prototype Shares.html is React + heavy interaction; htmx + form POST is the v1 architecture. Single-step add covers AC-Sd64f38-2-1 ('プリセット選ぶだけ'). Volume picker (separate from path text) deferred to backlog."
+    },
+    {
+      "id": "PD-9",
+      "topic": "Path validation — Volume existence",
+      "decision": "Validate that share.path matches an existing storage Volume (via injected VolumeChecker interface). Tests inject a fake checker. Production wiring uses storage.Engine.ListVolumes (deferred — for now use ListPools to derive top-level dataset names, sufficient for path prefix check).",
+      "rationale": "Sprint hint: 'path が ZFS dataset として存在することを Storage Engine に問い合わせて検証'. Loose interface so storage Engine doesn't need to add ListVolumes in this sprint (dataset list comes from current implementation gap — call out as warning)."
+    },
+    {
+      "id": "PD-10",
+      "topic": "Test strategy",
+      "decision": "Golden file tests for smb.conf and exports per preset (testdata/golden-smb-*.conf, golden-nfs.exports). cmdexec.Fake wraps systemctl/testparm/exportfs. acceptance test (tests/acceptance/share_flow_test.go) drives the engine end-to-end with an in-memory DB. E2E mock spec (Playwright) for UI rendering. NO real SMB on dev box — milestone demo on VM 192.168.1.42 covers it."
+    }
+  ],
+  "implementation_decisions": [
+    {
+      "id": "ID-1",
+      "topic": "Import cycle: engine/share <-> engine/share/{smb,nfs}",
+      "decision": "smb and nfs sub-packages do NOT import engine/share. PresetParams is duplicated in engine/share/smb (12 fields) — engine/share/views.go converts share.PresetParams -> smb.PresetParams. Same for ACL flattening (now lives in engine/share/views.go).",
+      "rationale": "Go forbids import cycles. Alternative (move smb/nfs render into engine/share root) loses the package-level boundary that documents the testparm/exportfs concern. Field duplication is one struct."
+    },
+    {
+      "id": "ID-2",
+      "topic": "Config conf.d single file vs per-share files",
+      "decision": "/etc/samba/conf.d/kura.conf and /etc/exports.d/kura.exports each contain ALL shares — not one file per share.",
+      "rationale": "Single file is fully replaced on every Apply, so stale shares can never linger from an aborted previous run. Per-share files would require enumerating + deleting old files. atomic write via tmp + rename keeps testparm validation honest."
+    },
+    {
+      "id": "ID-3",
+      "topic": "Path conflict policy",
+      "decision": "Reject exact-equal paths AND nested paths in either direction (new path under existing share, OR existing path under new path). ErrPathConflict surfaces a translated message.",
+      "rationale": "Nested SMB shares with conflicting ACLs is a known foot-gun. v1 conservative: reject. v1.x can soften to 'warn + ask user' once the UI has a confirmation modal."
+    },
+    {
+      "id": "ID-4",
+      "topic": "Reload sequence",
+      "decision": "Order: testparm validate → systemctl reload smbd → exportfs -ra → systemctl reload nfs-server. testparm before any reload so a syntax error fails fast and the share row is rolled back. exportfs -ra updates the kernel exports table.",
+      "rationale": "design.md / nfs-utils convention. Avoids half-reloaded state."
+    },
+    {
+      "id": "ID-5",
+      "topic": "Adapter Update strategy",
+      "decision": "Plan only emits create_share / delete_share — no update_share. A change to e.g. preset on an existing share would be modelled in v1.x as remove+create at the config.json layer.",
+      "rationale": "Engine surface stays minimal for the milestone. Update is a polish item; reload cost of remove+create is negligible."
+    },
+    {
+      "id": "ID-6",
+      "topic": "VolumeChecker is optional",
+      "decision": "Manager.checker can be nil. cmd/kura main.go does NOT wire a checker — Storage Engine does not yet expose ListVolumes. Acceptance happens in CreateInput.Validate (well-formed path) only.",
+      "rationale": "Wiring storage<->share would require expanding storage.Engine. Defer to next sprint; logged in backlog."
+    },
+    {
+      "id": "ID-7",
+      "topic": "Backlog: Volume picker UI",
+      "decision": "Free-text path input. Volume dropdown deferred.",
+      "rationale": "Storage engine ListVolumes is not yet a stable interface. Sprint scope is template + UI MVP."
+    },
+    {
+      "id": "ID-8",
+      "topic": "ACL CSV input format",
+      "decision": "CSV string `kind:name:mode` parsed in UI handler. Invalid tokens dropped silently — engine validator surfaces the user-facing error in one place.",
+      "rationale": "Matches prototype's 'family:r' badges. Builder UI (per-row form) is heavier; v1.x."
+    }
+  ],
+  "review_decisions": [
+    {
+      "id": "RV-1",
+      "topic": "Self-review of acceptance criteria",
+      "decision": "AC-Sd64f38-1-1 covered by tests/acceptance/share_flow_test.go::TestAcceptance_Share_CreateRegeneratesConfs (full HTTP flow). AC-Sd64f38-1-2 covered by engine/share/render_test.go::TestRenderSMBConfMandatoryPerformanceDefaults + the 4 golden files. AC-Sd64f38-2-1 covered by tests/acceptance/share_flow_test.go::TestAcceptance_Share_PresetSelectorHidesSMBKnobs.",
+      "rationale": "All three AC tests reference the AC ID in the comment so traceability is straightforward."
+    },
+    {
+      "id": "RV-2",
+      "topic": "Forbidden #13 audit",
+      "decision": "No raw smbd / testparm / exportfs stderr is rendered into the UI. classifyShareErr maps every sentinel to a translated message. Generic fallback uses MsgSharesErrCreateFailed which still gets the wrapped %v but only via the user-friendly format.",
+      "rationale": "Test TestSharesPostShowsTranslatedError verifies the path."
+    },
+    {
+      "id": "RV-3",
+      "topic": "Forbidden #5 audit (config.json sink, not source)",
+      "decision": "ShareEngine.ApplyAdapter reads config.json -> writes SQLite + regenerates files. UI Create path writes SQLite -> would NOT auto-update config.json. Same pattern as Storage.",
+      "rationale": "Config export reads SQLite + live state on demand (existing kura config export flow)."
+    }
+  ],
+  "deferred_to_backlog": [
+    {
+      "title": "Volume picker UI (replace free-text path with Volume + sub-path selector)",
+      "reason": "Storage engine's ListVolumes is not yet exposed via the read interface. Sprint scope is share creation; volume picker UX overlaps with future Storage tab work."
+    },
+    {
+      "title": "Diff display between previous and new generated config files",
+      "reason": "Sprint hint mentions this as 'milestone demo で映える'. Implementation done internally (file rewrite) but a dedicated UI panel is v1.x polish."
+    }
+  ]
+}
