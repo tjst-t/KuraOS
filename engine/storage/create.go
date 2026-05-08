@@ -185,17 +185,32 @@ func (c *CLI) ListSnapshots(ctx context.Context, dataset string) ([]SnapshotInfo
 	return parseSnapshotList(stdout)
 }
 
-// DestroyPool runs `zpool destroy [-f] <name>`. The caller is responsible
-// for confirmation (UI uses a name-typing modal, CLI requires the
-// --confirm flag) — this function does NO additional gating beyond the
-// engine call so the contract stays simple. Force passes -f, which exports
-// busy datasets first; without it the kernel refuses to destroy a pool
-// with mounted children.
+// DestroyPool runs `zpool destroy [-f] <name>`, then labelclears every
+// member disk so the disks return to "free" state in lsblk.
+//
+// `zpool destroy` removes the pool from the kernel's view but does NOT
+// wipe the on-disk ZFS labels — the partitions still report fstype=
+// zfs_member to blkid/lsblk. That makes the disks appear as "外部プール"
+// (foreign) on the next page load, and the New Pool form's free-disk
+// picker hides them. We follow up with `zpool labelclear -f` on each
+// member's leaf path so the labels go away and the disks are truly
+// reclaimed. Best-effort: a labelclear failure on an oddly-partitioned
+// device should not undo the destroy.
+//
+// The caller is responsible for confirmation (UI uses a name-typing
+// modal, CLI requires --confirm). Force passes -f to destroy, which
+// exports busy datasets first.
 func (c *CLI) DestroyPool(ctx context.Context, name string, force bool) error {
 	name = strings.TrimSpace(name)
 	if name == "" {
 		return fmt.Errorf("%w: pool name required", ErrPoolNameInvalid)
 	}
+
+	// Snapshot member disks BEFORE destroy so we know which to labelclear.
+	// Best-effort — if listing fails, we still attempt destroy + skip the
+	// cleanup step.
+	members, _ := c.poolMemberDisks(ctx, name)
+
 	args := []string{"destroy"}
 	if force {
 		args = append(args, "-f")
@@ -204,7 +219,44 @@ func (c *CLI) DestroyPool(ctx context.Context, name string, force bool) error {
 	if _, _, err := c.exec.Run(ctx, "zpool", args...); err != nil {
 		return fmt.Errorf("storage: zpool destroy %s: %w", name, err)
 	}
+
+	// Wipe stale ZFS labels so the disks come back as "Free" in the
+	// New Pool picker. Errors here are logged via the wrapped exec error
+	// but do not propagate — destroy already succeeded.
+	for _, dev := range members {
+		_, _, _ = c.exec.Run(ctx, "zpool", "labelclear", "-f", dev)
+	}
 	return nil
+}
+
+// poolMemberDisks returns every leaf disk path that the named pool's
+// topology references. Used by DestroyPool to drive labelclear; using
+// the parsed Pool struct over re-running zpool status keeps the helper
+// trivially testable with FakeExecutor.
+func (c *CLI) poolMemberDisks(ctx context.Context, name string) ([]string, error) {
+	pools, err := c.ListPools(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	var walk func(vs []Vdev)
+	walk = func(vs []Vdev) {
+		for _, v := range vs {
+			if v.Path != "" && len(v.Children) == 0 {
+				paths = append(paths, v.Path)
+			}
+			if len(v.Children) > 0 {
+				walk(v.Children)
+			}
+		}
+	}
+	for _, p := range pools {
+		if p.Name == name {
+			walk(p.Topology)
+			break
+		}
+	}
+	return paths, nil
 }
 
 // DestroyVolume runs `zfs destroy [-r] <dataset>`. Recursive, when true,

@@ -109,16 +109,31 @@ in shares.go so the template stays free of CLI-output tokens.
       </div>
       {{ end }}
     </div>
-    <div class="card-foot" style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--border);">
+    <div class="card-foot" style="display:flex;justify-content:space-between;align-items:center;padding:12px 18px;border-top:1px solid var(--border);gap:8px">
       <span class="muted mono" style="font-size:11px;">id: {{ $v.Selected.ID }}</span>
-      <form method="post" action="/ui/admin/shares/delete" data-testid="shares-delete-form" onsubmit="return confirm('Delete share {{ $v.Selected.Name }}?');">
-        <input type="hidden" name="id" value="{{ $v.Selected.ID }}" />
-        <button type="submit" class="btn btn-sm btn-danger" data-testid="shares-delete-btn">削除</button>
-      </form>
+      <div class="row gap-sm" style="display:flex;gap:6px">
+        <button type="button" class="btn btn-sm" data-testid="shares-edit-btn"
+          data-modal-open="edit-share-modal">{{ T "page.shares.edit" }}</button>
+        <form method="post" action="/ui/admin/shares/delete" data-testid="shares-delete-form" onsubmit="return confirm('Delete share {{ $v.Selected.Name }}?');">
+          <input type="hidden" name="id" value="{{ $v.Selected.ID }}" />
+          <button type="submit" class="btn btn-sm btn-danger" data-testid="shares-delete-btn">削除</button>
+        </form>
+      </div>
     </div>
   </div>
   {{ end }}
 </div>
+
+{{ if $v.Selected }}
+{{ template "modal" dict
+    "id"      "edit-share-modal"
+    "testid"  "shares-edit-modal"
+    "title"   (T "page.shares.edit.title")
+    "action"  "/ui/admin/shares/update"
+    "bodyTpl" "shares-edit-body"
+    "footTpl" "shares-edit-foot"
+    "ctx"     $v }}
+{{ end }}
 {{ else }}
 <div class="card" data-testid="shares-empty" style="padding:40px;text-align:center;">
   <p class="muted">{{ T "page.shares.empty" }}</p>
@@ -251,5 +266,76 @@ in shares.go so the template stays free of CLI-output tokens.
 </button>
 <button type="submit" class="btn btn-primary" data-testid="shares-form-submit">
   {{ T "page.shares.form.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== Edit Share modal body / foot =====
+   Pre-fills from $v.Selected. Name and Path are not editable — UpdateInput
+   in engine/share/share.go intentionally omits them, so they're shown
+   read-only in the modal. */ -}}
+{{ define "shares-edit-body" }}
+{{ $v := . }}
+{{ $sel := $v.Selected }}
+<div data-testid="shares-edit-form" style="display:flex;flex-direction:column;gap:14px;">
+  <input type="hidden" name="id" value="{{ $sel.ID }}">
+
+  <div class="field">
+    <label>{{ T "page.shares.form.name" }}</label>
+    <div class="mono">{{ $sel.Name }}</div>
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.edit.name_immutable" }}</p>
+  </div>
+  <div class="field">
+    <label>{{ T "page.shares.form.path" }}</label>
+    <div class="mono">{{ $sel.Path }}</div>
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.edit.path_immutable" }}</p>
+  </div>
+
+  <div class="field">
+    <label for="edit-share-protocol">{{ T "page.shares.form.protocol" }}</label>
+    <select id="edit-share-protocol" name="protocol" class="input" data-testid="shares-edit-protocol">
+      {{ range $v.Protocols }}<option value="{{ .ID }}"{{ if eq .ID $sel.ProtocolID }} selected{{ end }}>{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label>{{ T "page.shares.form.preset" }}</label>
+    <div class="col gap-sm" style="display:flex;flex-direction:column;gap:6px;">
+      {{ range $v.Presets }}
+      <label class="row center" style="display:flex;align-items:flex-start;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+        <input type="radio" name="preset" value="{{ .ID }}"{{ if eq .ID $sel.PresetID }} checked{{ end }} data-testid="shares-edit-preset-{{ .ID }}">
+        <span style="display:flex;flex-direction:column;gap:2px;">
+          <strong style="font-size:13px;">{{ .Label }}</strong>
+          <span class="muted" style="font-size:11px;">{{ .Hint }}</span>
+        </span>
+      </label>
+      {{ end }}
+    </div>
+  </div>
+  <div class="field">
+    <label for="edit-share-access">{{ T "page.shares.form.access" }}</label>
+    <select id="edit-share-access" name="access_mode" class="input" data-testid="shares-edit-access">
+      {{ range $v.Access }}<option value="{{ .ID }}"{{ if eq .ID $sel.AccessID }} selected{{ end }}>{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label for="edit-share-acl">{{ T "page.shares.form.acl" }}</label>
+    <input id="edit-share-acl" name="acl" type="text" class="input" autocomplete="off"
+           value="{{ range $i, $a := $sel.ACL }}{{ if $i }}, {{ end }}{{ $a.Token }}:{{ $a.ModeID }}{{ end }}"
+           placeholder="user:alice:rw, group:family:r" data-testid="shares-edit-acl">
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.acl_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="edit-share-description">{{ T "page.shares.form.description" }}</label>
+    <input id="edit-share-description" name="description" type="text" class="input" autocomplete="off"
+           value="{{ $sel.Description }}" data-testid="shares-edit-description">
+  </div>
+</div>
+{{ end }}
+
+{{ define "shares-edit-foot" }}
+<button type="button" class="btn" data-modal-close data-testid="shares-edit-cancel">
+  {{ T "page.shares.form.cancel" }}
+</button>
+<button type="submit" class="btn btn-primary" data-testid="shares-edit-submit">
+  {{ T "page.shares.edit.submit" }}
 </button>
 {{ end }}

@@ -51,11 +51,13 @@ type Renderer struct {
 	// under /ui/admin/storage/* without the read route ever being able to
 	// shadow it (specific paths win in the storage write mux).
 	storageWriteHandler http.Handler
-	// sharesHandler / sharesDeleteHandler — installed via SetSharesHandler.
-	// When unset, the route falls through to the generic "shares" placeholder
-	// (lets older acceptance tests keep passing while shares work lands).
+	// sharesHandler / sharesDeleteHandler / sharesUpdateHandler — installed
+	// via SetSharesHandlers. When unset, the route falls through to the
+	// generic "shares" placeholder (lets older acceptance tests keep passing
+	// while shares work lands).
 	sharesHandler       http.Handler
 	sharesDeleteHandler http.Handler
+	sharesUpdateHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -230,6 +232,10 @@ func (r *Renderer) SetSharesHandlers(get, del http.Handler) {
 	r.sharesDeleteHandler = del
 }
 
+// SetSharesUpdateHandler installs the POST handler for /ui/admin/shares/update.
+// Optional — older sprints (before the share-edit feature) leave it nil.
+func (r *Renderer) SetSharesUpdateHandler(h http.Handler) { r.sharesUpdateHandler = h }
+
 // adminNavGroups returns the sidebar definition with the active item set.
 // IDs match the prototype's NAV_GROUPS so test fixtures and screen
 // references line up. The 7-item admin row (Dashboard / Storage / Shares /
@@ -289,6 +295,9 @@ func (r *Renderer) Routes() http.Handler {
 	}
 	if r.sharesDeleteHandler != nil {
 		mux.Handle("/ui/admin/shares/delete", r.sharesDeleteHandler)
+	}
+	if r.sharesUpdateHandler != nil {
+		mux.Handle("/ui/admin/shares/update", r.sharesUpdateHandler)
 	}
 	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))

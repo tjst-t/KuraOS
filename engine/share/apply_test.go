@@ -33,6 +33,20 @@ func (s *stubEngine) Delete(ctx context.Context, id string) error {
 	s.deleted = append(s.deleted, id)
 	return nil
 }
+func (s *stubEngine) Update(_ context.Context, id string, in UpdateInput) (Share, error) {
+	for i, sh := range s.listed {
+		if sh.ID == id {
+			s.listed[i].Protocol = in.Protocol
+			s.listed[i].Preset = in.Preset
+			s.listed[i].AccessMode = in.AccessMode
+			s.listed[i].Description = in.Description
+			s.listed[i].Disabled = in.Disabled
+			s.listed[i].ACL = append([]ACLEntry(nil), in.ACL...)
+			return s.listed[i], nil
+		}
+	}
+	return Share{}, ErrShareNotFound
+}
 func (s *stubEngine) Apply(ctx context.Context) error { return nil }
 
 func TestAdapterPlanCreatesNewShares(t *testing.T) {

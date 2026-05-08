@@ -111,6 +111,7 @@ func run() error {
 		uiRenderer.SharesHandler(sharesDeps),
 		uiRenderer.SharesDeleteHandler(sharesDeps),
 	)
+	uiRenderer.SetSharesUpdateHandler(uiRenderer.SharesUpdateHandler(sharesDeps))
 
 	users := user.NewStore(st.DB(), nil)
 	sessions := session.NewStore(st.DB())

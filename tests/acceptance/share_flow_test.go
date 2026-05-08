@@ -63,6 +63,7 @@ func newServerWithShares(t *testing.T) (*httptest.Server, *user.Store, *share.Ma
 	}
 	deps := ui.SharesDeps{Engine: shareEng}
 	r.SetSharesHandlers(r.SharesHandler(deps), r.SharesDeleteHandler(deps))
+	r.SetSharesUpdateHandler(r.SharesUpdateHandler(deps))
 
 	users := user.NewStore(st.DB(), fastHasher{})
 	sessions := session.NewStore(st.DB())
@@ -239,6 +240,76 @@ func TestAcceptance_SharesPage_RepeatedRequestsRender(t *testing.T) {
 		if !strings.Contains(body, `data-testid="shares-form-submit"`) {
 			t.Errorf("request %d: shares form submit button missing", i+1)
 		}
+	}
+}
+
+// Edit a share via the new /ui/admin/shares/update endpoint and confirm
+// the engine sees the new values + smb.conf gets regenerated. Name and
+// path stay the same — UpdateInput omits them on purpose.
+func TestAcceptance_Share_EditUpdatesPresetAndACL(t *testing.T) {
+	srv, _, eng, _, _ := newServerWithShares(t)
+	c := loginAs(t, srv, "root", "longenoughpw")
+
+	// Create a share to edit.
+	create := url.Values{
+		"name":        {"docs"},
+		"path":        {"/tank/docs"},
+		"protocol":    {"smb"},
+		"preset":      {"general"},
+		"access_mode": {"read_write"},
+	}
+	resp, err := c.PostForm(srv.URL+"/ui/admin/shares", create)
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	resp.Body.Close()
+
+	// Now fetch the list to grab the share's id.
+	shares, err := eng.List(context.Background())
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(shares) == 0 {
+		t.Fatal("expected 1 share, got 0")
+	}
+	id := shares[0].ID
+
+	// Edit via the update endpoint: switch preset to media, ACL to alice rw.
+	form := url.Values{
+		"id":          {id},
+		"protocol":    {"smb"},
+		"preset":      {"media"},
+		"access_mode": {"read_only"},
+		"description": {"フォト共有"},
+		"acl":         {"user:alice:rw"},
+	}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/shares/update", form)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("update status = %d, want 303", resp.StatusCode)
+	}
+
+	got, err := eng.Get(context.Background(), id)
+	if err != nil {
+		t.Fatalf("get after update: %v", err)
+	}
+	if got.Preset != "media" {
+		t.Errorf("preset = %q, want media", got.Preset)
+	}
+	if got.AccessMode != "read_only" {
+		t.Errorf("access_mode = %q, want read_only", got.AccessMode)
+	}
+	if got.Description != "フォト共有" {
+		t.Errorf("description = %q, want フォト共有", got.Description)
+	}
+	if len(got.ACL) != 1 || got.ACL[0].Name != "alice" || got.ACL[0].Mode != share.ACLModeReadWrite {
+		t.Errorf("acl = %+v, want [user:alice rw]", got.ACL)
+	}
+	if got.Name != "docs" || got.Path != "/tank/docs" {
+		t.Errorf("name/path must stay unchanged: name=%q path=%q", got.Name, got.Path)
 	}
 }
 

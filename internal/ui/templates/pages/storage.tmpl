@@ -175,8 +175,14 @@ in storage.go so the template stays free of CLI-output tokens.
           <td><span class="mono" style="font-size:11px">{{ if .MountPoint }}{{ .MountPoint }}{{ else }}—{{ end }}</span></td>
           {{ if $v.WriteEnabled }}
           <td class="row gap-sm" style="display:flex;gap:6px;flex-wrap:wrap">
+            {{ if .IsPoolRoot }}
+            <button type="button" class="btn btn-sm" data-testid="storage-volume-quota-btn"
+              disabled aria-disabled="true"
+              title="{{ T "page.storage.volume.quota.pool_root_blocked" }}">{{ T "page.storage.volume.quota.set" }}</button>
+            {{ else }}
             <button type="button" class="btn btn-sm" data-testid="storage-volume-quota-btn"
               data-modal-open="quota-modal-{{ .Name }}">{{ T "page.storage.volume.quota.set" }}</button>
+            {{ end }}
             <button type="button" class="btn btn-sm" data-testid="storage-volume-snapshot-btn"
               data-modal-open="new-snapshot-modal" data-volume-name="{{ .Name }}"
               onclick="(function(){var d=document.getElementById('new-snapshot-modal');if(!d)return;var s=d.querySelector('select[name=&quot;dataset&quot;]');if(s){s.value='{{ .Name }}';}})();">{{ T "page.storage.snapshot.new" }}</button>

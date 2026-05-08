@@ -46,6 +46,7 @@ type ShareEngine interface {
 	List(ctx context.Context) ([]share.Share, error)
 	Get(ctx context.Context, id string) (share.Share, error)
 	Create(ctx context.Context, in share.CreateInput) (share.Share, error)
+	Update(ctx context.Context, id string, in share.UpdateInput) (share.Share, error)
 	Delete(ctx context.Context, id string) error
 }
 
@@ -111,6 +112,9 @@ type ShareRow struct {
 type ShareACLRow struct {
 	Token     string // user:alice / group:family
 	ModeLabel string
+	// ModeID is the raw mode code (rw / r / w) used by the edit form to
+	// rebuild the parseACLCSV-compatible string.
+	ModeID string
 }
 
 // SharePresetOption is one entry in the preset picker. Hint is shown beside
@@ -155,6 +159,43 @@ func (r *Renderer) SharesHandler(d SharesDeps) http.Handler {
 			w.Header().Set("Allow", "GET, POST")
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		}
+	})
+}
+
+// SharesUpdateHandler handles POST /ui/admin/shares/update. Form fields:
+// id, protocol, preset, access_mode, description, disabled, acl. Name and
+// path are intentionally NOT in the form — the engine's UpdateInput omits
+// them so renames go through delete + recreate. On success redirects back
+// to the detail pane (?selected=<id>) so the operator sees the result.
+func (r *Renderer) SharesUpdateHandler(d SharesDeps) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			r.handleSharesGet(w, req, d, r.tr.T(i18n.MsgSharesErrGeneric, err.Error()))
+			return
+		}
+		id := strings.TrimSpace(req.FormValue("id"))
+		if id == "" {
+			r.handleSharesGet(w, req, d, r.tr.T(i18n.MsgSharesErrGeneric, "missing id"))
+			return
+		}
+		in := share.UpdateInput{
+			Protocol:    share.Protocol(req.FormValue("protocol")),
+			Preset:      share.Preset(req.FormValue("preset")),
+			AccessMode:  share.AccessMode(req.FormValue("access_mode")),
+			Description: strings.TrimSpace(req.FormValue("description")),
+			Disabled:    req.FormValue("disabled") == "1" || req.FormValue("disabled") == "on",
+			ACL:         parseACLCSV(req.FormValue("acl")),
+		}
+		if _, err := d.Engine.Update(req.Context(), id, in); err != nil {
+			r.handleSharesGet(w, req, d, r.tr.T(i18n.MsgSharesErrGeneric, err.Error()))
+			return
+		}
+		http.Redirect(w, req, "/ui/admin/shares?selected="+id, http.StatusSeeOther)
 	})
 }
 
@@ -311,6 +352,7 @@ func shareToRow(tr translator, s share.Share) ShareRow {
 		row.ACL = append(row.ACL, ShareACLRow{
 			Token:     token,
 			ModeLabel: aclModeLabel(tr, a.Mode),
+			ModeID:    string(a.Mode),
 		})
 	}
 	return row

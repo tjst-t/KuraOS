@@ -18,8 +18,13 @@ import (
 type stubSharesEngine struct {
 	listed    []share.Share
 	created   []share.CreateInput
+	updated   []struct {
+		ID    string
+		Input share.UpdateInput
+	}
 	deleted   []string
 	createErr error
+	updateErr error
 }
 
 func (s *stubSharesEngine) List(_ context.Context) ([]share.Share, error) { return s.listed, nil }
@@ -43,6 +48,27 @@ func (s *stubSharesEngine) Create(_ context.Context, in share.CreateInput) (shar
 	}
 	s.listed = append(s.listed, out)
 	return out, nil
+}
+func (s *stubSharesEngine) Update(_ context.Context, id string, in share.UpdateInput) (share.Share, error) {
+	s.updated = append(s.updated, struct {
+		ID    string
+		Input share.UpdateInput
+	}{id, in})
+	if s.updateErr != nil {
+		return share.Share{}, s.updateErr
+	}
+	for i, sh := range s.listed {
+		if sh.ID == id {
+			s.listed[i].Protocol = in.Protocol
+			s.listed[i].Preset = in.Preset
+			s.listed[i].AccessMode = in.AccessMode
+			s.listed[i].Description = in.Description
+			s.listed[i].Disabled = in.Disabled
+			s.listed[i].ACL = append([]share.ACLEntry(nil), in.ACL...)
+			return s.listed[i], nil
+		}
+	}
+	return share.Share{}, share.ErrShareNotFound
 }
 func (s *stubSharesEngine) Delete(_ context.Context, id string) error {
 	s.deleted = append(s.deleted, id)

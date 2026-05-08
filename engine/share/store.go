@@ -66,6 +66,48 @@ func (s *Store) Create(ctx context.Context, sh Share) (Share, error) {
 	return s.Get(ctx, sh.ID)
 }
 
+// Update writes the editable fields onto an existing share row and
+// replaces its ACL list in a single transaction. Name and Path stay as
+// they are — UpdateInput intentionally omits them. ErrShareNotFound is
+// returned if the row went away between Get and Update.
+func (s *Store) Update(ctx context.Context, id string, sh Share) (Share, error) {
+	now := s.now().UTC().Format(time.RFC3339Nano)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Share{}, fmt.Errorf("share store: begin: %w", err)
+	}
+	defer tx.Rollback()
+
+	res, err := tx.ExecContext(ctx, `
+		UPDATE shares
+		SET protocol = ?, preset = ?, access_mode = ?, description = ?, disabled = ?, updated_at = ?
+		WHERE id = ?
+	`, string(sh.Protocol), string(sh.Preset), string(sh.AccessMode), sh.Description, boolToInt(sh.Disabled), now, id)
+	if err != nil {
+		return Share{}, fmt.Errorf("share store: update share: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return Share{}, ErrShareNotFound
+	}
+
+	if _, err := tx.ExecContext(ctx, `DELETE FROM share_acl WHERE share_id = ?`, id); err != nil {
+		return Share{}, fmt.Errorf("share store: delete acl: %w", err)
+	}
+	for _, a := range sh.ACL {
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO share_acl (share_id, principal_kind, principal_name, mode)
+			VALUES (?, ?, ?, ?)
+		`, id, string(a.Kind), a.Name, string(a.Mode)); err != nil {
+			return Share{}, fmt.Errorf("share store: insert acl: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return Share{}, fmt.Errorf("share store: commit: %w", err)
+	}
+	return s.Get(ctx, id)
+}
+
 // Get fetches a single share + ACL by ID. ErrShareNotFound is returned for
 // missing rows.
 func (s *Store) Get(ctx context.Context, id string) (Share, error) {

@@ -158,15 +158,54 @@ var (
 	ErrPathOutsideVolume = errors.New("share: path is outside any known ZFS volume")
 )
 
-// Engine is the surface the UI and config.apply pipeline consume. List + Get
-// + Create + Delete is the v1 set; Update lands here once we add an edit form
-// (next sprint of polish work).
+// Engine is the surface the UI and config.apply pipeline consume.
 type Engine interface {
 	List(ctx context.Context) ([]Share, error)
 	Get(ctx context.Context, id string) (Share, error)
 	Create(ctx context.Context, in CreateInput) (Share, error)
+	Update(ctx context.Context, id string, in UpdateInput) (Share, error)
 	Delete(ctx context.Context, id string) error
 	Apply(ctx context.Context) error
+}
+
+// UpdateInput is the request shape for Engine.Update. Name and Path are
+// intentionally NOT editable — they're the share's stable identity from a
+// client's perspective; renaming would silently break SMB / NFS mounts. To
+// rename / move a share, delete + recreate. Everything else (protocol,
+// preset, access mode, ACL, description, disabled) IS mutable.
+type UpdateInput struct {
+	Protocol    Protocol
+	Preset      Preset
+	AccessMode  AccessMode
+	Description string
+	Disabled    bool
+	ACL         []ACLEntry
+}
+
+// Validate runs the same field-level checks as CreateInput minus the
+// immutable ones (Name / Path).
+func (in UpdateInput) Validate() error {
+	if !in.Protocol.Valid() {
+		return fmt.Errorf("%w: %q", ErrInvalidProtocol, in.Protocol)
+	}
+	if !in.Preset.Valid() {
+		return fmt.Errorf("%w: %q", ErrInvalidPreset, in.Preset)
+	}
+	if !in.AccessMode.Valid() {
+		return fmt.Errorf("%w: %q", ErrInvalidAccessMode, in.AccessMode)
+	}
+	for i, a := range in.ACL {
+		if a.Kind != PrincipalUser && a.Kind != PrincipalGroup {
+			return fmt.Errorf("%w: entry %d kind %q", ErrInvalidACL, i, a.Kind)
+		}
+		if strings.TrimSpace(a.Name) == "" {
+			return fmt.Errorf("%w: entry %d empty name", ErrInvalidACL, i)
+		}
+		if !a.Mode.Valid() {
+			return fmt.Errorf("%w: entry %d mode %q", ErrInvalidACL, i, a.Mode)
+		}
+	}
+	return nil
 }
 
 // CreateInput is the request shape for Engine.Create. Validated before any

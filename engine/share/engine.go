@@ -148,6 +148,45 @@ func (m *Manager) Create(ctx context.Context, in CreateInput) (Share, error) {
 	return created, nil
 }
 
+// Update mutates an existing share's editable fields (protocol / preset /
+// access mode / description / disabled / ACL) and regenerates the conf
+// files. Name and Path stay where they are — UpdateInput omits them on
+// purpose so smbd / nfsd clients aren't yanked out from under their
+// existing mounts. If regeneration fails, the row mutation is rolled back
+// so smb.conf is never out of sync with the table.
+func (m *Manager) Update(ctx context.Context, id string, in UpdateInput) (Share, error) {
+	if err := in.Validate(); err != nil {
+		return Share{}, err
+	}
+	prev, err := m.store.Get(ctx, id)
+	if err != nil {
+		return Share{}, err
+	}
+	updated := Share{
+		ID:          prev.ID,
+		Name:        prev.Name,
+		Path:        prev.Path,
+		Protocol:    in.Protocol,
+		Preset:      in.Preset,
+		AccessMode:  in.AccessMode,
+		Description: in.Description,
+		Disabled:    in.Disabled,
+		ACL:         append([]ACLEntry(nil), in.ACL...),
+		CreatedAt:   prev.CreatedAt,
+	}
+	saved, err := m.store.Update(ctx, id, updated)
+	if err != nil {
+		return Share{}, err
+	}
+	if err := m.Apply(ctx); err != nil {
+		// Roll back to the prior state so testparm-failed conf doesn't
+		// outlive a successful row mutation.
+		_, _ = m.store.Update(ctx, id, prev)
+		return Share{}, err
+	}
+	return saved, nil
+}
+
 // Delete removes the share and regenerates the conf files. The store +
 // regenerate pair lives behind one method so the conf is never out of sync
 // with the table.
