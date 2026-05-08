@@ -4,6 +4,11 @@ prototype/claude_design/Shares.html: shares table + per-share detail card +
 "best defaults applied" knob list. Form is single-step: pick name + path +
 preset + access mode + optional ACL — no SMB tunables (priority #2).
 
+The "New share" dialog uses the reusable {{ template "modal" }} partial
+(see internal/ui/templates/partials/modal.tmpl). Modal behaviors
+(scroll lock, ESC, backdrop close, data-modal-open / data-modal-close)
+are auto-wired by /ui/static/kura.js.
+
 Data shape: PageData.Extra is a SharesView. All strings are pre-translated
 in shares.go so the template stays free of CLI-output tokens.
 */ -}}
@@ -16,7 +21,7 @@ in shares.go so the template stays free of CLI-output tokens.
   </div>
   <div class="row gap-sm" style="display:flex;gap:8px;">
     <button type="button" class="btn btn-primary" data-testid="shares-new-btn"
-      onclick="document.getElementById('new-share-modal').style.display='flex';">
+      data-modal-open="new-share-modal">
       {{ T "page.shares.new" }}
     </button>
   </div>
@@ -131,69 +136,75 @@ in shares.go so the template stays free of CLI-output tokens.
   </div>
 </section>
 
-<div id="new-share-modal" class="modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:50;align-items:center;justify-content:center;" data-testid="shares-new-modal">
-  <div class="card" style="width:480px;max-width:calc(100vw - 32px);">
-    <div class="card-head">
-      <h3 class="card-title">{{ T "page.shares.new" }}</h3>
-      <button type="button" class="btn btn-ghost btn-sm" data-testid="shares-new-cancel"
-        onclick="document.getElementById('new-share-modal').style.display='none';">
-        {{ T "page.shares.form.cancel" }}
-      </button>
+{{- /* ===== New share dialog (reusable modal partial) ===== */ -}}
+{{ template "modal" dict
+    "id"      "new-share-modal"
+    "testid"  "shares-new-modal"
+    "title"   (T "page.shares.new")
+    "action"  "/ui/admin/shares"
+    "bodyTpl" "shares-new-body"
+    "footTpl" "shares-new-foot"
+    "ctx"     $v }}
+{{ end }}
+
+{{- /* ===== Body / foot definitions for the new-share modal ===== */ -}}
+
+{{ define "shares-new-body" }}
+{{ $v := . }}
+<div data-testid="shares-new-form" style="display:flex;flex-direction:column;gap:14px;">
+  <div class="field">
+    <label for="share-name">{{ T "page.shares.form.name" }}</label>
+    <input id="share-name" name="name" type="text" class="input" required autocomplete="off" data-testid="shares-form-name">
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.name_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="share-path">{{ T "page.shares.form.path" }}</label>
+    <input id="share-path" name="path" type="text" class="input mono" required placeholder="/tank/photos" data-testid="shares-form-path">
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.path_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="share-protocol">{{ T "page.shares.form.protocol" }}</label>
+    <select id="share-protocol" name="protocol" class="input" data-testid="shares-form-protocol">
+      {{ range $v.Protocols }}<option value="{{ .ID }}">{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label>{{ T "page.shares.form.preset" }}</label>
+    <div class="col gap-sm" style="display:flex;flex-direction:column;gap:6px;" data-testid="shares-form-preset-group">
+      {{ range $i, $p := $v.Presets }}
+      <label class="row center" style="display:flex;align-items:flex-start;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">
+        <input type="radio" name="preset" value="{{ .ID }}"{{ if eq $i 0 }} checked{{ end }} data-testid="shares-form-preset-{{ .ID }}">
+        <span style="display:flex;flex-direction:column;gap:2px;">
+          <strong style="font-size:13px;">{{ .Label }}</strong>
+          <span class="muted" style="font-size:11px;">{{ .Hint }}</span>
+        </span>
+      </label>
+      {{ end }}
     </div>
-    <form method="post" action="/ui/admin/shares" class="card-body col" data-testid="shares-new-form" style="display:flex;flex-direction:column;gap:14px;">
-      <div class="field">
-        <label for="share-name">{{ T "page.shares.form.name" }}</label>
-        <input id="share-name" name="name" type="text" class="form-control" required autocomplete="off" data-testid="shares-form-name" />
-        <p class="field-hint muted" style="font-size:11px;margin:4px 0 0 0;">{{ T "page.shares.form.name_hint" }}</p>
-      </div>
-      <div class="field">
-        <label for="share-path">{{ T "page.shares.form.path" }}</label>
-        <input id="share-path" name="path" type="text" class="form-control" required placeholder="/tank/photos" data-testid="shares-form-path" />
-        <p class="field-hint muted" style="font-size:11px;margin:4px 0 0 0;">{{ T "page.shares.form.path_hint" }}</p>
-      </div>
-      <div class="field">
-        <label for="share-protocol">{{ T "page.shares.form.protocol" }}</label>
-        <select id="share-protocol" name="protocol" class="form-control" data-testid="shares-form-protocol">
-          {{ range $v.Protocols }}<option value="{{ .ID }}">{{ .Label }}</option>{{ end }}
-        </select>
-      </div>
-      <div class="field">
-        <label>{{ T "page.shares.form.preset" }}</label>
-        <div class="col gap-sm" style="display:flex;flex-direction:column;gap:6px;" data-testid="shares-form-preset-group">
-          {{ range $i, $p := $v.Presets }}
-          <label class="row center" style="display:flex;align-items:flex-start;gap:8px;padding:8px;border:1px solid var(--border);border-radius:6px;cursor:pointer;">
-            <input type="radio" name="preset" value="{{ .ID }}"{{ if eq $i 0 }} checked{{ end }} data-testid="shares-form-preset-{{ .ID }}" />
-            <span style="display:flex;flex-direction:column;gap:2px;">
-              <strong style="font-size:13px;">{{ .Label }}</strong>
-              <span class="muted" style="font-size:11px;">{{ .Hint }}</span>
-            </span>
-          </label>
-          {{ end }}
-        </div>
-      </div>
-      <div class="field">
-        <label for="share-access">{{ T "page.shares.form.access" }}</label>
-        <select id="share-access" name="access_mode" class="form-control" data-testid="shares-form-access">
-          {{ range $v.Access }}<option value="{{ .ID }}">{{ .Label }}</option>{{ end }}
-        </select>
-      </div>
-      <div class="field">
-        <label for="share-acl">{{ T "page.shares.form.acl" }}</label>
-        <input id="share-acl" name="acl" type="text" class="form-control" placeholder="user:alice:rw, group:family:r" autocomplete="off" data-testid="shares-form-acl" />
-        <p class="field-hint muted" style="font-size:11px;margin:4px 0 0 0;">{{ T "page.shares.form.acl_hint" }}</p>
-      </div>
-      <div class="field">
-        <label for="share-description">{{ T "page.shares.form.description" }}</label>
-        <input id="share-description" name="description" type="text" class="form-control" autocomplete="off" data-testid="shares-form-description" />
-      </div>
-      <div class="row gap-sm" style="display:flex;gap:8px;justify-content:flex-end;">
-        <button type="button" class="btn"
-          onclick="document.getElementById('new-share-modal').style.display='none';">
-          {{ T "page.shares.form.cancel" }}
-        </button>
-        <button type="submit" class="btn btn-primary" data-testid="shares-form-submit">{{ T "page.shares.form.submit" }}</button>
-      </div>
-    </form>
+  </div>
+  <div class="field">
+    <label for="share-access">{{ T "page.shares.form.access" }}</label>
+    <select id="share-access" name="access_mode" class="input" data-testid="shares-form-access">
+      {{ range $v.Access }}<option value="{{ .ID }}">{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label for="share-acl">{{ T "page.shares.form.acl" }}</label>
+    <input id="share-acl" name="acl" type="text" class="input" placeholder="user:alice:rw, group:family:r" autocomplete="off" data-testid="shares-form-acl">
+    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.acl_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="share-description">{{ T "page.shares.form.description" }}</label>
+    <input id="share-description" name="description" type="text" class="input" autocomplete="off" data-testid="shares-form-description">
   </div>
 </div>
+{{ end }}
+
+{{ define "shares-new-foot" }}
+<button type="button" class="btn" data-modal-close data-testid="shares-new-cancel">
+  {{ T "page.shares.form.cancel" }}
+</button>
+<button type="submit" class="btn btn-primary" data-testid="shares-form-submit">
+  {{ T "page.shares.form.submit" }}
+</button>
 {{ end }}

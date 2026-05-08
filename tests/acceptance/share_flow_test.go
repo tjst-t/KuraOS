@@ -211,6 +211,37 @@ func TestAcceptance_Share_InvalidInputShowsTranslatedError(t *testing.T) {
 	}
 }
 
+// Regression: shares page now uses {{ template "modal" }} via the new
+// partial. The first hit of any page that uses tpl-dispatched bodies used
+// to succeed and subsequent hits returned "template clone error" because
+// the tpl func executed on the master template tree. Hit /ui/admin/shares
+// three times to ensure the fix (Renderer.tplDispatch as a stable clone)
+// holds for shares too.
+func TestAcceptance_SharesPage_RepeatedRequestsRender(t *testing.T) {
+	srv, _, _, _, _ := newServerWithShares(t)
+	c := loginAs(t, srv, "root", "longenoughpw")
+	for i := 0; i < 3; i++ {
+		resp, err := c.Get(srv.URL + "/ui/admin/shares")
+		if err != nil {
+			t.Fatalf("request %d: GET: %v", i+1, err)
+		}
+		body := readBody(t, resp)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("request %d: status = %d, want 200", i+1, resp.StatusCode)
+		}
+		if strings.Contains(body, "template clone error") || strings.Contains(body, "template error:") {
+			t.Fatalf("request %d: response body contains template error", i+1)
+		}
+		if !strings.Contains(body, `data-testid="shares-new-modal"`) {
+			t.Errorf("request %d: new-share modal markup missing", i+1)
+		}
+		if !strings.Contains(body, `data-testid="shares-form-submit"`) {
+			t.Errorf("request %d: shares form submit button missing", i+1)
+		}
+	}
+}
+
 func mustReadFile(t *testing.T, path string) string {
 	t.Helper()
 	b, err := os.ReadFile(path)
