@@ -1,9 +1,13 @@
 {{- /*
 storage.tmpl — admin /ui/admin/storage page. Visual SSOT is
 prototype/claude_design/Storage.html: PoolCard grid + import banner + disks
-table. Volume / snapshot / scrub tabs from the prototype are deferred to
-subsequent sprints — this sprint covers only the read-only views shipped
-with engine/storage's ListPools / ListDisks / ListImportable.
+table + dialogs.
+
+Modal vocabulary refactored to the reusable {{ template "modal" }} partial
+(see internal/ui/templates/partials/modal.tmpl). All modal behaviors
+(scroll lock, ESC, backdrop click-to-close, data-modal-open / data-modal-close
+buttons) are auto-wired by /ui/static/kura.js — page scripts only need to
+add the form-specific validation logic via kura.gateForm().
 
 Data shape: PageData.Extra is a StorageView. All strings are pre-translated
 in storage.go so the template stays free of CLI-output tokens.
@@ -18,7 +22,7 @@ in storage.go so the template stays free of CLI-output tokens.
   <div class="row gap-sm" style="display:flex;gap:8px;">
     {{ if $v.WriteEnabled }}
     <button type="button" class="btn btn-primary" data-testid="storage-new-pool-btn"
-      onclick="document.getElementById('new-pool-modal').setAttribute('open','true');document.getElementById('new-pool-modal').style.display='flex';">
+      data-modal-open="new-pool-modal">
       {{ T "page.storage.new_pool" }}
     </button>
     {{ else }}
@@ -45,7 +49,7 @@ in storage.go so the template stays free of CLI-output tokens.
   </div>
   {{ if $v.WriteEnabled }}
   <button type="button" class="btn btn-sm" data-testid="storage-import-inspect-btn"
-    onclick="document.getElementById('import-modal-{{ $v.Importer.First }}').style.display='flex';">
+    data-modal-open="import-modal-{{ $v.Importer.First }}">
     {{ T "page.storage.import_inspect" }}
   </button>
   {{ else }}
@@ -185,7 +189,7 @@ in storage.go so the template stays free of CLI-output tokens.
           {{ if $v.WriteEnabled }}
           <td style="text-align:right">
             <button type="button" class="btn btn-sm" data-testid="storage-import-row-action"
-              onclick="document.getElementById('import-modal-{{ .Name }}').style.display='flex';">
+              data-modal-open="import-modal-{{ .Name }}">
               {{ T "page.storage.import.confirm" }}
             </button>
           </td>
@@ -198,106 +202,35 @@ in storage.go so the template stays free of CLI-output tokens.
 </section>
 {{ end }}
 
+{{- /* ===== Modals (rendered via reusable partial) ===== */ -}}
+
 {{ if $v.WriteEnabled }}
 {{ range $v.Imports }}
-<div id="import-modal-{{ .Name }}" class="modal" data-testid="storage-import-modal" data-pool="{{ .Name }}"
-  style="display:none">
-  <form method="post" action="/ui/admin/storage/import" class="card" style="min-width:420px;max-width:560px">
-    <div class="card-head">
-      <h3 class="card-title">{{ T "page.storage.import.confirm" }}: <span class="mono">{{ .Name }}</span></h3>
-    </div>
-    <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
-      <input type="hidden" name="name" value="{{ .Name }}">
-      <div class="field">
-        <label style="font-size:12px;color:var(--text-3)">{{ T "page.storage.import.col.topology" }}</label>
-        <div class="mono" style="font-size:12px">{{ .Topology }}</div>
-      </div>
-      <label class="row center" style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
-        <input type="checkbox" name="force" value="1" data-testid="storage-import-force-checkbox">
-        <span>
-          <div>{{ T "page.storage.import.force" }}</div>
-          <div style="font-size:11px;color:var(--warn);margin-top:2px">{{ T "page.storage.import.force_warn" }}</div>
-        </span>
-      </label>
-    </div>
-    <div class="card-foot" style="justify-content:flex-end;gap:8px">
-      <button type="button" class="btn" onclick="document.getElementById('import-modal-{{ .Name }}').style.display='none';">
-        {{ T "page.storage.new_pool.cancel" }}
-      </button>
-      <button type="submit" class="btn btn-primary" data-testid="storage-import-submit-btn">
-        {{ T "page.storage.import.submit" }}
-      </button>
-    </div>
-  </form>
-</div>
+{{ template "modal" dict
+    "id"      (printf "import-modal-%s" .Name)
+    "testid"  "storage-import-modal"
+    "title"   (printf "%s: %s" (T "page.storage.import.confirm") .Name)
+    "action"  "/ui/admin/storage/import"
+    "bodyTpl" "storage-import-modal-body"
+    "footTpl" "storage-import-modal-foot"
+    "ctx"     . }}
 {{ end }}
 
-<div id="new-pool-modal" class="modal" data-testid="storage-new-pool-modal" style="display:none">
-  <form method="post" action="/ui/admin/storage/pools" class="card" style="min-width:520px;max-width:760px">
-    <div class="card-head">
-      <h3 class="card-title">{{ T "page.storage.new_pool.title" }}</h3>
-    </div>
-    <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
-      <div class="field">
-        <label>{{ T "page.storage.new_pool.name" }}</label>
-        <input class="input mono" name="name" required data-testid="storage-new-pool-name">
-        <div class="field-hint">{{ T "page.storage.new_pool.name_hint" }}</div>
-      </div>
-      <div class="field">
-        <label>{{ T "page.storage.new_pool.layout" }}</label>
-        <select name="data_layout" class="input" required data-testid="storage-new-pool-layout">
-          {{ range $v.Layouts }}
-          <option value="{{ .ID }}">{{ .Label }}</option>
-          {{ end }}
-        </select>
-      </div>
-      <div class="field">
-        <label>{{ T "page.storage.new_pool.disks" }}</label>
-        {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "data_disks" "Required" true "Testid" "storage-new-pool-disks" }}
-        <div class="field-hint">{{ T "page.storage.new_pool.disks_hint" }}</div>
-      </div>
-      <details>
-        <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.special" }}</summary>
-        <div class="field" style="margin-top:8px">
-          <label>{{ T "page.storage.new_pool.layout" }}</label>
-          <select name="special_layout" class="input">
-            <option value="">—</option>
-            <option value="mirror">mirror</option>
-            <option value="raidz1">raidz1</option>
-            <option value="raidz2">raidz2</option>
-            <option value="raidz3">raidz3</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>{{ T "page.storage.new_pool.disks" }}</label>
-          {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "special_disks" "Required" false "Testid" "storage-new-pool-special-disks" }}
-          <div class="field-hint">{{ T "page.storage.new_pool.special_hint" }}</div>
-        </div>
-      </details>
-      <details>
-        <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.spares" }}</summary>
-        <div class="field" style="margin-top:8px">
-          {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "spares" "Required" false "Testid" "storage-new-pool-spares" }}
-        </div>
-      </details>
-    </div>
-    <div class="card-foot" style="justify-content:flex-end;gap:8px">
-      <button type="button" class="btn" onclick="document.getElementById('new-pool-modal').style.display='none';">
-        {{ T "page.storage.new_pool.cancel" }}
-      </button>
-      <button type="submit" class="btn btn-primary" data-testid="storage-new-pool-submit"
-        aria-disabled="true" title="">
-        {{ T "page.storage.new_pool.submit" }}
-      </button>
-    </div>
-  </form>
-</div>
+{{ template "modal" dict
+    "id"      "new-pool-modal"
+    "testid"  "storage-new-pool-modal"
+    "title"   (T "page.storage.new_pool.title")
+    "action"  "/ui/admin/storage/pools"
+    "bodyTpl" "storage-new-pool-body"
+    "footTpl" "storage-new-pool-foot"
+    "ctx"     $v }}
 
-{{- /* Client-side validation + cross-picker disk dedup. The browser is the
-       only source of truth for live UX feedback; the server still performs
-       authoritative validation in engine/storage/validation.go (priority #5
-       reliability), so this script is presentational only — never a security
-       boundary. Strings are i18n via storage-validation-msgs JSON island. */ -}}
+{{- /* ===== Pool-form validation script (page-specific) =====
+   The validation rules depend on which layout is selected, so the logic
+   stays here. kura.gateForm wires the standard submit-button gating
+   (aria-disabled + tooltip + submit blocking). The cross-picker dedup is
+   storage-specific and runs as a side-effect inside the validate
+   callback. i18n strings are injected via the JSON island below.       */ -}}
 <script type="application/json" id="storage-validation-msgs">
 {
   "name_required":           "{{ T "page.storage.new_pool.err.name_required" }}",
@@ -309,37 +242,11 @@ in storage.go so the template stays free of CLI-output tokens.
 }
 </script>
 <script>
-// Body scroll lock while any modal is visible. We watch every .modal
-// element's `style` attribute for changes (the existing inline onclick
-// handlers toggle display:flex/none) and add/remove `modal-open` on
-// <body>. CSS in kura.css turns off body scrolling when that class is set.
-(function() {
-  var modals = document.querySelectorAll('.modal');
-  if (!modals.length) return;
-  function visible(m) { return m.style.display && m.style.display !== 'none'; }
-  function sync() {
-    var anyVisible = false;
-    for (var i = 0; i < modals.length; i++) {
-      if (visible(modals[i])) { anyVisible = true; break; }
-    }
-    document.body.classList.toggle('modal-open', anyVisible);
-  }
-  if (typeof MutationObserver !== 'undefined') {
-    var mo = new MutationObserver(sync);
-    modals.forEach(function(m) {
-      mo.observe(m, { attributes: true, attributeFilter: ['style'] });
-    });
-  }
-  sync();
-})();
-
-(function() {
+(function () {
   var modal = document.getElementById('new-pool-modal');
   if (!modal) return;
   var form = modal.querySelector('form');
   if (!form) return;
-  var submit = form.querySelector('[data-testid="storage-new-pool-submit"]');
-  if (!submit) return;
 
   var msgs = {};
   try {
@@ -350,7 +257,7 @@ in storage.go so the template stays free of CLI-output tokens.
   var fields = ['data_disks', 'special_disks', 'spares'];
 
   function fmt(tpl, params) {
-    return (tpl || '').replace(/\{(\w+)\}/g, function(_, k) {
+    return (tpl || '').replace(/\{(\w+)\}/g, function (_, k) {
       return (params[k] != null) ? params[k] : '{' + k + '}';
     });
   }
@@ -362,16 +269,13 @@ in storage.go so the template stays free of CLI-output tokens.
     return s;
   }
 
-  function update() {
-    var sel = {};
-    fields.forEach(function(f) { sel[f] = selectedSet(f); });
-
-    // Cross-picker dedup: any disk selected in one picker is grayed-out in
-    // the other two. The selected row in its own picker stays interactive
-    // so the operator can deselect it without first unchecking elsewhere.
-    fields.forEach(function(f) {
+  // Cross-picker dedup: gray out rows whose disk is selected in another
+  // picker. The selected row in its own picker stays interactive so the
+  // operator can deselect it without first unchecking elsewhere.
+  function applyDedup(sel) {
+    fields.forEach(function (f) {
       var rows = form.querySelectorAll('[data-field="' + f + '"] .disk-picker-row');
-      rows.forEach(function(row) {
+      rows.forEach(function (row) {
         var cb = row.querySelector('input[type="checkbox"]');
         if (!cb) return;
         var path = cb.value;
@@ -390,60 +294,137 @@ in storage.go so the template stays free of CLI-output tokens.
         }
       });
     });
-
-    // Validate. Spares are always optional, so no rule fires for them.
-    var errs = [];
-    var nameInput = form.querySelector('input[name="name"]');
-    if (!nameInput || !(nameInput.value || '').trim()) errs.push(msgs.name_required);
-
-    var dataLayoutEl = form.querySelector('select[name="data_layout"]');
-    var dataLayout = dataLayoutEl ? dataLayoutEl.value : '';
-    if (!dataLayout) {
-      errs.push(msgs.data_layout_required);
-    } else {
-      var dmin = layoutMin[dataLayout] || 1;
-      var dgot = sel.data_disks.size;
-      if (dgot < dmin) {
-        errs.push(fmt(msgs.data_too_few, { layout: dataLayout, min: dmin, got: dgot }));
-      }
-    }
-
-    var specialLayoutEl = form.querySelector('select[name="special_layout"]');
-    var specialLayout = specialLayoutEl ? specialLayoutEl.value : '';
-    var sgot = sel.special_disks.size;
-    if (specialLayout || sgot > 0) {
-      if (!specialLayout) {
-        errs.push(msgs.special_layout_required);
-      } else {
-        var smin = layoutMin[specialLayout] || 0;
-        if (sgot < smin) {
-          errs.push(fmt(msgs.special_too_few, { layout: specialLayout, min: smin, got: sgot }));
-        }
-      }
-    }
-
-    if (errs.length === 0) {
-      submit.removeAttribute('aria-disabled');
-      submit.removeAttribute('title');
-    } else {
-      submit.setAttribute('aria-disabled', 'true');
-      submit.setAttribute('title', errs.map(function(e) { return '• ' + e; }).join('\n'));
-    }
   }
 
-  form.addEventListener('change', update);
-  form.addEventListener('input', update);
-  // Block submission if validation failed. Server-side validation still
-  // exists; this is just the UX guard that matches the visible disabled
-  // state of the button.
-  form.addEventListener('submit', function(e) {
-    if (submit.getAttribute('aria-disabled') === 'true') {
-      e.preventDefault();
-      e.stopPropagation();
-    }
-  });
-  update();
+  // Wire the standard submit-button gating + submit blocking via kura.gateForm.
+  // The validate callback returns the error list; kura handles aria-disabled +
+  // tooltip + preventDefault on submit when invalid.
+  if (window.kura && typeof window.kura.gateForm === 'function') {
+    window.kura.gateForm(form, function (frm) {
+      var sel = {};
+      fields.forEach(function (f) { sel[f] = selectedSet(f); });
+      applyDedup(sel);
+
+      var errs = [];
+      var nameInput = frm.querySelector('input[name="name"]');
+      if (!nameInput || !(nameInput.value || '').trim()) errs.push(msgs.name_required);
+
+      var dataLayoutEl = frm.querySelector('select[name="data_layout"]');
+      var dataLayout = dataLayoutEl ? dataLayoutEl.value : '';
+      if (!dataLayout) {
+        errs.push(msgs.data_layout_required);
+      } else {
+        var dmin = layoutMin[dataLayout] || 1;
+        var dgot = sel.data_disks.size;
+        if (dgot < dmin) {
+          errs.push(fmt(msgs.data_too_few, { layout: dataLayout, min: dmin, got: dgot }));
+        }
+      }
+
+      var specialLayoutEl = frm.querySelector('select[name="special_layout"]');
+      var specialLayout = specialLayoutEl ? specialLayoutEl.value : '';
+      var sgot = sel.special_disks.size;
+      if (specialLayout || sgot > 0) {
+        if (!specialLayout) {
+          errs.push(msgs.special_layout_required);
+        } else {
+          var smin = layoutMin[specialLayout] || 0;
+          if (sgot < smin) {
+            errs.push(fmt(msgs.special_too_few, { layout: specialLayout, min: smin, got: sgot }));
+          }
+        }
+      }
+      return errs;
+    });
+  }
 })();
 </script>
 {{ end }}
+{{ end }}
+
+{{- /* ===== Body / foot definitions for the modal partials =====
+   Each define block is a top-level template; the "modal" partial reaches
+   them via the `tpl` template func at render time. Naming convention:
+   {{page-id}}-{{form-id}}-body / -foot to avoid collisions across pages. */ -}}
+
+{{ define "storage-import-modal-body" }}
+<div style="display:flex;flex-direction:column;gap:12px">
+  <input type="hidden" name="name" value="{{ .Name }}">
+  <div class="field">
+    <label style="font-size:12px;color:var(--text-3)">{{ T "page.storage.import.col.topology" }}</label>
+    <div class="mono" style="font-size:12px">{{ .Topology }}</div>
+  </div>
+  <label class="row center" style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
+    <input type="checkbox" name="force" value="1" data-testid="storage-import-force-checkbox">
+    <span>
+      <div>{{ T "page.storage.import.force" }}</div>
+      <div style="font-size:11px;color:var(--warn);margin-top:2px">{{ T "page.storage.import.force_warn" }}</div>
+    </span>
+  </label>
+</div>
+{{ end }}
+
+{{ define "storage-import-modal-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="storage-import-submit-btn">
+  {{ T "page.storage.import.submit" }}
+</button>
+{{ end }}
+
+{{ define "storage-new-pool-body" }}
+{{ $v := . }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <div class="field">
+    <label>{{ T "page.storage.new_pool.name" }}</label>
+    <input class="input mono" name="name" required data-testid="storage-new-pool-name">
+    <div class="field-hint">{{ T "page.storage.new_pool.name_hint" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.new_pool.layout" }}</label>
+    <select name="data_layout" class="input" required data-testid="storage-new-pool-layout">
+      {{ range $v.Layouts }}
+      <option value="{{ .ID }}">{{ .Label }}</option>
+      {{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.new_pool.disks" }}</label>
+    {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "data_disks" "Required" true "Testid" "storage-new-pool-disks" }}
+    <div class="field-hint">{{ T "page.storage.new_pool.disks_hint" }}</div>
+  </div>
+  <details>
+    <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.special" }}</summary>
+    <div class="field" style="margin-top:8px">
+      <label>{{ T "page.storage.new_pool.layout" }}</label>
+      <select name="special_layout" class="input">
+        <option value="">—</option>
+        <option value="mirror">mirror</option>
+        <option value="raidz1">raidz1</option>
+        <option value="raidz2">raidz2</option>
+        <option value="raidz3">raidz3</option>
+      </select>
+    </div>
+    <div class="field">
+      <label>{{ T "page.storage.new_pool.disks" }}</label>
+      {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "special_disks" "Required" false "Testid" "storage-new-pool-special-disks" }}
+      <div class="field-hint">{{ T "page.storage.new_pool.special_hint" }}</div>
+    </div>
+  </details>
+  <details>
+    <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.spares" }}</summary>
+    <div class="field" style="margin-top:8px">
+      {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "spares" "Required" false "Testid" "storage-new-pool-spares" }}
+    </div>
+  </details>
+</div>
+{{ end }}
+
+{{ define "storage-new-pool-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary"
+  data-testid="storage-new-pool-submit"
+  data-validate-submit
+  aria-disabled="true" title="">
+  {{ T "page.storage.new_pool.submit" }}
+</button>
 {{ end }}

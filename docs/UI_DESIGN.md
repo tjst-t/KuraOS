@@ -108,3 +108,106 @@ shadow:  sm / md / lg (light/dark でアルファ強度を切替)
 | `Sf92666` Network / TLS / Logs | `Network.html`、`Settings.html` の TLS / 更新 / ログタブ |
 | `S0eedaa` File API + Files UI | (プロトタイプには Files 画面が無い → 設計時に追加プロトタイプを作成) |
 | `S99702c` Portal + Wizard 完成 | `Portal.html`、`Setup.html` 全 6 ステップ |
+
+## 再利用可能なフロントエンドツールキット
+
+すべての admin ページで共通して使える小さな仕組みを 3 つ用意している。
+
+### 1. モーダル partial (`{{ template "modal" }}`)
+
+`internal/ui/templates/partials/modal.tmpl`。ヘッダ / フッタを固定し、ボディだけがスクロールする shell。Body / Foot は呼び出し側が `{{ define ... }}` で名前付きテンプレートを定義し、その名前を partial に渡す。
+
+```go
+{{ template "modal" dict
+    "id"      "myform-modal"
+    "testid"  "myform-modal"
+    "title"   (T "myform.title")
+    "action"  "/ui/admin/myform"
+    "bodyTpl" "myform-body"
+    "footTpl" "myform-foot"
+    "ctx"     $someViewModel }}
+
+{{ define "myform-body" }}
+  <div class="field">...</div>
+{{ end }}
+
+{{ define "myform-foot" }}
+  <button type="button" class="btn" data-modal-close>{{ T "..." }}</button>
+  <button type="submit" class="btn btn-primary" data-validate-submit>{{ T "..." }}</button>
+{{ end }}
+```
+
+* `id` 必須 / `title` 必須
+* `action` を渡すと `<form method="post" action="...">` でラップされる (省略時は `<div>`)
+* `ctx` は body / foot の `.` として渡される (任意の view-model)
+* テンプレート名の collision を避けるため `{ページ ID }-{ フォーム ID }-body` のように prefix を付ける
+
+### 2. クライアント挙動 (`/ui/static/kura.js`)
+
+`internal/ui/dist/kura.js` (admin layout で `<script src="/ui/static/kura.js" defer>` 経由で読み込み)。DOMContentLoaded で以下を自動配線:
+
+| トリガー | 動作 |
+|---|---|
+| `<button data-modal-open="modal-id">` | 該当 modal を開く |
+| `<button data-modal-close>` | 自身を含む modal を閉じる |
+| `.modal` 背景クリック | その modal を閉じる |
+| ESC キー | 表示中の modal のうち最上位を閉じる |
+| いずれかの modal が表示中 | `<body>` に `modal-open` クラス → 背面ページのスクロールロック (CSS `body.modal-open { overflow:hidden }`) |
+
+公開 API:
+
+```js
+kura.modal.open(id)        // プログラマティックに開く
+kura.modal.close(id)       // プログラマティックに閉じる
+kura.modal.closeTop()      // 最上位 modal を閉じる
+```
+
+### 3. フォーム送信ボタンのバリデーションゲート (`kura.gateForm`)
+
+submit ボタンを `aria-disabled` で動的にロック + hover ツールチップで未達条件を表示する API。`disabled` 属性を使わない理由は、disabled なボタンには hover イベントが届かず tooltip が出ないため。
+
+```js
+kura.gateForm(form, function (frm) {
+  var errs = [];
+  if (...) errs.push("条件 X が未達");
+  if (...) errs.push("条件 Y が未達");
+  return errs;  // 空配列 → ボタン有効、要素あり → 無効 + tooltip
+});
+```
+
+ボタンの選択優先順は `[data-validate-submit]` → `button[type="submit"]`。
+
+* `errs` を返す callback は `change` / `input` イベントで再実行される
+* tooltip は `• 条件 X が未達\n• 条件 Y が未達` のように bullet list 形式
+* ボタンが `aria-disabled="true"` のまま `submit` イベントが発生したら `e.preventDefault()` する
+* サーバ側のバリデーションは別途必須 — このゲートはあくまで UX 補助。data 整合性の authority は server (priority #5 信頼性)
+
+#### 文字列の i18n
+
+JS 内にユーザー向け文字列をハードコードしないため、テンプレートに JSON island を埋め込んで `JSON.parse` で取得する:
+
+```html
+<script type="application/json" id="myform-validation-msgs">
+{
+  "name_required": "{{ T "myform.err.name_required" }}",
+  "too_few":       "{{ T "myform.err.too_few" }}"
+}
+</script>
+<script>
+(function () {
+  var form = document.getElementById('myform-modal').querySelector('form');
+  var msgs = JSON.parse(document.getElementById('myform-validation-msgs').textContent);
+  kura.gateForm(form, function (frm) {
+    var errs = [];
+    if (!frm.elements['name'].value.trim()) errs.push(msgs.name_required);
+    return errs;
+  });
+})();
+</script>
+```
+
+`{layout}` `{min}` のようなプレースホルダ入りメッセージは `String.replace(/\{(\w+)\}/g, ...)` で置換する。
+
+### 実装例
+
+`internal/ui/templates/pages/storage.tmpl` が完全な使用例 (modal partial × 2 + gateForm + cross-picker dedup)。新しいフォームを追加するときは storage.tmpl を見ながら同じパターンを踏襲する。

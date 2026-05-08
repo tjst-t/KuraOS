@@ -1,0 +1,66 @@
+{{- /*
+modal — reusable dialog shell with pinned header/footer, scroll-locked
+backdrop, and ESC / click-outside / data-modal-close button support
+(behavior wired by /ui/static/kura.js).
+
+Usage from a page template:
+
+    {{ define "myform-body" }}
+      <div class="field">
+        <label>{{ T "..." }}</label>
+        <input class="input" name="..." required>
+      </div>
+      ...more fields...
+    {{ end }}
+
+    {{ define "myform-foot" }}
+      <button type="button" class="btn" data-modal-close>{{ T "..." }}</button>
+      <button type="submit" class="btn btn-primary" data-validate-submit>
+        {{ T "..." }}
+      </button>
+    {{ end }}
+
+    {{ template "modal" dict
+        "id"      "myform-modal"
+        "title"   (T "myform.title")
+        "action"  "/ui/admin/myform"
+        "bodyTpl" "myform-body"
+        "footTpl" "myform-foot"
+        "ctx"     $someContextValue }}
+
+Dict keys (all values strings unless noted):
+  id      — DOM id for the outer .modal element (required)
+  title   — header text (required)
+  testid  — data-testid override (optional, defaults to id)
+  action  — form action URL. When set, body+foot are wrapped in a
+            <form>; data-modal-close + data-validate-submit work as
+            buttons inside it. Omit for non-form modals.
+  method  — form method (default "post"; only applies if action is set)
+  bodyTpl — name of a {{ define ... }} template to render inside .card-body
+  footTpl — name of a {{ define ... }} template to render inside .card-foot
+  ctx     — value passed as the data pipeline to bodyTpl / footTpl
+
+The body/foot templates receive ctx as `.` so they can use whatever
+shape the caller passed in (struct / map / view-model).
+*/ -}}
+{{ define "modal" }}
+{{- $id := .id -}}
+{{- $testid := .id -}}{{ if .testid }}{{ $testid = .testid }}{{ end -}}
+<div id="{{ $id }}" class="modal" data-testid="{{ $testid }}" style="display:none">
+  {{- if .action }}
+  <form method="{{ if .method }}{{ .method }}{{ else }}post{{ end }}" action="{{ .action }}" class="card">
+  {{- else }}
+  <div class="card">
+  {{- end }}
+    <div class="card-head">
+      <h3 class="card-title">{{ .title }}</h3>
+    </div>
+    <div class="card-body">{{ tpl .bodyTpl .ctx }}</div>
+    <div class="card-foot" style="justify-content:flex-end;gap:8px">{{ tpl .footTpl .ctx }}</div>
+  {{- if .action }}
+  </form>
+  {{- else }}
+  </div>
+  {{- end }}
+</div>
+{{ end }}

@@ -10,6 +10,7 @@ package ui
 import (
 	"bytes"
 	"embed"
+	"encoding/json"
 	"fmt"
 	"html/template"
 	"io/fs"
@@ -77,6 +78,35 @@ func New(tr *i18n.Translator, version string) (*Renderer, error) {
 				m[key] = values[i+1]
 			}
 			return m, nil
+		},
+		// tpl renders the named template with the given data and returns the
+		// result as already-escaped HTML. Used by partials/modal.tmpl to
+		// dispatch on caller-supplied body/foot template names — Go html/template
+		// requires literal template names in {{ template }}, so we route
+		// through ExecuteTemplate at call time. Captured-by-reference closure
+		// over `r` works because Renderer.templates is set in New() before any
+		// caller can ever invoke this function.
+		"tpl": func(name string, data any) (template.HTML, error) {
+			if r.templates == nil {
+				return "", fmt.Errorf("tpl: templates not yet parsed")
+			}
+			var buf bytes.Buffer
+			if err := r.templates.ExecuteTemplate(&buf, name, data); err != nil {
+				return "", fmt.Errorf("tpl %q: %w", name, err)
+			}
+			return template.HTML(buf.String()), nil
+		},
+		// safeJS marks a translated string as safe to interpolate inside a
+		// <script>'s JSON-island string literal. The value is JSON-escaped
+		// with Go's encoding/json so backslashes and quotes are handled
+		// uniformly. Use sparingly — only inside known-safe contexts where
+		// you control the surrounding quoting.
+		"safeJS": func(s string) (template.JS, error) {
+			b, err := json.Marshal(s)
+			if err != nil {
+				return "", err
+			}
+			return template.JS(b), nil
 		},
 	}
 	t := template.New("kura").Funcs(funcs)
