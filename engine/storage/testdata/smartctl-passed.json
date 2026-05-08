@@ -1,0 +1,16 @@
+{
+  "smartctl": {"version": [7, 3], "exit_status": 0},
+  "device": {"name": "/dev/sda", "type": "sat"},
+  "model_name": "WDC WD80EFZZ-68BTXN0",
+  "serial_number": "VLH8WMTL",
+  "smart_status": {"passed": true},
+  "temperature": {"current": 38},
+  "power_on_time": {"hours": 14820},
+  "ata_smart_attributes": {
+    "table": [
+      {"id": 5,   "name": "Reallocated_Sector_Ct", "raw": {"value": 0}},
+      {"id": 197, "name": "Current_Pending_Sector", "raw": {"value": 0}},
+      {"id": 199, "name": "UDMA_CRC_Error_Count", "raw": {"value": 0}}
+    ]
+  }
+}

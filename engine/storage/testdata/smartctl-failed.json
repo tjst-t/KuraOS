@@ -1,0 +1,13 @@
+{
+  "smartctl": {"version": [7, 3], "exit_status": 8},
+  "device": {"name": "/dev/sdf", "type": "sat"},
+  "smart_status": {"passed": false},
+  "temperature": {"current": 51},
+  "power_on_time": {"hours": 28000},
+  "ata_smart_attributes": {
+    "table": [
+      {"id": 5,   "name": "Reallocated_Sector_Ct", "raw": {"value": 211}},
+      {"id": 197, "name": "Current_Pending_Sector", "raw": {"value": 64}}
+    ]
+  }
+}

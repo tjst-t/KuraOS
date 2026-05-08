@@ -1,0 +1,202 @@
+{
+  "sprint_id": "Se3b190",
+  "title": "StorageEngine 読み取り (pools / disks / SMART / import scan)",
+  "branch": "autopilot/main/Se3b190",
+  "mode": "auto",
+  "milestone": false,
+
+  "planning_decisions": [
+    {
+      "topic": "Sprint scope as defined",
+      "decision": "Execute the three Stories without splitting. Se3b190-1 (CmdExecutor + parsers), Se3b190-2 (disks + SMART), Se3b190-3 (importable scan + UI) each map to one user-facing behaviour and depend in that order.",
+      "rationale": "DESIGN_PRINCIPLES priority #7 (段階的実装). Write operations (CreatePool, ImportPool) are explicitly deferred per the sprint description and CLAUDE.md hint."
+    },
+    {
+      "topic": "CmdExecutor lives at internal/cmdexec, not engine/storage/cmdexec",
+      "decision": "Place the Executor interface + Real + Fake at internal/cmdexec/. engine/storage imports it.",
+      "rationale": "ARCHITECTURE.md mentions multiple engines that shell out (storage, share, network/acme). Keeping the executor under internal/ avoids the awkward case where engine/share would have to import engine/storage just to get an Executor. Same package boundary used in the existing internal/ tree."
+    },
+    {
+      "topic": "ZFS CLI parsing strategy",
+      "decision": "Parse zpool list -H -p (TSV, parseable units) for headline pool data; zpool status -P -L for topology trees; zpool import (no args) for importable-pool scan; lsblk -J -O -b + smartctl -a -j for disks. Every output is an indent / section-keyword DSL, parsed line-by-line with a hand-rolled scanner; no third-party parser libraries.",
+      "rationale": "VISION tech_constraints_phase_1 explicitly requires CLI wrapping (libzfs_core CGo banned). DESIGN_PRINCIPLES priority #6 (重要箇所は内製) — parser correctness is a KuraOS differentiator vs. vendor-locked NAS UIs that hide ZFS state."
+    },
+    {
+      "topic": "Health / VdevType / VdevLayout / DiskUsage / SMARTStatus enums",
+      "decision": "Define explicit string-typed enums in engine/storage/types.go covering only the v1 set. Out_of_scope_permanent items (dedup / SLOG / L2ARC / native crypto) intentionally have no constants.",
+      "rationale": "DESIGN_PRINCIPLES priority #8 (明示的). The struct file IS the schema; adding a field is a deliberate change. Templates render via i18n.T so raw CLI tokens never reach the page (VISION forbidden)."
+    },
+    {
+      "topic": "Storage error category mapping (forbidden-rule compliance)",
+      "decision": "When ListPools fails, classify the error into one of {zfs_unavailable, zfs_permission, timeout, unknown} and render a translated reason. Never splat err.Error() into the page.",
+      "rationale": "DESIGN_PRINCIPLES forbidden #13: 『Docker / ZFS / SMB の CLI 出力を直接画面に表示しない』. The first smoke-test pass *did* leak the raw 'exec: \"zpool\": executable file not found' — caught and fixed before commit."
+    },
+    {
+      "topic": "Storage UI handler wiring via Renderer.SetStorageHandler",
+      "decision": "Add an optional Renderer.storageHandler field set via SetStorageHandler before Routes(). Routes() falls back to the placeholder if no handler is set so the auth-only acceptance tests (S1e7eeb) keep passing.",
+      "rationale": "Smaller blast radius than changing Routes()' signature. Mirrors the existing AuthHandler / SetupHandler injection pattern from S1e7eeb."
+    },
+    {
+      "topic": "Volume / snapshot / scrub tabs from the prototype are deferred",
+      "decision": "Only PoolCard grid + disks table + import banner from Storage.html land here. The 4-tab strip (ボリューム / ディスク / スナップショット / Scrub) is not implemented this sprint.",
+      "rationale": "Sprint scope is explicit: read-only views only. Volume CRUD requires write ops. Snapshot management depends on engine/backup. Both belong to subsequent sprints."
+    },
+    {
+      "topic": "GUI spec + Playwright authoring without runner",
+      "decision": "Author tests/e2e/storage-{disks,import}.e2e.spec.ts and tests/mock/storage-page.mock.spec.ts documenting the visual contract. Acceptance gating is carried by tests/acceptance/storage_flow_test.go (Go integration test that boots the gateway with a stub StorageEngine).",
+      "rationale": "Same constraint as S464e47 / S1e7eeb (Playwright runner not installed). The Go test exercises the same HTTP contracts so AC gating is real, not aspirational."
+    },
+    {
+      "topic": "Test data realism vs. dev-box constraints",
+      "decision": "Save canned ZFS / lsblk / smartctl outputs under engine/storage/testdata/ covering single / mirror / raidz2 / degraded-with-special-and-spare / two-importable / empty cases. Tests run via cmdexec.Fake; no real ZFS or smartctl invocation in the unit/integration suite.",
+      "rationale": "CLAUDE.md test-environment note: dev box has NO ZFS. Mocking via Executor is the only path. Realistic VM testing happens at the milestone."
+    },
+    {
+      "topic": "DiskUsage classification with foreign vs free distinction",
+      "decision": "Disks with zfs_member partitions but no claim from any imported pool are classified as DiskUsageForeign (not DiskUsageFree). The disks table renders this as a 'warn' badge.",
+      "rationale": "DESIGN_PRINCIPLES priority #5 (信頼性). Wiping a foreign-pool disk thinking it was free is a real-world way users lose data. Surfacing the distinction in the UI is a free safety win."
+    }
+  ],
+
+  "implementation_decisions": [
+    {
+      "topic": "engine/storage package boundary",
+      "decision": "Types (Pool, Vdev, Disk, ImportablePool, SMARTInfo, enums) + Engine interface + CLI struct + parsers + tests all live under engine/storage/. The package exports an interface + a CLI implementation + struct types; private helpers (parseZpoolList etc.) stay package-private.",
+      "rationale": "Mirrors engine/user / engine/auth/session layout from S1e7eeb. Hides parsing internals from the gateway/ui caller."
+    },
+    {
+      "topic": "Section keyword pre-fills rootIndent in zpool status parser",
+      "decision": "When the parser hits 'cache' / 'logs' / 'spares' it sets rootIndent=0 immediately so the next leaf line is treated as a child rather than an unclaimed root.",
+      "rationale": "First test pass missed cache/log/spare leaves entirely because the data section logic skipped the first indented row as the synthetic pool root. Caught by the table-driven test for the degraded-with-special fixture; one-line fix."
+    },
+    {
+      "topic": "smartctl exit code 1-7 tolerance",
+      "decision": "smartctl prints valid JSON even when its exit code is non-zero (e.g. SMART warning predictions). Use errors.As to inspect *exec.ExitError and continue parsing if stdout is non-empty.",
+      "rationale": "Real-world smartctl behaviour. Without this, every drive that smartctl wants to flag a warning on would render as Unknown."
+    },
+    {
+      "topic": "topologySummary keeps it short",
+      "decision": "Pool subtitle on the PoolCard is 'raidz2 × 4' / 'mirror × 2 · special mirror · cache · spare' — top-level vdevs only, no device counts beyond the first level.",
+      "rationale": "Linear/Vercel-style information density (DESIGN_PRINCIPLES ui_ux). Operators who want the full tree expand the topology block below."
+    },
+    {
+      "topic": "i18n: 56 new MessageIDs added, all wired",
+      "decision": "Added page.storage.* keys for title / labels / health / SMART / disk usage / import banner / column headers / error categories. i18n-coverage.sh now reports 118 keys (was 62 after S1e7eeb).",
+      "rationale": "DESIGN_PRINCIPLES forbidden #2 — no hardcoded user-visible strings. Coverage script enforces."
+    },
+    {
+      "topic": "Storage handler is read-only; no write routes registered",
+      "decision": "Only GET /ui/admin/storage is mounted. The 'New Pool' button and the 'Inspect' import button are disabled aria-disabled='true' with translated tooltip text linking to the next-sprint deferral.",
+      "rationale": "Sprint scope. Better UX than hiding the buttons (gives users mental model of what's coming) and stops them from being accidentally clickable as new routes show up."
+    },
+    {
+      "topic": "Stub StorageEngine in acceptance tests, not a fake CmdExecutor",
+      "decision": "tests/acceptance/storage_flow_test.go injects a hand-rolled stubStorage at the ui.StorageEngineReader interface boundary. The CmdExecutor fake is exercised in engine/storage's own unit tests.",
+      "rationale": "DESIGN_PRINCIPLES priority #9. Acceptance test scope is 'wiring'; unit test scope is 'parser correctness'. Separating them keeps each test focused."
+    }
+  ],
+
+  "review_decisions": [
+    {
+      "topic": "Forbidden-rule scan",
+      "decision": "No raw zpool / smartctl / lsblk output reaches the rendered HTML. No CGo. No libzfs_core. No special vdev creation (next sprint). No write operations on /api or /ui surface. argon2id (existing) remains the only password hasher. Smoke test on the dev box (no zpool installed) shows a translated 'ZFS が利用できません' banner instead of a Go error chain.",
+      "rationale": "VISION + DESIGN_PRINCIPLES forbidden lists. CLAUDE.md ZFS-CLI-wrapping constraint. The error-classification fix was made specifically because the first smoke-test pass leaked CLI tokens."
+    },
+    {
+      "topic": "Acceptance criteria traceability",
+      "decision": "Test IDs marked in source: [AC-Se3b190-1-1] in engine/storage/zfs_parse_test.go covers parser correctness across single/mirror/raidz2/degraded/import-empty/import-found. [AC-Se3b190-2-1] in engine/storage/disks_test.go + tests/acceptance/storage_flow_test.go covers disk listing + SMART. [AC-Se3b190-3-1] in tests/acceptance/storage_flow_test.go + internal/ui/storage_test.go covers the import banner.",
+      "rationale": "ROADMAP.json AC entries map 1:1 to test names; sprint verify expects the [AC-...] tag prefix."
+    },
+    {
+      "topic": "Smoke test against real binary",
+      "decision": "Built bin/kura, booted on KURA_PORT=18302 with a fresh sqlite DB. POSTed /setup/admin to create root admin → 302 dashboard with cookie. GET /ui/admin/storage → 200; body contains data-testid='storage-disks' (lsblk works on the dev box), data-testid='storage-error' with translated 'ZFS が利用できません' (zpool absent). No raw CLI tokens leak.",
+      "rationale": "Acceptance criteria target the running binary. Two independent signals (Go integration + manual smoke) confirm the wiring."
+    }
+  ],
+
+  "warnings": [
+    "The 'storage' tab in the prototype's 4-tab strip (Volumes / Disks / Snapshots / Scrub) is collapsed into a single page in this sprint — only Disks (table) is implemented, plus the always-visible Pools grid and conditional Import banner. Volumes / Snapshots / Scrub UIs land in subsequent sprints with their respective engines.",
+    "engine/storage.CLI does not yet expose write methods (CreatePool / CreateVolume / SetQuota / CreateSnapshot / AddSpare / ImportPool). They land in the next sprint.",
+    "Real ZFS validation on VM 192.168.1.42 is deferred to the milestone demo — every test in this sprint is mock-based per the dev-box constraint.",
+    "The storage page does not yet plug into config.json import/export. The StorageConfig struct stays empty in this sprint; the ApplyAdapter for the StorageEngine arrives with the write sprint where pools/datasets actually have a config representation.",
+    "smartctl temperature is captured from the JSON's 'temperature.current' field which works for SAT/ATA drives and modern NVMe with smartctl ≥ 7.x. Older smartctl on Ubuntu may not populate this — falls back to '—' in the UI."
+  ],
+
+  "test_summary": {
+    "go_test_status": "pass",
+    "packages": [
+      "engine/auth/session",
+      "engine/storage",
+      "engine/user",
+      "i18n",
+      "internal/cmdexec",
+      "internal/config",
+      "internal/gateway",
+      "internal/store",
+      "internal/ui",
+      "tests/acceptance"
+    ],
+    "new_tests_added": [
+      "internal/cmdexec/cmdexec_test.go",
+      "engine/storage/zfs_parse_test.go",
+      "engine/storage/disks_test.go",
+      "internal/ui/storage_test.go",
+      "tests/acceptance/storage_flow_test.go"
+    ],
+    "shell_acceptance_status": "pass (i18n-coverage.sh: 118 keys, 2 passed)",
+    "go_vet": "clean",
+    "gofmt": "clean",
+    "smoke_test": "pass — binary boots, storage page returns 200 with auth, translated error banner shows on dev box without zpool/smartctl, lsblk-derived disk rows render, no raw CLI tokens leak",
+    "i18n_coverage_keys": 118
+  },
+
+  "artifacts": {
+    "branch": "autopilot/main/Se3b190",
+    "new_files": [
+      "internal/cmdexec/cmdexec.go",
+      "internal/cmdexec/fake.go",
+      "internal/cmdexec/cmdexec_test.go",
+      "engine/storage/types.go",
+      "engine/storage/storage.go",
+      "engine/storage/zfs_parse.go",
+      "engine/storage/zfs_parse_test.go",
+      "engine/storage/disks.go",
+      "engine/storage/disks_test.go",
+      "engine/storage/testdata/zpool-list-empty.txt",
+      "engine/storage/testdata/zpool-list-two-pools.txt",
+      "engine/storage/testdata/zpool-status-single.txt",
+      "engine/storage/testdata/zpool-status-mirror.txt",
+      "engine/storage/testdata/zpool-status-raidz2.txt",
+      "engine/storage/testdata/zpool-status-degraded-with-special-and-spare.txt",
+      "engine/storage/testdata/zpool-import-empty.txt",
+      "engine/storage/testdata/zpool-import-two-importable.txt",
+      "engine/storage/testdata/lsblk-typical.json",
+      "engine/storage/testdata/smartctl-passed.json",
+      "engine/storage/testdata/smartctl-warning.json",
+      "engine/storage/testdata/smartctl-failed.json",
+      "internal/ui/storage.go",
+      "internal/ui/storage_test.go",
+      "internal/ui/templates/pages/storage.tmpl",
+      "tests/acceptance/storage_flow_test.go",
+      "tests/e2e/storage-disks.e2e.spec.ts",
+      "tests/e2e/storage-import.e2e.spec.ts",
+      "tests/mock/storage-page.mock.spec.ts",
+      "docs/sprint-logs/Se3b190/decisions.json"
+    ],
+    "modified_files": [
+      "cmd/kura/main.go",
+      "internal/ui/ui.go",
+      "internal/ui/dist/kura.css",
+      "i18n/messages.go",
+      "i18n/locales/ja.json"
+    ],
+    "new_packages": [
+      "internal/cmdexec",
+      "engine/storage"
+    ],
+    "new_routes": [
+      "GET /ui/admin/storage (now real; was placeholder in S464e47)"
+    ],
+    "prototype_fidelity": "high — PoolCard / disks table / import banner mirror Storage.html. Volume / snapshot / scrub tabs deferred per sprint scope."
+  }
+}

@@ -32,6 +32,11 @@ type Renderer struct {
 	tr        *i18n.Translator
 	version   string
 	templates *template.Template
+	// storageHandler, when non-nil, replaces the storage placeholder route.
+	// Set via Renderer.SetStorageHandler before Routes() is called. Keeping
+	// this as an optional field rather than a constructor parameter lets the
+	// auth-only acceptance tests (S1e7eeb) keep working unchanged.
+	storageHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -133,6 +138,12 @@ type PageData struct {
 	Extra       any
 }
 
+// SetStorageHandler installs h as the /ui/admin/storage route. Must be called
+// before Routes(); calling it after has no effect because the mux has
+// already snapshotted the field. Wiring the handler this way (rather than
+// passing it to Routes) keeps the signature of Routes stable across sprints.
+func (r *Renderer) SetStorageHandler(h http.Handler) { r.storageHandler = h }
+
 // adminNavGroups returns the sidebar definition with the active item set.
 // IDs match the prototype's NAV_GROUPS so test fixtures and screen
 // references line up. The 7-item admin row (Dashboard / Storage / Shares /
@@ -168,7 +179,11 @@ func (r *Renderer) Routes() http.Handler {
 	mux.HandleFunc("/ui/admin", r.redirectToDashboard)
 	mux.HandleFunc("/ui/admin/", r.redirectToDashboard)
 	mux.HandleFunc("/ui/admin/dashboard", r.handleDashboard)
-	mux.HandleFunc("/ui/admin/storage", r.handlePlaceholder("storage", i18n.MsgNavStorage))
+	if r.storageHandler != nil {
+		mux.Handle("/ui/admin/storage", r.storageHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/storage", r.handlePlaceholder("storage", i18n.MsgNavStorage))
+	}
 	mux.HandleFunc("/ui/admin/shares", r.handlePlaceholder("shares", i18n.MsgNavShares))
 	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))

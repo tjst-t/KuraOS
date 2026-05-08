@@ -1,0 +1,10 @@
+  pool: scratch
+ state: ONLINE
+  scan: none requested
+config:
+
+	NAME                       STATE     READ WRITE CKSUM
+	scratch                    ONLINE       0     0     0
+	  /dev/disk/by-id/sdz      ONLINE       0     0     0
+
+errors: No known data errors

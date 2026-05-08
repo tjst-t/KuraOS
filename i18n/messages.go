@@ -80,6 +80,74 @@ const (
 	MsgLoginLogoutSuccess    MessageID = "page.login.logout_success"
 )
 
+// Storage page (added in Se3b190 — read-only views).
+const (
+	MsgStorageTitle           MessageID = "page.storage.title"
+	MsgStorageSubtitle        MessageID = "page.storage.subtitle"
+	MsgStorageEmpty           MessageID = "page.storage.empty"
+	MsgStorageImportBanner    MessageID = "page.storage.import_banner"
+	MsgStorageImportBannerOne MessageID = "page.storage.import_banner_one"
+	MsgStorageImportInspect   MessageID = "page.storage.import_inspect"
+	MsgStorageImportDeferred  MessageID = "page.storage.import_deferred"
+	MsgStorageNewPool         MessageID = "page.storage.new_pool"
+	MsgStorageNewPoolDeferred MessageID = "page.storage.new_pool_deferred"
+	MsgStoragePoolsHeading    MessageID = "page.storage.pools_heading"
+	MsgStorageDisksHeading    MessageID = "page.storage.disks_heading"
+	MsgStorageImportHeading   MessageID = "page.storage.import_heading"
+
+	MsgStoragePoolHealthOnline    MessageID = "page.storage.pool.health.online"
+	MsgStoragePoolHealthDegraded  MessageID = "page.storage.pool.health.degraded"
+	MsgStoragePoolHealthFaulted   MessageID = "page.storage.pool.health.faulted"
+	MsgStoragePoolHealthOffline   MessageID = "page.storage.pool.health.offline"
+	MsgStoragePoolHealthUnavail   MessageID = "page.storage.pool.health.unavail"
+	MsgStoragePoolHealthRemoved   MessageID = "page.storage.pool.health.removed"
+	MsgStoragePoolHealthSuspended MessageID = "page.storage.pool.health.suspended"
+	MsgStoragePoolHealthUnknown   MessageID = "page.storage.pool.health.unknown"
+
+	MsgStorageVdevTopology MessageID = "page.storage.vdev.topology"
+	MsgStorageVdevDataRow  MessageID = "page.storage.vdev.data_row"
+	MsgStorageVdevSpecial  MessageID = "page.storage.vdev.special"
+	MsgStorageVdevCache    MessageID = "page.storage.vdev.cache"
+	MsgStorageVdevLog      MessageID = "page.storage.vdev.log"
+	MsgStorageVdevSpare    MessageID = "page.storage.vdev.spare"
+
+	MsgStoragePoolUsed       MessageID = "page.storage.pool.used"
+	MsgStoragePoolFrag       MessageID = "page.storage.pool.frag"
+	MsgStoragePoolDataIntact MessageID = "page.storage.pool.data_intact"
+
+	MsgStorageDisksColDevice MessageID = "page.storage.disks.col.device"
+	MsgStorageDisksColModel  MessageID = "page.storage.disks.col.model"
+	MsgStorageDisksColPool   MessageID = "page.storage.disks.col.pool"
+	MsgStorageDisksColSize   MessageID = "page.storage.disks.col.size"
+	MsgStorageDisksColTemp   MessageID = "page.storage.disks.col.temp"
+	MsgStorageDisksColHours  MessageID = "page.storage.disks.col.hours"
+	MsgStorageDisksColSMART  MessageID = "page.storage.disks.col.smart"
+	MsgStorageDisksColUsage  MessageID = "page.storage.disks.col.usage"
+
+	MsgStorageDiskUsageFree    MessageID = "page.storage.disk.usage.free"
+	MsgStorageDiskUsagePool    MessageID = "page.storage.disk.usage.pool"
+	MsgStorageDiskUsageSpare   MessageID = "page.storage.disk.usage.spare"
+	MsgStorageDiskUsageForeign MessageID = "page.storage.disk.usage.foreign"
+	MsgStorageDiskUsageSystem  MessageID = "page.storage.disk.usage.system"
+
+	MsgStorageSMARTPassed      MessageID = "page.storage.smart.passed"
+	MsgStorageSMARTWarning     MessageID = "page.storage.smart.warning"
+	MsgStorageSMARTFailed      MessageID = "page.storage.smart.failed"
+	MsgStorageSMARTUnavailable MessageID = "page.storage.smart.unavailable"
+	MsgStorageSMARTUnsupported MessageID = "page.storage.smart.unsupported"
+
+	MsgStorageImportColName     MessageID = "page.storage.import.col.name"
+	MsgStorageImportColGUID     MessageID = "page.storage.import.col.guid"
+	MsgStorageImportColState    MessageID = "page.storage.import.col.state"
+	MsgStorageImportColTopology MessageID = "page.storage.import.col.topology"
+
+	MsgStorageError               MessageID = "page.storage.error"
+	MsgStorageErrorZFSUnavailable MessageID = "page.storage.error.zfs_unavailable"
+	MsgStorageErrorZFSPermission  MessageID = "page.storage.error.zfs_permission"
+	MsgStorageErrorTimeout        MessageID = "page.storage.error.timeout"
+	MsgStorageErrorUnknown        MessageID = "page.storage.error.unknown"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"
