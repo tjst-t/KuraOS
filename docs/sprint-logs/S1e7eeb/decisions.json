@@ -1,0 +1,225 @@
+{
+  "sprint_id": "S1e7eeb",
+  "title": "認証基盤 (ローカルユーザー + セッション + 初期管理者ウィザード)",
+  "branch": "autopilot/main/S1e7eeb",
+  "mode": "auto",
+  "milestone": true,
+  "started_at": "2026-05-08T00:55:00Z",
+  "completed_at": "2026-05-08T01:08:00Z",
+
+  "planning_decisions": [
+    {
+      "topic": "Sprint scope as defined",
+      "decision": "Execute the three Stories without splitting. S1e7eeb-1 (data model + argon2id), S1e7eeb-2 (session + middleware + login UI), S1e7eeb-3 (setup wizard Step 1) each map to one user-facing behaviour.",
+      "rationale": "DESIGN_PRINCIPLES priority #7 (段階的実装). MFA / WebAuthn / SAML / LDAP are explicitly out_of_scope_permanent in VISION.json — no temptation to fold them in."
+    },
+    {
+      "topic": "Session strategy: opaque cookies, not JWT",
+      "decision": "Sessions are server-side opaque tokens (32 random bytes, base64url) stored in a sessions SQLite table. JWT for the future /api surface is deferred to a later sprint.",
+      "rationale": "VISION tech_constraints_phase_1 says session cookies for UI / JWT for API hybrid. Opaque tokens give real revocation (logout = update revoked_at), avoid JWT key rotation surface, and match the priority #5 信頼性 rule (no broken auth invariants)."
+    },
+    {
+      "topic": "Argon2id parameters",
+      "decision": "Default Hasher uses t=2, m=19MiB, p=1 with 16-byte salt and 32-byte output. Parameters embedded in PHC encoding so per-row rotation is possible without schema change.",
+      "rationale": "OWASP Password Storage Cheat Sheet (2024) minimum recommended argon2id parameters. Achievable on raspi-class NAS hardware in well under a second. CLAUDE.md priority #5 (信頼性) requires argon2id (not bcrypt/PBKDF2)."
+    },
+    {
+      "topic": "User vs auth_method split",
+      "decision": "Password verifier lives on auth_methods, not on users. A user row holds identity; an auth_methods row holds a credential. Method values 'password' / 'oidc' / 'passkey' are constrained at the table level so future federation sprints can attach an oidc method to an existing local user without a schema change.",
+      "rationale": "DESIGN_PRINCIPLES priority #1 (config.json SSOT) — keeps the user model stable across sprints. priority #9 テスタビリティ — Hasher is interface, store accepts a fake."
+    },
+    {
+      "topic": "Cookie attributes",
+      "decision": "kura_session is HttpOnly + SameSite=Lax + Path=/ + Max-Age=604800 (7d). Secure flag is wired through Deps and toggled by KURA_SECURE_COOKIES env var (false on LAN HTTP, true once TLS is on in S822961).",
+      "rationale": "OWASP Session Management Cheat Sheet minimum sensible defaults. SameSite=Lax (not Strict) so post-login navigations from external apps still carry the cookie. HttpOnly so XSS in /ui/admin templates can't read the token."
+    },
+    {
+      "topic": "Role hierarchy",
+      "decision": "Two roles total: admin and user. /ui/admin requires admin; /ui requires user-or-above; /setup requires zero admins. No permission matrix.",
+      "rationale": "VISION out_of_scope_permanent excludes fine-grained RBAC for v1. priority #8 明示的 — keep the rule trivial."
+    },
+    {
+      "topic": "Setup wizard scope",
+      "decision": "Implement Step 1 (admin creation) only. Sidebar shows 4 steps total (admin / storage / share / done) with steps 2-4 marked 'todo'. Storage / Share steps land in S99702c per ROADMAP.",
+      "rationale": "Sprint description constrains Step 1-2 (sic). Closer reading: only admin creation is implementable without storage/share engines. Followed scope guidance (defer storage/share to S99702c) and showed remaining steps as todo so user mental model is preserved."
+    },
+    {
+      "topic": "Username-enumeration timing leak",
+      "decision": "VerifyPassword runs the (failing) hasher even when the username doesn't exist so timing is constant across (a) unknown user (b) wrong password.",
+      "rationale": "Standard mitigation. Without it, an attacker times the response to enumerate valid usernames before phishing them."
+    },
+    {
+      "topic": "Re-check no-admin in POST /setup/admin",
+      "decision": "The wizard's POST handler re-runs CountByRole(admin) inside the request before INSERT. Closes the race where two browser tabs open /setup, then both POST.",
+      "rationale": "priority #5 信頼性. Without the re-check the system invariant 'at most one fresh-install admin via wizard' could be silently broken."
+    },
+    {
+      "topic": "Playwright deferral",
+      "decision": "Authored login.e2e.spec.ts / setup-wizard.e2e.spec.ts and matching .mock.spec.ts files documenting the contract, but do not run them in this sandbox. Acceptance gating is carried by the Go acceptance suite at tests/acceptance/auth_flow_test.go which boots the real gateway + SQLite.",
+      "rationale": "Same constraint as S464e47 (Playwright runner not installed). The Go integration test exercises the same HTTP contracts so AC gating is real, not aspirational."
+    },
+    {
+      "topic": "GUI spec autonomous mode",
+      "decision": "Authored docs/sprint-logs/S1e7eeb/gui-spec.json with 6 scenarios covering all 5 acceptance criteria + endpoint contract table.",
+      "rationale": "Sprint runner contract: gui-spec is mandatory for GUI sprints."
+    },
+    {
+      "topic": "Login layout vs Setup layout",
+      "decision": "Both use a new templates/layouts/auth.tmpl (no admin sidebar). Login is center-shell card; Setup is wizard-shell two-pane (sidebar progress + main column). Both load /ui/static/kura.css so design-system tokens are unified.",
+      "rationale": "VISION visual_spec_source = prototype/claude_design/. Setup.html in the prototype is wizard-shell; login pages elsewhere in the prototype use center-shell. Reused vocab verbatim — no new design."
+    }
+  ],
+
+  "implementation_decisions": [
+    {
+      "topic": "Migration 0002 lives in internal/store/migrations/",
+      "decision": "Added 0002_users.sql with users / groups / user_groups / auth_methods / sessions tables. Foreign keys ON, sessions indexed by (expires_at) WHERE revoked_at IS NULL for cheap active-session listing.",
+      "rationale": "store.Open already runs every embedded migration in sorted-version order; no glue code needed. CLAUDE.md: 副作用は interface 経由 — migrations stay declarative."
+    },
+    {
+      "topic": "engine/user package boundary",
+      "decision": "Types (User, Group, AuthMethod, Role) + Store (CreateLocalUser, GetByID, GetByUsername, CountByRole, VerifyPassword) + Hasher interface + argon2id implementation all live under engine/user/. Public surface is small; all DB shape stays inside the package.",
+      "rationale": "Mirrors the engine/* layout in ARCHITECTURE.md."
+    },
+    {
+      "topic": "engine/auth/session package boundary",
+      "decision": "Single Store with Issue / Lookup / Revoke. Session token == sessions.id row PK; no separate token-to-row map. WithClock + WithTTL exist for tests; production main.go uses defaults.",
+      "rationale": "priority #9 テスタビリティ. priority #3 単純さ — a 32-byte random token IS the lookup key, so there is no second index to maintain."
+    },
+    {
+      "topic": "Auth middleware in internal/gateway/auth.go",
+      "decision": "authBundle has SessionResolver + UserLookup interfaces (defined in this package). requireRole / requireNoAdmin / requireAdminExists are the three middlewares. Resolved User is attached to the context behind a private key; PrincipalFromContext exposes it to downstream handlers.",
+      "rationale": "Gateway must not cross-import engine/user types into its handler signatures (cyclic-dep risk). Defining the resolver/lookup interfaces locally + accepting any implementer matches the SOLID 'depend on interfaces' rule and stays easy to fake in tests."
+    },
+    {
+      "topic": "User-portal /ui stub",
+      "decision": "Added a /ui handler in internal/ui/Routes() that renders a minimal centered card. Lets the user-role middleware actually permit /ui without /ui being a 404. Real portal lands in a later sprint.",
+      "rationale": "Without it AC-S1e7eeb-2-3 (/ui returns 200 for user role) cannot pass. priority #8 明示的: do not pretend an endpoint works when the handler is missing."
+    },
+    {
+      "topic": "Tailwind: ported form / wizard CSS into kura.css",
+      "decision": "Extended internal/ui/src/kura.css under @layer components with .field / .input / .center-shell / .wizard-shell / .wizard-aside / .wizard-step / .wizard-main / .wizard-eyebrow / .wizard-title / .wizard-lead / .wizard-foot — copied from prototype/claude_design/shared/shared.css.",
+      "rationale": "Visual SSOT. Tailwind output regenerated via make ui-css and committed (S464e47 convention)."
+    },
+    {
+      "topic": "i18n MessageIDs added",
+      "decision": "Added 28 new MessageID constants (MsgLogin* x10, MsgSetup* x18) plus matching ja.json keys. i18n-coverage.sh now reports 62 keys (was 34) and still passes.",
+      "rationale": "DESIGN_PRINCIPLES forbidden #2 — no hardcoded user-visible Japanese."
+    },
+    {
+      "topic": "/login + /setup do not require admin existence",
+      "decision": "Gateway mounts /login + /setup directly (with appropriate role / no-admin gating); they are NOT wrapped by requireAdminExists. /healthz is also unauthenticated.",
+      "rationale": "Otherwise a fresh install would 302-loop /setup → /login → /setup. priority #8 明示的."
+    },
+    {
+      "topic": "Session cookie is set even when /setup creates the admin",
+      "decision": "POST /setup/admin issues a session for the new admin and lands them on /ui/admin/dashboard. Failure to issue a session falls back to /login with the user already created.",
+      "rationale": "UX: Step 1 should end with a working management console, not a detour through login. Failure mode picks safety: degrade to login rather than report a confusing partial-success state."
+    },
+    {
+      "topic": "Empty tests/acceptance/listtables placeholder kept",
+      "decision": "Did not touch the existing listtables placeholder; left it empty. Auth flow acceptance lives in tests/acceptance/auth_flow_test.go (a Go test that boots the gateway).",
+      "rationale": "S464e47 used the same pattern. Avoids gratuitous churn."
+    }
+  ],
+
+  "review_decisions": [
+    {
+      "topic": "Forbidden-rule scan",
+      "decision": "No MFA/WebAuthn/SAML/LDAP/SCIM code. No external plugin loading. argon2id (not bcrypt/PBKDF2). No raw Japanese in templates (i18n-coverage.sh: 62/62 PASS). config.json export does not include user passwords (auth_methods is intentionally NOT in the config.json schema yet — it would carry hashes; that surface lands when the engine/user ApplyAdapter is added in a later sprint).",
+      "rationale": "VISION + DESIGN_PRINCIPLES forbidden lists. CLAUDE.md: 'アプリの内部秘密 ... を config.json export 時に平文で含めない' — currently observed by simply not exposing auth_methods through the config schema."
+    },
+    {
+      "topic": "Username enumeration vs invalid-creds error message",
+      "decision": "Wrong password and unknown user return the same translated message ('ユーザー名またはパスワードが違います') and the same 401. Hasher runs in both paths.",
+      "rationale": "Industry standard. Sneaks zero info to the attacker."
+    },
+    {
+      "topic": "Smoke test against real binary",
+      "decision": "Booted bin/kura on port 18281 with a fresh sqlite db; verified GET / -> 302 /setup, POST /setup/admin -> 302 dashboard with Set-Cookie, GET /ui/admin/dashboard with cookie -> 200, GET /setup after admin -> 302 /login, POST /login wrong -> 401, POST /login right -> 302 dashboard.",
+      "rationale": "Acceptance criteria are about the running binary. Go integration tests + this manual smoke test give two independent signals."
+    }
+  ],
+
+  "warnings": [
+    "User / group ApplyAdapter for config.json import/export is NOT registered in this sprint — Users field in config.json stays empty (UsersConfig{} placeholder from S464e47). Adding it touches the secret-redaction story (CLAUDE.md: 平文で含めない); deferred to a follow-up sprint where a clear password-export policy is decided.",
+    "/ui (user portal) is a one-page stub — login as a role=user account works but the only content is brand + tagline. Real portal is a later-sprint feature.",
+    "JWT for /api is not in S1e7eeb scope (UI half only). The gateway has no /api routes yet, so this is not a regression.",
+    "No password-strength policy beyond min-length 8. NIST SP 800-63B-4 deprecates class-mix rules and recommends breach-corpus checks; that lands when a dependency on a corpus (haveibeenpwned k-anon API or local hash list) is decided.",
+    "Session cookie Secure flag defaults to false (LAN HTTP). In production behind TLS (S822961) operators must set KURA_SECURE_COOKIES=1.",
+    "/setup wizard sidebar shows 4 steps but only Step 1 is interactive. UI is honest about the deferred scope (deferred_note message)."
+  ],
+
+  "test_summary": {
+    "go_test_status": "pass",
+    "packages": [
+      "engine/auth/session",
+      "engine/user",
+      "i18n",
+      "internal/config",
+      "internal/gateway",
+      "internal/store",
+      "internal/ui",
+      "tests/acceptance"
+    ],
+    "new_tests_added": [
+      "engine/user/password_test.go",
+      "engine/user/store_test.go",
+      "engine/auth/session/session_test.go",
+      "internal/gateway/auth_test.go",
+      "internal/ui/login_test.go",
+      "internal/ui/setup_test.go",
+      "tests/acceptance/auth_flow_test.go"
+    ],
+    "shell_acceptance_status": "pass (i18n-coverage.sh, config-roundtrip.sh, auth-flow.sh)",
+    "go_vet": "clean",
+    "gofmt": "clean",
+    "smoke_test": "pass — binary boots on portman-allocated port, fresh DB redirects to /setup, full setup → login → dashboard cycle exercised against the running binary",
+    "i18n_coverage_keys": 62
+  },
+
+  "artifacts": {
+    "branch": "autopilot/main/S1e7eeb",
+    "new_files": [
+      "engine/user/user.go",
+      "engine/user/password.go",
+      "engine/user/store.go",
+      "engine/user/password_test.go",
+      "engine/user/store_test.go",
+      "engine/auth/session/session.go",
+      "engine/auth/session/session_test.go",
+      "internal/gateway/auth.go",
+      "internal/gateway/auth_test.go",
+      "internal/ui/auth.go",
+      "internal/ui/login_test.go",
+      "internal/ui/setup.go",
+      "internal/ui/setup_test.go",
+      "internal/ui/templates/layouts/auth.tmpl",
+      "internal/ui/templates/pages/login.tmpl",
+      "internal/ui/templates/pages/setup.tmpl",
+      "internal/store/migrations/0002_users.sql",
+      "tests/e2e/login.e2e.spec.ts",
+      "tests/e2e/setup-wizard.e2e.spec.ts",
+      "tests/mock/login.mock.spec.ts",
+      "tests/mock/setup-wizard.mock.spec.ts",
+      "tests/acceptance/auth-flow.sh",
+      "tests/acceptance/auth_flow_test.go",
+      "docs/sprint-logs/S1e7eeb/decisions.json",
+      "docs/sprint-logs/S1e7eeb/gui-spec.json",
+      "docs/sprint-logs/S1e7eeb/acceptance-matrix.json",
+      "docs/sprint-logs/S1e7eeb/test-results.json"
+    ],
+    "modified_files": [
+      "cmd/kura/main.go",
+      "internal/gateway/gateway.go",
+      "internal/ui/ui.go",
+      "internal/ui/src/kura.css",
+      "internal/ui/dist/kura.css",
+      "i18n/messages.go",
+      "i18n/locales/ja.json",
+      "go.mod",
+      "go.sum"
+    ],
+    "new_db_tables": ["users", "groups", "user_groups", "auth_methods", "sessions"]
+  }
+}

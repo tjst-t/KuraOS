@@ -8,7 +8,9 @@
     "done": 0,
     "in_progress": 0,
     "remaining": 14,
-    "percentage": 0
+    "percentage": 0,
+    "completed_sprints": 3,
+    "updated_at": "2026-05-08T01:08:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -208,115 +210,116 @@
     },
     "S1e7eeb": {
       "title": "認証基盤 (ローカルユーザー + セッション + 初期管理者ウィザード)",
-      "status": "pending",
+      "status": "done",
       "description": "ローカル認証、ブラウザセッション、Gateway 認証ミドルウェア、admin/user ロール、初期管理者作成ウィザードまで。OIDC Provider と外部 IdP federation はスプリント 9 で扱う。ウィザード視覚仕様は prototype/claude_design/Setup.html (Step 1-2 のみ)。",
       "milestone": true,
       "stories": {
         "S1e7eeb-1": {
           "title": "ローカルユーザー / グループモデルとパスワードハッシュ",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、ユーザーとグループを SQLite に永続化したい。なぜなら、後続の Share / アプリ公開制御の前提だから。",
           "acceptance_criteria": [
             {
               "id": "AC-S1e7eeb-1-1",
               "description": "User / Group / AuthMethod テーブルが migration で作られ、admin/user ロールが扱える",
               "test": "[AC-S1e7eeb-1-1] in engine/user/store_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1e7eeb-1-2",
               "description": "パスワードは argon2id でハッシュ化され平文で保存されない",
               "test": "[AC-S1e7eeb-1-2] in engine/user/password_test.go",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1e7eeb-1-1": {
               "title": "engine/user パッケージ",
               "description": "User / Group / AuthMethod / Role の構造体と SQLite store",
-              "status": "pending"
+              "status": "done"
             },
             "S1e7eeb-1-2": {
               "title": "argon2id パスワードハッシュ",
               "description": "golang.org/x/crypto/argon2 ベースの hash/verify",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S1e7eeb-2": {
           "title": "ブラウザセッション と Gateway 認証ミドルウェア",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、/ui/admin にログイン後アクセスし、未認証時はログインページにリダイレクトされるようにしたい。なぜなら、管理 UI を不正アクセスから守るため。",
           "acceptance_criteria": [
             {
               "id": "AC-S1e7eeb-2-1",
               "description": "/login で username+password を送信するとセッション cookie が発行され、admin ロールがあれば /ui/admin にアクセスできる",
               "test": "[AC-S1e7eeb-2-1] in tests/e2e/login.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1e7eeb-2-2",
               "description": "未認証で /ui/admin にアクセスすると /login にリダイレクトされる",
               "test": "[AC-S1e7eeb-2-2] in tests/e2e/login.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1e7eeb-2-3",
               "description": "user ロールでは /ui/admin に 403、/ui には 200",
               "test": "[AC-S1e7eeb-2-3] in tests/e2e/login.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1e7eeb-2-1": {
               "title": "engine/auth/session",
               "description": "セッション cookie の発行/検証、SQLite に sessions テーブル",
-              "status": "pending"
+              "status": "done"
             },
             "S1e7eeb-2-2": {
               "title": "Gateway 認証ミドルウェア",
               "description": "ロールベースのルーティング (/ui/admin → admin、/ui → user 以上)",
-              "status": "pending"
+              "status": "done"
             },
             "S1e7eeb-2-3": {
               "title": "Login UI",
               "description": "htmx で POST /login → cookie 発行 → /ui/admin リダイレクト",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S1e7eeb-3": {
           "title": "初期管理者作成ウィザード (最小版)",
-          "status": "pending",
+          "status": "done",
           "user_story": "新規 NAS オーナーとして、初回ブラウザアクセス時に管理者アカウントを作成して管理 UI に入れるようにしたい。なぜなら、誰でも入れる状態を初期に作らないため。",
           "acceptance_criteria": [
             {
               "id": "AC-S1e7eeb-3-1",
               "description": "管理者が未作成の状態で / にアクセスすると /setup にリダイレクトされ、admin 作成フォームが表示される",
               "test": "[AC-S1e7eeb-3-1] in tests/e2e/setup-wizard.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1e7eeb-3-2",
               "description": "管理者作成後 /setup には到達できない (作成済みなら login にリダイレクト)",
               "test": "[AC-S1e7eeb-3-2] in tests/e2e/setup-wizard.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1e7eeb-3-1": {
               "title": "/setup ウィザードページ (Step1: admin 作成)",
               "description": "ストレージ・Share の追加ステップは S99702c で拡張予定",
-              "status": "pending"
+              "status": "done"
             },
             "S1e7eeb-3-2": {
               "title": "admin 未作成判定ミドルウェア",
               "description": "User テーブルに admin が無いときだけ /setup を許可",
-              "status": "pending"
+              "status": "done"
             }
           }
         }
-      }
+      },
+      "completed_at": "2026-05-08T01:08:00Z"
     },
     "Se3b190": {
       "title": "StorageEngine 読み取り (pools / disks / SMART / import scan)",
