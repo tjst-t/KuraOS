@@ -236,3 +236,43 @@ func TestAcceptance_StoragePage_NewPoolButtonEnabled(t *testing.T) {
 		t.Errorf("New Pool modal markup missing")
 	}
 }
+
+// Regression for the modal-partial refactor: the {{ tpl }} template func used
+// to execute against the master template tree, which marked it as "escaped"
+// after the first request. Subsequent calls to template.Clone() in
+// renderToBuffer would then fail with "cannot Clone after it has executed",
+// and the page returned the body "template clone error" with a status that
+// was already 200 (because render() eagerly wrote the header). This test
+// hits the storage page three times in a row to catch that regression — the
+// first request used to succeed and only the second/third surfaced the bug.
+func TestAcceptance_StoragePage_RepeatedRequestsRender(t *testing.T) {
+	eng := &stubStorageRW{stubStorage: stubStorage{
+		pools: storageFixturePools(),
+		disks: storageFixtureDisks(),
+	}}
+	srv, _ := newServerWithStorageRW(t, eng)
+
+	c := loginAs(t, srv, "root", "longenoughpw")
+	for i := 0; i < 3; i++ {
+		resp, err := c.Get(srv.URL + "/ui/admin/storage")
+		if err != nil {
+			t.Fatalf("request %d: GET: %v", i+1, err)
+		}
+		body := readBody(t, resp)
+		resp.Body.Close()
+		if resp.StatusCode != 200 {
+			t.Fatalf("request %d: status = %d, want 200", i+1, resp.StatusCode)
+		}
+		if strings.Contains(body, "template clone error") || strings.Contains(body, "template error:") {
+			t.Fatalf("request %d: response body contains template error: %q", i+1, body[:min(len(body), 400)])
+		}
+		if !strings.Contains(body, `data-testid="storage-new-pool-modal"`) {
+			t.Errorf("request %d: New Pool modal markup missing", i+1)
+		}
+		if !strings.Contains(body, `data-testid="storage-new-pool-btn"`) {
+			t.Errorf("request %d: New Pool button missing", i+1)
+		}
+	}
+}
+
+func min(a, b int) int { if a < b { return a }; return b }

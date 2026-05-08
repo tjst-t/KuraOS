@@ -33,6 +33,14 @@ type Renderer struct {
 	tr        *i18n.Translator
 	version   string
 	templates *template.Template
+	// tplDispatch is a clone of `templates` used by the {{ tpl ... }} template
+	// func to execute named body/foot templates from inside the modal partial.
+	// Executing on the master would set its escape state and break subsequent
+	// Clone() calls in renderToBuffer (Go html/template's documented contract:
+	// you cannot Clone a template after it has been executed). Cloning once
+	// at New() time and reusing the dispatch tree across requests is safe —
+	// Execute is concurrency-safe and may be called repeatedly.
+	tplDispatch *template.Template
 	// storageHandler, when non-nil, replaces the storage placeholder route.
 	// Set via Renderer.SetStorageHandler before Routes() is called. Keeping
 	// this as an optional field rather than a constructor parameter lets the
@@ -83,15 +91,16 @@ func New(tr *i18n.Translator, version string) (*Renderer, error) {
 		// result as already-escaped HTML. Used by partials/modal.tmpl to
 		// dispatch on caller-supplied body/foot template names — Go html/template
 		// requires literal template names in {{ template }}, so we route
-		// through ExecuteTemplate at call time. Captured-by-reference closure
-		// over `r` works because Renderer.templates is set in New() before any
-		// caller can ever invoke this function.
+		// through ExecuteTemplate at call time. Crucially we execute on
+		// tplDispatch (a clone of master), not on r.templates: executing
+		// the master would mark it escaped and break the next request's
+		// Clone() in renderToBuffer.
 		"tpl": func(name string, data any) (template.HTML, error) {
-			if r.templates == nil {
-				return "", fmt.Errorf("tpl: templates not yet parsed")
+			if r.tplDispatch == nil {
+				return "", fmt.Errorf("tpl: dispatch tree not ready")
 			}
 			var buf bytes.Buffer
-			if err := r.templates.ExecuteTemplate(&buf, name, data); err != nil {
+			if err := r.tplDispatch.ExecuteTemplate(&buf, name, data); err != nil {
 				return "", fmt.Errorf("tpl %q: %w", name, err)
 			}
 			return template.HTML(buf.String()), nil
@@ -128,6 +137,13 @@ func New(tr *i18n.Translator, version string) (*Renderer, error) {
 		}
 	}
 	r.templates = t
+	// Cache a clone for the `tpl` func to execute against. See the field
+	// comment on Renderer.tplDispatch for the rationale.
+	dispatch, err := t.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("ui: clone dispatch tree: %w", err)
+	}
+	r.tplDispatch = dispatch
 	return r, nil
 }
 
@@ -342,39 +358,55 @@ func (r *Renderer) buildPageData(activeID string, titleID i18n.MessageID) PageDa
 	}
 }
 
-// render executes the admin layout against the supplied page template.
-// Convenience wrapper around renderWithLayout that always returns 200.
+// render executes the admin layout against the supplied page template and
+// writes 200 OK on success. The body is buffered first so a template error
+// produces a clean 500 with no partial output.
 func (r *Renderer) render(w http.ResponseWriter, pageTemplate string, data PageData) {
-	w.WriteHeader(http.StatusOK)
-	r.renderWithLayout(w, "templates/layouts/admin.tmpl", pageTemplate, data)
-}
-
-// renderWithLayout executes layoutTemplate, with pageTemplate's {{ define "content" }}
-// block re-parsed into a fresh clone so concurrent requests can't race to
-// redefine the same name on the shared tree. Output is buffered first so a
-// template error returns 500 with no half-rendered body.
-func (r *Renderer) renderWithLayout(w http.ResponseWriter, layoutTemplate, pageTemplate string, data PageData) {
-	clone, err := r.templates.Clone()
+	body, err := r.renderToBuffer("templates/layouts/admin.tmpl", pageTemplate, data)
 	if err != nil {
-		http.Error(w, "template clone error", http.StatusInternalServerError)
-		return
-	}
-	raw, err := fs.ReadFile(templatesFS, pageTemplate)
-	if err != nil {
-		http.Error(w, "template read error", http.StatusInternalServerError)
-		return
-	}
-	if _, err := clone.New(pageTemplate).Parse(string(raw)); err != nil {
-		http.Error(w, "template parse error", http.StatusInternalServerError)
-		return
-	}
-	var buf bytes.Buffer
-	if err := clone.ExecuteTemplate(&buf, layoutTemplate, data); err != nil {
-		http.Error(w, "template execute error: "+err.Error(), http.StatusInternalServerError)
+		http.Error(w, "template error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// Note: do NOT call w.WriteHeader here — caller may have already
-	// written a non-200 status (e.g. login form re-rendered with 401).
-	_, _ = w.Write(buf.Bytes())
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(body)
+}
+
+// renderWithLayout executes layoutTemplate without writing the status code —
+// the caller is expected to have called WriteHeader first when the response
+// is non-200 (auth.go / setup.go re-render forms with 400/401/422). On
+// template error this still writes a 500 via http.Error, which logs a
+// "superfluous WriteHeader" warning if the caller had already written a
+// status; that warning is acceptable in the failure path.
+func (r *Renderer) renderWithLayout(w http.ResponseWriter, layoutTemplate, pageTemplate string, data PageData) {
+	body, err := r.renderToBuffer(layoutTemplate, pageTemplate, data)
+	if err != nil {
+		http.Error(w, "template error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	_, _ = w.Write(body)
+}
+
+// renderToBuffer is the shared core: clone the master template tree, re-parse
+// the page template into the clone (so concurrent requests can't race to
+// redefine names on the shared tree), execute the layout, and return the
+// rendered HTML. Errors are wrapped with the offending step for diagnosis.
+func (r *Renderer) renderToBuffer(layoutTemplate, pageTemplate string, data PageData) ([]byte, error) {
+	clone, err := r.templates.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("clone master: %w", err)
+	}
+	raw, err := fs.ReadFile(templatesFS, pageTemplate)
+	if err != nil {
+		return nil, fmt.Errorf("read %q: %w", pageTemplate, err)
+	}
+	if _, err := clone.New(pageTemplate).Parse(string(raw)); err != nil {
+		return nil, fmt.Errorf("parse %q: %w", pageTemplate, err)
+	}
+	var buf bytes.Buffer
+	if err := clone.ExecuteTemplate(&buf, layoutTemplate, data); err != nil {
+		return nil, fmt.Errorf("execute %q: %w", layoutTemplate, err)
+	}
+	return buf.Bytes(), nil
 }
