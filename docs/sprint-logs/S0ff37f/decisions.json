@@ -1,0 +1,82 @@
+{
+  "sprint": "S0ff37f",
+  "decisions": [
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "planning",
+      "title": "Stories accepted as written, no splits",
+      "detail": "All 3 Stories already follow {role}+{want}+{why} format and each represents a single bounded foundation behavior (binary skeleton / SQLite store / i18n embed). No granularity issues warranting a split.",
+      "reference": "DESIGN_PRINCIPLES priority_rules#7 (段階的実装), CLAUDE.md sprint conventions"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "planning",
+      "title": "gui-spec skipped",
+      "detail": "Sprint S0ff37f is a bootstrap sprint (Go module init, /healthz JSON endpoint, SQLite store, i18n loader). No GUI screens or interactive components. Acceptance tests are shell + Go unit tests, not Playwright.",
+      "reference": "VISION current_phase Phase 1 bootstrap"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "Module path github.com/kuraos-org/kura",
+      "detail": "Per task S0ff37f-1-1 description.",
+      "reference": "ROADMAP.json sprints.S0ff37f.stories.S0ff37f-1.tasks.S0ff37f-1-1"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "Go toolchain bumped to 1.25 by go mod tidy",
+      "detail": "Initially set `go 1.22` (the explicit task requirement). modernc.org/sqlite v1.50.0 (latest stable, the SQLite driver chosen for CGo-free builds) transitively requires Go 1.25.0, so `go mod tidy` bumped the directive. Kept the bumped version: it still satisfies '1.22 以上' from the task spec, and downgrading sqlite to a 1.22-compatible version forfeits security updates. Dev box runs go1.26 — confirmed building.",
+      "reference": "ROADMAP.json task S0ff37f-1-1; DESIGN_PRINCIPLES priority_rule #6 (既存ライブラリ活用)"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "SQLite driver: modernc.org/sqlite",
+      "detail": "Pure-Go (no CGo). Lets `go build` work in the smallest container without C toolchain. Aligns with VISION tech_constraints_phase_1 'DB バインディング: 標準 database/sql + SQLite ドライバ (重い ORM を避ける)'.",
+      "reference": "VISION tech_constraints_phase_1 #3, #12; ROADMAP task S0ff37f-2-1"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "DB path resolution via KURA_STATE_DB env, default /var/lib/kura/state.db",
+      "detail": "AC-S0ff37f-2-1 mandates /var/lib/kura/state.db when no override is given. The store auto-creates parent dirs when permitted. For dev/CI without root, KURA_STATE_DB lets tests point to a tmpdir. Avoids hardcoding test-only paths. No fallback path is invented inside store.Open — explicit > implicit (DESIGN_PRINCIPLES priority_rule #8).",
+      "reference": "DESIGN_PRINCIPLES priority_rule #8 (明示的 > 暗黙的); ROADMAP AC-S0ff37f-2-1"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "Migrations via embed.FS + numeric prefix ordering",
+      "detail": "internal/store/migrations/0001_init.sql etc. Applied in lexicographic order, recorded in schema_version(version INTEGER PRIMARY KEY, applied_at TEXT). Idempotent: re-runs skip already-applied versions. Initial 0001 creates a placeholder kv table so the schema isn't empty (and so AC-S0ff37f-2-1 'empty tables provided' is satisfied).",
+      "reference": "ROADMAP task S0ff37f-2-2; DESIGN_PRINCIPLES priority_rule #6 (重要箇所は内製 — migration は KuraOS の core)"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "i18n MessageID is a typed string constant",
+      "detail": "type MessageID string with constants in i18n/messages.go (MsgSystemStartup, MsgSystemHealthy). Translator.T(id, args...) returns the formatted Japanese string. Missing keys return the MessageID itself (visible failure beats silent fallback). DESIGN_PRINCIPLES forbidden#2 banishes hardcoded user-facing strings, and priority_rule #8 (明示的 > 暗黙的) drives the typed-constant choice.",
+      "reference": "DESIGN_PRINCIPLES forbidden #2, priority_rule #8; CLAUDE.md i18n rule"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "/healthz returns JSON via i18n status message",
+      "detail": "/healthz returns {\"status\": <i18n>, \"version\": <build var>, \"started_at\": <RFC3339>}. status uses i18n.T(MsgSystemHealthy) so even the bootstrap response avoids hardcoded user-facing text. version comes from a -ldflags injectable string default 'dev'.",
+      "reference": "ROADMAP task S0ff37f-1-3; DESIGN_PRINCIPLES forbidden #2"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "Graceful shutdown via signal.NotifyContext",
+      "detail": "main wires signal.NotifyContext(ctx, SIGINT, SIGTERM) and passes ctx to http.Server.Shutdown. Single-binary, no goroutine leaks. Aligns with priority_rule #4 (シンプルなモジュラーモノリス).",
+      "reference": "DESIGN_PRINCIPLES priority_rule #4; ROADMAP task S0ff37f-1-2"
+    },
+    {
+      "timestamp": "2026-05-08T00:00:00Z",
+      "category": "implementation",
+      "title": "Acceptance tests as shell scripts in tests/acceptance/",
+      "detail": "AC-S0ff37f-1-* and AC-S0ff37f-2-* are integration-flavored (build artifact present, server boots, file exists). Implemented as bash with '[AC-...]' markers in echo lines so traceability is grep-able. Go-level unit tests cover i18n (AC-S0ff37f-3-1) since it's pure-Go.",
+      "reference": "Sprint runner two-tier testing rule; CLAUDE.md test convention"
+    }
+  ]
+}
