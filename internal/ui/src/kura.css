@@ -502,10 +502,13 @@
   .tbl td { padding: 12px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; }
   .tbl tr:last-child td { border-bottom: none; }
   .tbl tr:hover td { background: var(--bg); }
-  .tbl tr[aria-selected="true"] td {
-    background: var(--accent-soft);
-    box-shadow: inset 2px 0 0 var(--accent);
-  }
+  /* Selected row: soft jade background across the whole row. The previous
+     `box-shadow: inset 2px 0 0 var(--accent)` per-td version produced a
+     darker "stripe" between every pair of cells because the shadow was
+     drawn for each cell separately — visually noisy. Plain background-
+     only is calmer and matches the prototype's selection state. */
+  .tbl tr[aria-selected="true"] td { background: var(--accent-soft); }
+  .tbl tr[aria-selected="true"]:hover td { background: var(--accent-soft); }
   .tbl .td-mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
   .tbl .td-num,
   .tbl th.td-num,
