@@ -1724,6 +1724,31 @@
       "added_in": "hotfix-2026-05-08",
       "reason": "Storage の `--bg-1` typo / `.tbl` CSS 未移植は engine + UI test 全 pass でも残った。テスト通過と prototype との実体一致は別問題。sprint demo phase で実 binary を起動して acceptance criteria の操作を一通りなぞる手順を sprint/references/sprint-demo.md にも明記する。",
       "status": "open"
+    },
+    {
+      "id": "BL-2026-05-08-smb-auth-bridge",
+      "title": "KuraOS user → Samba auth bridge",
+      "added_in": "hotfix-2026-05-08",
+      "reason": "S1e7eeb で KuraOS の user は argon2id でハッシュ保存。一方 Samba は NT-LM ハッシュ (smbpasswd / tdbsam) を使うため、KuraOS UI で作った admin で SMB 接続できない。setUp 時に平文パスワードを掴んで argon2id (kura) と smbpasswd 経由 NT ハッシュ (samba) の両方に書く実装が必要。S822961 (OIDC) より前に解決すべき blocker。",
+      "status": "open",
+      "blocks": [
+        "Sd64f38 SMB share の実用テスト",
+        "operator が Windows / macOS から接続"
+      ]
+    },
+    {
+      "id": "BL-2026-05-08-smb-conf-include",
+      "title": "Samba 主 smb.conf に conf.d/kura.conf を自動 include",
+      "added_in": "hotfix-2026-05-08",
+      "reason": "ShareEngine は /etc/samba/conf.d/kura.conf を生成するが、Ubuntu の stock /etc/samba/smb.conf はそれを include しない。kura 起動時または apt パッケージ provisioning で `include = /etc/samba/conf.d/kura.conf` を追加する必要がある。VM では手動で追加した。",
+      "status": "open"
+    },
+    {
+      "id": "BL-2026-05-08-share-fs-perms",
+      "title": "Share 作成時の Linux ファイルシステム権限管理",
+      "added_in": "hotfix-2026-05-08",
+      "reason": "ZFS dataset (/tank/photos 等) はデフォルトで root:root 0755 で作られるため、SMB ユーザーが書き込めない。Share 作成時の ACL に基づいて chown/chmod を実行する必要がある。今は VM で手動 chown した。",
+      "status": "open"
     }
   ]
 }
