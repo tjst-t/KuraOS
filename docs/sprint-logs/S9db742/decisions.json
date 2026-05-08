@@ -1,0 +1,129 @@
+{
+  "sprint_id": "S9db742",
+  "title": "StorageEngine 書き込み (CreatePool/Volume/Snapshot, special vdev バリデーション)",
+  "completed_at": "2026-05-08",
+  "branch": "autopilot/main/S9db742",
+  "planning": [
+    {
+      "topic": "Story granularity",
+      "decision": "Kept the three pre-planned stories (Pool create + validation, Volume/Preset/Snapshot, Import). Each maps to a coherent user-visible behavior; splitting further would have produced sub-stories smaller than the test scaffolding they needed.",
+      "rationale": "DESIGN_PRINCIPLES priority #5 (信頼性 > 機能) — keep validation rule changes in the same Story as the create flow they protect."
+    },
+    {
+      "topic": "Destroy / wipe scope",
+      "decision": "Excluded DestroyPool / DestroyVolume / wipe operations. Only create / import / snapshot / rollback in scope.",
+      "rationale": "DESIGN_PRINCIPLES priority #5 + sprint brief: destructive ops require a name-typing confirmation UX which is not yet built. Adding the engine method without the dialog would invite accidental wiring."
+    }
+  ],
+  "implementation": [
+    {
+      "topic": "Single-SSD special vdev rejection",
+      "decision": "ValidatePoolConfig returns ErrSpecialNotRedundant unless cfg.ForceNoRedundancy is set. UI never sets it (the form has no field). CLI exposes --force-no-redundancy on `kura storage create-pool` only.",
+      "rationale": "DESIGN_PRINCIPLES forbidden #3 (single SSD special = error, not warning) + forbidden #14 (force flow only via CLI flag). Test: TestValidatePoolConfig/err_special_vdev_single_SSD."
+    },
+    {
+      "topic": "Preset bundle values (general / media / database)",
+      "decision": "Sourced from docs/initial-input/Kuraos-design.md §4.4. Used compression=zstd for all three presets (CLAUDE.md hint mentioned lz4 for media/database; design.md §4.4 says zstd; design.md is the authoritative document).",
+      "rationale": "DESIGN_PRINCIPLES priority #2 (賢いデフォルト > 設定項目を増やす) — preset is opaque to user. Keeping a single compressor (zstd) reduces variance; modern hardware absorbs CPU cost."
+    },
+    {
+      "topic": "Database preset adds logbias=latency",
+      "decision": "PresetDatabase sets LogBias=\"latency\" in addition to recordsize=16K, special_small_blocks=64K. Other presets leave LogBias empty (ZFS default).",
+      "rationale": "design.md §4.4 explicitly notes (logbias=latency) for database. Saves the operator from a foot-gun where DB workloads stall on indirect-sync writes."
+    },
+    {
+      "topic": "Import flow: dry-run -> actual",
+      "decision": "ImportPool issues `zpool import -d /dev/disk/by-id -N <name>` first (dry-run, no mount), then `zpool import -d /dev/disk/by-id <name>` if dry-run succeeds. Same flag set is reused for both calls.",
+      "rationale": "DESIGN_PRINCIPLES priority #5: surface ZFS feature-flag mismatch / availability problems before mounting datasets. Two-step flow gives a clean rollback boundary."
+    },
+    {
+      "topic": "Force import requires explicit checkbox",
+      "decision": "ImportOpts.Force is wired only when the form sends `force=1`. The import modal renders an unchecked checkbox with warning copy. UI never produces a one-click force.",
+      "rationale": "Forbidden #14: force flow not reachable as one-click UX. Acceptance test TestAcceptance_StorageImportPool asserts default Force=false; TestAcceptance_StorageImportPool_ForceFlow asserts the explicit opt-in path."
+    },
+    {
+      "topic": "Read/Write engine split",
+      "decision": "Kept Engine interface monolithic (read + write) but added separate ui.StorageEngineReader / StorageEngineWriter so handlers can opt into write surface. Read tests still inject a stub that does not implement Writer.",
+      "rationale": "DESIGN_PRINCIPLES priority #9 (testability) — small interfaces at the consumer side, single struct implementation on the engine side."
+    },
+    {
+      "topic": "Pool/Volume create idempotency",
+      "decision": "Validation runs before any CLI shell-out (TestCreatePool_validatesBeforeShell asserts zero calls when validation rejects). Mid-stream zfs failures bubble up wrapped errors; we do not attempt automatic cleanup.",
+      "rationale": "Sprint brief: 'Pool/Volume create 失敗時は冪等再試行可能に'. The chosen approach: validate-first prevents partial state; if zpool create itself partially fails ZFS already won't return the pool to the listing, so retry is safe."
+    },
+    {
+      "topic": "config.json apply adapter",
+      "decision": "engine/storage/apply.go registers a config.ApplyAdapter for section=\"storage\". Plan emits create_pool / import_pool / create_volume / set_quota steps; pool/volume removal never produces a step.",
+      "rationale": "Priority #1 SSOT — pool/volume created via UI must round-trip through config.json export. Destructive omission matches the sprint scope-out."
+    },
+    {
+      "topic": "CLI subcommand surface",
+      "decision": "Added `kura storage create-pool` with flags: --name, --vdev <layout:disks>, --special, --spares, --small-block, --force-no-redundancy. Subcommand syntax: `mirror:/dev/sda,/dev/sdb`.",
+      "rationale": "Sprint brief: 'kura storage create-pool ... [--force-no-redundancy] (この --force-no-redundancy は special vdev single disk を許可する唯一の経路)'. The CLI surface lets a knowledgeable operator perform the override under their own responsibility."
+    },
+    {
+      "topic": "ZFS feature-flag mismatch handling",
+      "decision": "Surface the dry-run zpool error to the operator wrapped via fmt.Errorf with i18n.MsgStorageErrImportFailed. No auto-upgrade attempt.",
+      "rationale": "Priority #5 信頼性: feature upgrades during import are not reversible. Operator must opt in by retrying with appropriate flags from the CLI."
+    }
+  ],
+  "review": [
+    {
+      "topic": "Test gating",
+      "decision": "All write paths covered by table-driven Go tests with cmdexec.Fake. No real ZFS required. E2E vs VM: deferred to milestone Sd64f38 demo (real ZFS verification).",
+      "rationale": "CLAUDE.md test_environment: dev box has no ZFS, mock everything via cmdexec.Fake; real validation at milestone."
+    },
+    {
+      "topic": "Backlog candidates surfaced",
+      "decision": "None added. The Volume tab UI rendering in the live Storage page is light (button skeletons only) — when tank dataset listing is wired (next sprint), the Volume/Snapshot tabs can render real data.",
+      "rationale": "Volume listing is not in this sprint's scope; the engine surface to list datasets is design.md §4.2 (CreateVolume/SetQuota) but a full ListVolumes is incremental."
+    }
+  ],
+  "warnings": [
+    {
+      "topic": "Real ZFS verification gap",
+      "detail": "Engine code paths are not exercised against an actual zpool. Any subtle CLI-flag drift between OpenZFS versions would only show at milestone Sd64f38 VM demo."
+    },
+    {
+      "topic": "Volume listing UI deferred",
+      "detail": "Storage page renders the New Pool / Import flows and the existing read-only PoolCard / disks table. Volume / Snapshot tabs from the prototype are intentionally minimal — full data wiring waits for the next sprint that adds engine.ListVolumes / engine.ListAllSnapshots."
+    },
+    {
+      "topic": "Force-no-redundancy CLI flag is a sharp edge",
+      "detail": "The --force-no-redundancy escape hatch is documented only in code comments and decisions.json. Operators who do not read the source will not discover it; that's intentional but could trip a power user."
+    }
+  ],
+  "artifacts": {
+    "new_files": [
+      "engine/storage/validation.go",
+      "engine/storage/validation_test.go",
+      "engine/storage/presets.go",
+      "engine/storage/presets_test.go",
+      "engine/storage/create.go",
+      "engine/storage/create_test.go",
+      "engine/storage/import.go",
+      "engine/storage/import_test.go",
+      "engine/storage/apply.go",
+      "engine/storage/apply_test.go",
+      "internal/ui/storage_write.go",
+      "cmd/kura/storage.go",
+      "tests/acceptance/storage_write_test.go",
+      "tests/acceptance/storage-presets.sh"
+    ],
+    "modified_files": [
+      "engine/storage/storage.go",
+      "engine/storage/types.go",
+      "engine/storage/zfs_parse.go",
+      "internal/ui/storage.go",
+      "internal/ui/ui.go",
+      "internal/ui/templates/pages/storage.tmpl",
+      "internal/config/config.go",
+      "i18n/messages.go",
+      "i18n/locales/ja.json",
+      "cmd/kura/main.go"
+    ],
+    "validation_rules_count": 8,
+    "presets_implemented": ["general", "media", "database"],
+    "test_status": "pass (engine/storage 4 test files, all passing; tests/acceptance 6 new sub-tests, all passing; full ./... go test 0 failures)"
+  }
+}

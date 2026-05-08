@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 // parseZpoolList consumes the tab-separated, header-less output of
@@ -526,4 +527,51 @@ func parseDedup(s string) float64 {
 
 func isZpoolImportEmpty(raw []byte) bool {
 	return strings.Contains(string(raw), "no pools available for import")
+}
+
+// parseSnapshotList consumes `zfs list -H -p -t snapshot -o name,used,refer,creation`.
+// `creation` from -p is the unix timestamp; we convert it to time.Time.
+// Empty input returns nil, nil (no snapshots is normal, not an error).
+func parseSnapshotList(raw []byte) ([]SnapshotInfo, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, nil
+	}
+	var out []SnapshotInfo
+	sc := bufio.NewScanner(bytes.NewReader(raw))
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lineNo := 0
+	for sc.Scan() {
+		lineNo++
+		line := strings.TrimRight(sc.Text(), "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 4 {
+			return nil, fmt.Errorf("zfs list snapshot: line %d: want 4 fields, got %d", lineNo, len(fields))
+		}
+		full := fields[0]
+		dataset, name := full, ""
+		if i := strings.IndexByte(full, '@'); i > 0 {
+			dataset = full[:i]
+			name = full[i+1:]
+		}
+		used, _ := strconv.ParseInt(strings.TrimSpace(fields[1]), 10, 64)
+		refer, _ := strconv.ParseInt(strings.TrimSpace(fields[2]), 10, 64)
+		ts, _ := strconv.ParseInt(strings.TrimSpace(fields[3]), 10, 64)
+		info := SnapshotInfo{
+			Dataset:    dataset,
+			Name:       name,
+			UsedBytes:  used,
+			ReferBytes: refer,
+		}
+		if ts > 0 {
+			info.Created = time.Unix(ts, 0).UTC()
+		}
+		out = append(out, info)
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("zfs list snapshot: scan: %w", err)
+	}
+	return out, nil
 }

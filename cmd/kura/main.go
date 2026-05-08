@@ -42,11 +42,13 @@ func dispatch(args []string) error {
 	switch args[0] {
 	case "config":
 		return configCmd(args[1:])
+	case "storage":
+		return storageCmd(args[1:])
 	case "version", "--version", "-v":
 		fmt.Println(Version)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try: config | version)", args[0])
+		return fmt.Errorf("unknown command %q (try: config | storage | version)", args[0])
 	}
 }
 
@@ -87,7 +89,13 @@ func run() error {
 	// methods will return errors which the UI surfaces as a translated
 	// banner rather than crashing.
 	storageEngine := storage.NewCLI(cmdexec.NewReal())
-	uiRenderer.SetStorageHandler(uiRenderer.StorageHandler(ui.StorageDeps{Engine: storageEngine}))
+	storageDeps := ui.StorageDeps{Engine: storageEngine, Writer: storageEngine}
+	uiRenderer.SetStorageHandler(uiRenderer.StorageHandler(storageDeps))
+	uiRenderer.SetStorageWriteHandler(uiRenderer.StorageWriteHandler(storageDeps))
+	// SSOT (DESIGN_PRINCIPLES priority #1): config.json apply must be able
+	// to recreate pools/volumes the UI created. The storage adapter is
+	// registered against the global config.registry once per process.
+	storage.RegisterApplyAdapter(storageEngine)
 
 	users := user.NewStore(st.DB(), nil)
 	sessions := session.NewStore(st.DB())

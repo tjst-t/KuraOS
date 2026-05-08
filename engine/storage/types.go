@@ -173,3 +173,91 @@ type ImportablePool struct {
 	Action    string `json:"action,omitempty"`
 	Topology  []Vdev `json:"topology"`
 }
+
+// PresetID names a dataset preset baked into KuraOS. The preset fixes
+// recordsize / compression / special_small_blocks so the operator never has
+// to reason about ZFS tunables (DESIGN_PRINCIPLES priority #2: 賢いデフォルト
+// > 設定項目を増やす).
+type PresetID string
+
+const (
+	PresetGeneral  PresetID = "general"
+	PresetMedia    PresetID = "media"
+	PresetDatabase PresetID = "database"
+)
+
+// VdevSpec describes one vdev to create on `zpool create`. Disks lists the
+// canonical /dev/disk/by-id paths (preferred — pool stays consistent across
+// kernel renames).
+type VdevSpec struct {
+	Layout VdevLayout `json:"layout"`
+	Disks  []string   `json:"disks"`
+}
+
+// PoolConfig is the request shape for CreatePool. Mirrors the config.json
+// "pools[]" entry described in design.md §3.1 / §4.6.
+type PoolConfig struct {
+	Name string   `json:"name"`
+	Data VdevSpec `json:"data"`
+	// Special is the optional metadata / small-block accelerator vdev. v1
+	// rejects single-disk specials in production; CLI escape hatch
+	// (--force-no-redundancy) sets ForceNoRedundancy on the call.
+	Special *VdevSpec `json:"special,omitempty"`
+	// SmallBlockThreshold is the byte threshold for small_block_threshold
+	// (zfs property: special_small_blocks). 0 = metadata only.
+	SmallBlockThreshold int64 `json:"small_block_threshold,omitempty"`
+	// Spares are leaf disks added as hot spares.
+	Spares []string `json:"spares,omitempty"`
+	// Ashift is the pool's ashift (block size hint, default 12 = 4K). 0 lets
+	// the engine pick the safe default.
+	Ashift int `json:"ashift,omitempty"`
+	// ForceNoRedundancy is the CLI-only escape hatch for the single-SSD
+	// special vdev case. UI never sets this — the storage handler does not
+	// expose a control. When false (default), validation rejects single-disk
+	// special vdevs (DESIGN_PRINCIPLES forbidden #3).
+	ForceNoRedundancy bool `json:"-"`
+}
+
+// VolumeOpts is the request shape for CreateVolume. Either Preset or the raw
+// RecordSize / Compression are populated; preset takes precedence so UI can
+// stay declarative.
+type VolumeOpts struct {
+	// Preset, when set, fixes recordsize / compression / special_small_blocks
+	// from presets.go. Empty = use raw fields.
+	Preset PresetID `json:"preset,omitempty"`
+	// QuotaBytes is the dataset quota in bytes; 0 = no quota.
+	QuotaBytes int64 `json:"quota_bytes,omitempty"`
+	// MountPoint, when set, overrides the default <pool>/<name> mountpoint.
+	MountPoint string `json:"mountpoint,omitempty"`
+	// Raw fields used only when Preset is empty. Engines should normally
+	// not see these — UI prefers Preset for new datasets.
+	RecordSize         string `json:"recordsize,omitempty"`
+	Compression        string `json:"compression,omitempty"`
+	SpecialSmallBlocks string `json:"special_small_blocks,omitempty"`
+	// LogBias is set to "latency" by the database preset.
+	LogBias string `json:"logbias,omitempty"`
+}
+
+// SnapshotInfo is one row in `zfs list -t snapshot`. Created may be zero if
+// the parser couldn't find the creation property.
+type SnapshotInfo struct {
+	Dataset    string    `json:"dataset"`
+	Name       string    `json:"name"`
+	UsedBytes  int64     `json:"used_bytes"`
+	ReferBytes int64     `json:"refer_bytes,omitempty"`
+	Created    time.Time `json:"created,omitempty"`
+}
+
+// ImportOpts maps to the zpool import flags. Force corresponds to -f and is
+// only set after explicit user confirmation in the UI (single dedicated
+// checkbox + warning copy — DESIGN_PRINCIPLES forbidden #14: force flow not
+// reachable as a one-click UX).
+type ImportOpts struct {
+	Force    bool   `json:"force,omitempty"`
+	ReadOnly bool   `json:"readonly,omitempty"`
+	AltRoot  string `json:"altroot,omitempty"`
+	// ByGUID, when non-empty, picks the pool by GUID (zpool import <guid>)
+	// instead of by name. Useful when two pools share a name on different
+	// disks.
+	ByGUID string `json:"by_guid,omitempty"`
+}

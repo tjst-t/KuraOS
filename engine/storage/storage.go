@@ -7,15 +7,30 @@ import (
 	"github.com/kuraos-org/kura/internal/cmdexec"
 )
 
-// Engine is the read-only surface the Sprint Se3b190 UI consumes. Write
-// operations (CreatePool, ImportPool, AddSpare, ...) are intentionally absent
-// — they belong to the next sprint, where validation rules from
-// DESIGN_PRINCIPLES priority #5 (信頼性 > 機能) get their own thorough test
-// table. Splitting read from write keeps this sprint's surface tight.
+// Engine is the surface the UI and config-apply pipeline consume. Read
+// methods landed in Sprint Se3b190; write methods (CreatePool / CreateVolume
+// / CreateSnapshot / ImportPool) landed in S9db742, gated by the validation
+// rules in validation.go (DESIGN_PRINCIPLES priority #5 信頼性 > 機能).
+//
+// destroy / wipe operations are deliberately absent: design.md §4.2 lists
+// DestroyVolume, but DESIGN_PRINCIPLES forbids destructive operations
+// without explicit confirmation, and that confirmation UX is out-of-scope
+// for this sprint. Adding the methods would invite accidental wiring before
+// the safety dialog exists.
 type Engine interface {
 	ListPools(ctx context.Context) ([]Pool, error)
 	ListDisks(ctx context.Context) ([]Disk, error)
 	ListImportable(ctx context.Context) ([]ImportablePool, error)
+
+	CreatePool(ctx context.Context, cfg PoolConfig) error
+	CreateVolume(ctx context.Context, dataset string, opts VolumeOpts) error
+	SetQuota(ctx context.Context, dataset string, quotaBytes int64) error
+
+	CreateSnapshot(ctx context.Context, dataset, name string) error
+	ListSnapshots(ctx context.Context, dataset string) ([]SnapshotInfo, error)
+	Rollback(ctx context.Context, dataset, snapshot string) error
+
+	ImportPool(ctx context.Context, name string, opts ImportOpts) error
 }
 
 // CLI is the production Engine: it shells out to zpool / zfs / lsblk /
