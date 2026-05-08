@@ -8,7 +8,7 @@
     "done": 6,
     "in_progress": 0,
     "remaining": 8,
-    "percentage": 42,
+    "percentage": 43,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -17,7 +17,7 @@
       "S9db742",
       "Sd64f38"
     ],
-    "updated_at": "2026-05-08T03:00:00Z"
+    "updated_at": "2026-05-08T02:43:00Z"
   },
   "execution_order": [
     "S0ff37f",
