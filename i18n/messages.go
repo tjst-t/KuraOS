@@ -65,3 +65,42 @@ const (
 	MsgConfigInvalidJSON      MessageID = "config.invalid_json"
 	MsgConfigDiffNoChanges    MessageID = "config.diff.no_changes"
 )
+
+// Login page (added in S1e7eeb).
+const (
+	MsgLoginTitle            MessageID = "page.login.title"
+	MsgLoginSubtitle         MessageID = "page.login.subtitle"
+	MsgLoginUsernameLabel    MessageID = "page.login.username"
+	MsgLoginPasswordLabel    MessageID = "page.login.password"
+	MsgLoginSubmit           MessageID = "page.login.submit"
+	MsgLoginInvalidCreds     MessageID = "page.login.invalid_credentials"
+	MsgLoginUsernameRequired MessageID = "page.login.username_required"
+	MsgLoginPasswordRequired MessageID = "page.login.password_required"
+	MsgLoginGenericError     MessageID = "page.login.generic_error"
+	MsgLoginLogoutSuccess    MessageID = "page.login.logout_success"
+)
+
+// Setup wizard (added in S1e7eeb — Step 1 only).
+const (
+	MsgSetupTitle              MessageID = "page.setup.title"
+	MsgSetupSubtitle           MessageID = "page.setup.subtitle"
+	MsgSetupStepWelcome        MessageID = "page.setup.step.welcome"
+	MsgSetupStepAdmin          MessageID = "page.setup.step.admin"
+	MsgSetupStepStorage        MessageID = "page.setup.step.storage"
+	MsgSetupStepShare          MessageID = "page.setup.step.share"
+	MsgSetupStepRemote         MessageID = "page.setup.step.remote"
+	MsgSetupStepDone           MessageID = "page.setup.step.done"
+	MsgSetupAdminTitle         MessageID = "page.setup.admin.title"
+	MsgSetupAdminLead          MessageID = "page.setup.admin.lead"
+	MsgSetupAdminUsername      MessageID = "page.setup.admin.username"
+	MsgSetupAdminDisplayName   MessageID = "page.setup.admin.display_name"
+	MsgSetupAdminPassword      MessageID = "page.setup.admin.password"
+	MsgSetupAdminPasswordAgain MessageID = "page.setup.admin.password_again"
+	MsgSetupAdminSubmit        MessageID = "page.setup.admin.submit"
+	MsgSetupAdminError         MessageID = "page.setup.admin.error"
+	MsgSetupAdminPasswordShort MessageID = "page.setup.admin.password_short"
+	MsgSetupAdminPasswordMatch MessageID = "page.setup.admin.password_mismatch"
+	MsgSetupAdminUsernameTaken MessageID = "page.setup.admin.username_taken"
+	MsgSetupAdminUsernameRule  MessageID = "page.setup.admin.username_rule"
+	MsgSetupDeferredNote       MessageID = "page.setup.deferred_note"
+)

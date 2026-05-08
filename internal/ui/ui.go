@@ -175,6 +175,30 @@ func (r *Renderer) Routes() http.Handler {
 	mux.HandleFunc("/ui/admin/apps", r.handlePlaceholder("apps", i18n.MsgNavApps))
 	mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
 
+	// /ui — user-portal landing. The portal proper is built out in a later
+	// sprint; for S1e7eeb this is a tiny stub so role-user accounts have a
+	// 200 OK landing page that the auth middleware can permit.
+	mux.HandleFunc("/ui", func(w http.ResponseWriter, req *http.Request) {
+		if req.URL.Path != "/ui" {
+			http.NotFound(w, req)
+			return
+		}
+		if req.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<!doctype html><html lang="ja"><head>` +
+			`<meta charset="utf-8"><title>KuraOS</title>` +
+			`<link rel="stylesheet" href="/ui/static/kura.css"></head>` +
+			`<body><div class="center-shell"><div class="card"><div class="card-body">` +
+			`<h1 class="page-title">` + r.tr.T(i18n.MsgBrandName) + `</h1>` +
+			`<p class="page-sub">` + r.tr.T(i18n.MsgDashboardSubtitle) + `</p>` +
+			`</div></div></div></body></html>`))
+	})
+
 	return mux
 }
 
@@ -220,18 +244,23 @@ func (r *Renderer) buildPageData(activeID string, titleID i18n.MessageID) PageDa
 	}
 }
 
-// render executes the layout against the supplied page template. We render
-// into a buffer first so that template errors return a 500 with no partial
-// body written.
+// render executes the admin layout against the supplied page template.
+// Convenience wrapper around renderWithLayout that always returns 200.
 func (r *Renderer) render(w http.ResponseWriter, pageTemplate string, data PageData) {
+	w.WriteHeader(http.StatusOK)
+	r.renderWithLayout(w, "templates/layouts/admin.tmpl", pageTemplate, data)
+}
+
+// renderWithLayout executes layoutTemplate, with pageTemplate's {{ define "content" }}
+// block re-parsed into a fresh clone so concurrent requests can't race to
+// redefine the same name on the shared tree. Output is buffered first so a
+// template error returns 500 with no half-rendered body.
+func (r *Renderer) renderWithLayout(w http.ResponseWriter, layoutTemplate, pageTemplate string, data PageData) {
 	clone, err := r.templates.Clone()
 	if err != nil {
 		http.Error(w, "template clone error", http.StatusInternalServerError)
 		return
 	}
-	// Re-parse the page template into the clone so its {{ define "content" }}
-	// overrides the layout's empty block. Without this each request would race
-	// to redefine "content" on the shared tree.
 	raw, err := fs.ReadFile(templatesFS, pageTemplate)
 	if err != nil {
 		http.Error(w, "template read error", http.StatusInternalServerError)
@@ -242,11 +271,12 @@ func (r *Renderer) render(w http.ResponseWriter, pageTemplate string, data PageD
 		return
 	}
 	var buf bytes.Buffer
-	if err := clone.ExecuteTemplate(&buf, "templates/layouts/admin.tmpl", data); err != nil {
+	if err := clone.ExecuteTemplate(&buf, layoutTemplate, data); err != nil {
 		http.Error(w, "template execute error: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
+	// Note: do NOT call w.WriteHeader here — caller may have already
+	// written a non-200 status (e.g. login form re-rendered with 401).
 	_, _ = w.Write(buf.Bytes())
 }

@@ -1,0 +1,44 @@
+{
+  "sprint_id": "S1e7eeb",
+  "go_test": {
+    "command": "go test -count=1 ./...",
+    "status": "pass",
+    "packages": [
+      {"path": "github.com/kuraos-org/kura/engine/auth/session", "status": "ok", "duration_s": 0.081},
+      {"path": "github.com/kuraos-org/kura/engine/user", "status": "ok", "duration_s": 0.188},
+      {"path": "github.com/kuraos-org/kura/i18n", "status": "ok", "duration_s": 0.002},
+      {"path": "github.com/kuraos-org/kura/internal/config", "status": "ok", "duration_s": 0.005},
+      {"path": "github.com/kuraos-org/kura/internal/gateway", "status": "ok", "duration_s": 0.009},
+      {"path": "github.com/kuraos-org/kura/internal/store", "status": "ok", "duration_s": 0.024},
+      {"path": "github.com/kuraos-org/kura/internal/ui", "status": "ok", "duration_s": 0.031},
+      {"path": "github.com/kuraos-org/kura/tests/acceptance", "status": "ok", "duration_s": 0.044}
+    ]
+  },
+  "shell_acceptance": {
+    "i18n_coverage_sh": {"status": "pass", "passed": 2, "failed": 0, "keys_covered": 62},
+    "config_roundtrip_sh": {"status": "pass", "passed": 3, "failed": 0},
+    "auth_flow_sh": {"status": "pass", "passed": 3, "failed": 0}
+  },
+  "lint": {
+    "go_vet": "clean",
+    "gofmt": "clean"
+  },
+  "build": {
+    "make_build": "ok — bin/kura built (~18MB)",
+    "tailwind_compile": "ok — internal/ui/dist/kura.css regenerated"
+  },
+  "smoke_test": {
+    "command_pattern": "KURA_PORT=18281 KURA_STATE_DB=/tmp/state.db ./bin/kura",
+    "checks": [
+      {"target": "/healthz", "expect": "200 + {status,version,started_at}", "result": "pass"},
+      {"target": "/ on fresh DB", "expect": "302 Location: /setup", "result": "pass"},
+      {"target": "/setup on fresh DB", "expect": "200 HTML wizard form", "result": "pass"},
+      {"target": "/ui/admin/dashboard without cookie", "expect": "302 Location: /login", "result": "pass"},
+      {"target": "POST /setup/admin valid", "expect": "302 /ui/admin/dashboard + Set-Cookie kura_session", "result": "pass"},
+      {"target": "/ui/admin/dashboard with cookie", "expect": "200", "result": "pass"},
+      {"target": "/setup after admin exists", "expect": "302 /login", "result": "pass"},
+      {"target": "POST /login wrong password", "expect": "401", "result": "pass"},
+      {"target": "POST /login correct credentials", "expect": "302 /ui/admin/dashboard + Set-Cookie", "result": "pass"}
+    ]
+  }
+}

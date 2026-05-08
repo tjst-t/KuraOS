@@ -11,6 +11,8 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kuraos-org/kura/engine/auth/session"
+	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
 	"github.com/kuraos-org/kura/internal/gateway"
 	"github.com/kuraos-org/kura/internal/store"
@@ -78,12 +80,31 @@ func run() error {
 		return fmt.Errorf("init ui: %w", err)
 	}
 
+	users := user.NewStore(st.DB(), nil)
+	sessions := session.NewStore(st.DB())
+	secureCookies := os.Getenv("KURA_SECURE_COOKIES") == "1"
+
+	authH := uiRenderer.AuthHandler(ui.AuthDeps{
+		Users:         users,
+		Sessions:      sessions,
+		SecureCookies: secureCookies,
+	})
+	setupH := uiRenderer.SetupHandler(ui.SetupDeps{
+		Users:         users,
+		Sessions:      sessions,
+		SecureCookies: secureCookies,
+	})
+
 	startedAt := time.Now().UTC()
 	handler := gateway.New(gateway.Deps{
-		Translator: tr,
-		Version:    Version,
-		StartedAt:  startedAt,
-		UIHandler:  uiRenderer.Routes(),
+		Translator:   tr,
+		Version:      Version,
+		StartedAt:    startedAt,
+		UIHandler:    uiRenderer.Routes(),
+		AuthHandler:  authH,
+		SetupHandler: setupH,
+		Sessions:     sessions,
+		Users:        users,
 	})
 
 	srv := &http.Server{

@@ -1,0 +1,77 @@
+{
+  "sprint_id": "S1e7eeb",
+  "criteria": [
+    {
+      "id": "AC-S1e7eeb-1-1",
+      "description": "User / Group / AuthMethod テーブルが migration で作られ、admin/user ロールが扱える",
+      "test": "TestStore_CreateLocalUser_AdminAndUserRoles in engine/user/store_test.go",
+      "supplemental_tests": [
+        "TestStore_CreateLocalUser_RejectsInvalidRole",
+        "TestStore_CountByRole",
+        "TestStore_GetByUsername_NotFound"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-1-2",
+      "description": "パスワードは argon2id でハッシュ化され平文で保存されない",
+      "test": "TestHasher_RoundTrip in engine/user/password_test.go",
+      "supplemental_tests": [
+        "TestHasher_DifferentSaltsProduceDifferentHashes",
+        "TestHasher_RejectsMalformed",
+        "TestHasher_EmptyPasswordRejected"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-2-1",
+      "description": "/login で username+password を送信するとセッション cookie が発行され、admin ロールがあれば /ui/admin にアクセスできる",
+      "test": "TestLogin_POSTSuccessSetsCookieAndRedirects in internal/ui/login_test.go",
+      "supplemental_tests": [
+        "TestAcceptance_LoginFlow/AC-S1e7eeb-2-1_admin_login_->_dashboard in tests/acceptance/auth_flow_test.go",
+        "tests/e2e/login.e2e.spec.ts (Playwright contract)"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-2-2",
+      "description": "未認証で /ui/admin にアクセスすると /login にリダイレクトされる",
+      "test": "TestAuth_UnauthRedirectsToLogin in internal/gateway/auth_test.go",
+      "supplemental_tests": [
+        "TestAcceptance_LoginFlow/AC-S1e7eeb-2-2_unauth_->_/login"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-2-3",
+      "description": "user ロールでは /ui/admin に 403、/ui には 200",
+      "test": "TestAuth_UserRoleGetsForbiddenOnAdmin in internal/gateway/auth_test.go",
+      "supplemental_tests": [
+        "TestAcceptance_LoginFlow/AC-S1e7eeb-2-3_user_role:_/ui_200,_/ui/admin_403"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-3-1",
+      "description": "管理者が未作成の状態で / にアクセスすると /setup にリダイレクトされ、admin 作成フォームが表示される",
+      "test": "TestAuth_NoAdmin_RootRedirectsToSetup in internal/gateway/auth_test.go + TestSetup_GETRendersAdminForm in internal/ui/setup_test.go",
+      "supplemental_tests": [
+        "TestAcceptance_FreshDB_RootRedirectsToSetup",
+        "TestAcceptance_SetupWizard_HappyPath"
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-S1e7eeb-3-2",
+      "description": "管理者作成後 /setup には到達できない (作成済みなら login にリダイレクト)",
+      "test": "TestSetup_POSTRefusesWhenAdminAlreadyExists in internal/ui/setup_test.go + TestAcceptance_SetupWizard_HappyPath final-step assertion",
+      "status": "pass"
+    }
+  ],
+  "summary": {
+    "total": 7,
+    "passed": 7,
+    "failed": 0,
+    "ratio": 1.0
+  }
+}

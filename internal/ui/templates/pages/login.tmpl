@@ -1,0 +1,65 @@
+{{- /*
+login.tmpl — sign-in page. Visual language matches prototype/claude_design/
+center-shell convention: a single card centered on the Fog background, jade
+accent on the primary CTA. The form posts to /login (regular HTML form, no
+htmx for the initial step — keeps it usable before any JS loads). On error
+the server re-renders this same page with .ErrorMessage set.
+*/ -}}
+{{ define "content" }}
+<div class="center-shell">
+  <div class="card" style="max-width:380px;width:100%;">
+    <div class="card-body" style="padding:32px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <div class="brand-mark">{{ template "brand-mark" . }}</div>
+        <div>
+          <div class="brand-name">{{ T "brand.name" }}</div>
+          <div class="brand-sub">v{{ .Version }}</div>
+        </div>
+      </div>
+      <h1 class="page-title" style="font-size:22px;margin:4px 0 6px;">{{ T "page.login.title" }}</h1>
+      <p class="page-sub" style="margin-bottom:20px;">{{ T "page.login.subtitle" }}</p>
+
+      {{ if .Extra.ErrorMessage }}
+      <div class="banner crit" data-testid="login-error" style="margin-bottom:16px;">
+        <div>{{ .Extra.ErrorMessage }}</div>
+      </div>
+      {{ end }}
+      {{ if .Extra.InfoMessage }}
+      <div class="banner ok" data-testid="login-info" style="margin-bottom:16px;">
+        <div>{{ .Extra.InfoMessage }}</div>
+      </div>
+      {{ end }}
+
+      <form method="post" action="/login" data-testid="login-form" style="display:flex;flex-direction:column;gap:14px;">
+        <div class="field">
+          <label for="login-username">{{ T "page.login.username" }}</label>
+          <input
+            id="login-username"
+            class="input mono"
+            type="text"
+            name="username"
+            autocomplete="username"
+            value="{{ .Extra.Username }}"
+            required
+            autofocus
+          />
+        </div>
+        <div class="field">
+          <label for="login-password">{{ T "page.login.password" }}</label>
+          <input
+            id="login-password"
+            class="input mono"
+            type="password"
+            name="password"
+            autocomplete="current-password"
+            required
+          />
+        </div>
+        <button type="submit" class="btn btn-accent" style="justify-content:center;padding:9px 16px;">
+          {{ T "page.login.submit" }}
+        </button>
+      </form>
+    </div>
+  </div>
+</div>
+{{ end }}

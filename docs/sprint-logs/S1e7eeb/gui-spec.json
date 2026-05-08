@@ -1,0 +1,100 @@
+{
+  "sprint_id": "S1e7eeb",
+  "title": "Auth foundation — login + setup wizard",
+  "scenarios": [
+    {
+      "id": "GS-S1e7eeb-login-1",
+      "story": "S1e7eeb-2",
+      "name": "Successful admin login redirects to /ui/admin/dashboard",
+      "entry_url": "/login",
+      "steps": [
+        "GET /login renders the login form",
+        "POST /login with username=admin password=correct issues a Set-Cookie kura_session",
+        "Subsequent GET /ui/admin/dashboard with cookie returns 200 HTML"
+      ],
+      "ac_ids": ["AC-S1e7eeb-2-1"]
+    },
+    {
+      "id": "GS-S1e7eeb-login-2",
+      "story": "S1e7eeb-2",
+      "name": "Unauthenticated /ui/admin redirects to /login",
+      "entry_url": "/ui/admin/dashboard",
+      "steps": [
+        "GET /ui/admin/dashboard without cookie returns 302",
+        "Location header points to /login"
+      ],
+      "ac_ids": ["AC-S1e7eeb-2-2"]
+    },
+    {
+      "id": "GS-S1e7eeb-login-3",
+      "story": "S1e7eeb-2",
+      "name": "User role gets 200 on /ui, 403 on /ui/admin",
+      "entry_url": "/login",
+      "steps": [
+        "POST /login as a user-role account",
+        "GET /ui returns 200",
+        "GET /ui/admin/dashboard returns 403"
+      ],
+      "ac_ids": ["AC-S1e7eeb-2-3"]
+    },
+    {
+      "id": "GS-S1e7eeb-login-4",
+      "story": "S1e7eeb-2",
+      "name": "Wrong password returns 401 with i18n error",
+      "entry_url": "/login",
+      "steps": [
+        "POST /login with wrong password returns 401",
+        "Body contains the translated 'invalid credentials' message"
+      ],
+      "ac_ids": ["AC-S1e7eeb-2-1"]
+    },
+    {
+      "id": "GS-S1e7eeb-setup-1",
+      "story": "S1e7eeb-3",
+      "name": "Fresh install lands on /setup",
+      "entry_url": "/",
+      "steps": [
+        "GET / on a database with no admin redirects to /setup",
+        "/setup renders Step 1 (admin creation form)"
+      ],
+      "ac_ids": ["AC-S1e7eeb-3-1"]
+    },
+    {
+      "id": "GS-S1e7eeb-setup-2",
+      "story": "S1e7eeb-3",
+      "name": "After admin creation, /setup is blocked",
+      "entry_url": "/setup",
+      "steps": [
+        "POST /setup/admin with valid credentials creates admin user",
+        "Subsequent GET /setup redirects to /login"
+      ],
+      "ac_ids": ["AC-S1e7eeb-3-2"]
+    }
+  ],
+  "endpoint_contracts": [
+    {"method": "GET",  "path": "/login",            "auth": "public",       "response": "200 HTML form"},
+    {"method": "POST", "path": "/login",            "auth": "public",       "response": "302 + Set-Cookie on success | 401 on bad creds"},
+    {"method": "POST", "path": "/logout",           "auth": "session",      "response": "302 to /login + clear cookie"},
+    {"method": "GET",  "path": "/setup",            "auth": "no-admin-only","response": "200 HTML wizard | 302 /login if admin exists"},
+    {"method": "POST", "path": "/setup/admin",      "auth": "no-admin-only","response": "302 to /ui/admin/dashboard + Set-Cookie"},
+    {"method": "GET",  "path": "/ui/admin/*",       "auth": "role:admin",   "response": "200 | 302 /login | 403"},
+    {"method": "GET",  "path": "/ui",               "auth": "role:user+",   "response": "200 | 302 /login"}
+  ],
+  "test_files": [
+    "tests/e2e/login.e2e.spec.ts",
+    "tests/e2e/setup-wizard.e2e.spec.ts",
+    "tests/mock/login.mock.spec.ts",
+    "tests/mock/setup-wizard.mock.spec.ts"
+  ],
+  "go_supplemental_tests": [
+    "internal/gateway/auth_test.go",
+    "engine/auth/session/session_test.go",
+    "engine/user/store_test.go",
+    "engine/user/password_test.go",
+    "internal/ui/login_test.go",
+    "internal/ui/setup_test.go"
+  ],
+  "notes": [
+    "Playwright runner is not installed in this sandbox per S464e47 pattern; the Go httptest tests carry the actual acceptance gating, while .spec.ts files document the contract for future E2E enablement."
+  ]
+}

@@ -1,0 +1,28 @@
+{{- /*
+auth.tmpl — minimal layout for unauthenticated screens (login, setup wizard).
+Shares the prototype's <html data-theme> + Fog palette so brand consistency
+holds, but skips the sidebar / header chrome that only makes sense after the
+user is signed in. Inline boot script keeps the dark/light flash from
+appearing before paint.
+*/ -}}
+<!doctype html>
+<html lang="{{ .Locale }}" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ .PageTitle }} — {{ T "brand.name" }}</title>
+<link rel="stylesheet" href="/ui/static/kura.css" />
+<script src="/ui/static/htmx.min.js" defer></script>
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem('kura-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+{{ block "content" . }}{{ end }}
+</body>
+</html>

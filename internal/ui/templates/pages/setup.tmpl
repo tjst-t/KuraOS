@@ -1,0 +1,73 @@
+{{- /*
+setup.tmpl — first-run wizard. Step 1 (admin creation) is the only step in
+S1e7eeb's scope; the remaining sidebar entries are rendered as todo so users
+see where the storage / share configuration will land in S99702c. Layout is
+the prototype's wizard-shell verbatim (sidebar progress + main column),
+ported from prototype/claude_design/Setup.html.
+*/ -}}
+{{ define "content" }}
+<div class="wizard-shell">
+  <aside class="wizard-aside">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+      <div class="brand-mark">{{ template "brand-mark" . }}</div>
+      <div>
+        <div class="brand-name">{{ T "brand.name" }}</div>
+        <div class="brand-sub">{{ T "page.setup.title" }}</div>
+      </div>
+    </div>
+    <h2>{{ T "page.setup.title" }}</h2>
+    <div style="display:flex;flex-direction:column;gap:0;">
+      <div class="wizard-step" data-state="active"><span class="num">1</span><span>{{ T "page.setup.step.admin" }}</span></div>
+      <div class="wizard-step" data-state="todo"><span class="num">2</span><span>{{ T "page.setup.step.storage" }}</span></div>
+      <div class="wizard-step" data-state="todo"><span class="num">3</span><span>{{ T "page.setup.step.share" }}</span></div>
+      <div class="wizard-step" data-state="todo"><span class="num">4</span><span>{{ T "page.setup.step.done" }}</span></div>
+    </div>
+    <div style="flex:1"></div>
+    <div class="muted" style="font-size:11px;">v{{ .Version }}</div>
+  </aside>
+
+  <main class="wizard-main">
+    <div class="wizard-eyebrow">STEP 1 / 4</div>
+    <h1 class="wizard-title">{{ T "page.setup.admin.title" }}</h1>
+    <p class="wizard-lead">{{ T "page.setup.admin.lead" }}</p>
+
+    {{ if .Extra.ErrorMessage }}
+    <div class="banner crit" data-testid="setup-error" style="margin-bottom:16px;">
+      <div>{{ .Extra.ErrorMessage }}</div>
+    </div>
+    {{ end }}
+
+    <form method="post" action="/setup/admin" data-testid="setup-form" style="display:flex;flex-direction:column;gap:14px;max-width:480px;">
+      <div class="field">
+        <label for="setup-username">{{ T "page.setup.admin.username" }}</label>
+        <input id="setup-username" class="input mono" type="text" name="username"
+               autocomplete="username" required value="{{ .Extra.Username }}" autofocus />
+        <div class="field-hint">{{ T "page.setup.admin.username_rule" }}</div>
+      </div>
+      <div class="field">
+        <label for="setup-display-name">{{ T "page.setup.admin.display_name" }}</label>
+        <input id="setup-display-name" class="input" type="text" name="display_name"
+               value="{{ .Extra.DisplayName }}" />
+      </div>
+      <div class="field">
+        <label for="setup-password">{{ T "page.setup.admin.password" }}</label>
+        <input id="setup-password" class="input mono" type="password" name="password"
+               autocomplete="new-password" required />
+      </div>
+      <div class="field">
+        <label for="setup-password2">{{ T "page.setup.admin.password_again" }}</label>
+        <input id="setup-password2" class="input mono" type="password" name="password_confirm"
+               autocomplete="new-password" required />
+      </div>
+
+      <div class="hr"></div>
+      <div class="muted" style="font-size:12px;">{{ T "page.setup.deferred_note" }}</div>
+
+      <div class="wizard-foot">
+        <span></span>
+        <button type="submit" class="btn btn-accent">{{ T "page.setup.admin.submit" }}</button>
+      </div>
+    </form>
+  </main>
+</div>
+{{ end }}

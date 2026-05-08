@@ -1,0 +1,10 @@
+?   	github.com/kuraos-org/kura/cmd/kura	[no test files]
+ok  	github.com/kuraos-org/kura/engine/auth/session	0.081s
+ok  	github.com/kuraos-org/kura/engine/user	0.188s
+ok  	github.com/kuraos-org/kura/i18n	0.002s
+ok  	github.com/kuraos-org/kura/internal/config	0.005s
+ok  	github.com/kuraos-org/kura/internal/gateway	0.009s
+ok  	github.com/kuraos-org/kura/internal/store	0.024s
+ok  	github.com/kuraos-org/kura/internal/ui	0.031s
+ok  	github.com/kuraos-org/kura/tests/acceptance	0.044s
+?   	github.com/kuraos-org/kura/tests/acceptance/listtables	[no test files]
