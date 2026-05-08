@@ -31,6 +31,22 @@ type stubStorageRW struct {
 		Name string
 		Opts storage.ImportOpts
 	}
+	volumeCalls []struct {
+		Dataset string
+		Opts    storage.VolumeOpts
+	}
+	snapshotCalls []struct {
+		Dataset string
+		Name    string
+	}
+	rollbackCalls []struct {
+		Dataset  string
+		Snapshot string
+	}
+	quotaCalls []struct {
+		Dataset string
+		Bytes   int64
+	}
 	createErr error
 }
 
@@ -49,11 +65,42 @@ func (s *stubStorageRW) CreatePool(_ context.Context, cfg storage.PoolConfig) er
 	s.createCalls = append(s.createCalls, cfg)
 	return nil
 }
-func (s *stubStorageRW) CreateVolume(context.Context, string, storage.VolumeOpts) error {
+func (s *stubStorageRW) CreateVolume(_ context.Context, dataset string, opts storage.VolumeOpts) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.volumeCalls = append(s.volumeCalls, struct {
+		Dataset string
+		Opts    storage.VolumeOpts
+	}{dataset, opts})
 	return nil
 }
-func (s *stubStorageRW) CreateSnapshot(context.Context, string, string) error { return nil }
-func (s *stubStorageRW) Rollback(context.Context, string, string) error       { return nil }
+func (s *stubStorageRW) CreateSnapshot(_ context.Context, dataset, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.snapshotCalls = append(s.snapshotCalls, struct {
+		Dataset string
+		Name    string
+	}{dataset, name})
+	return nil
+}
+func (s *stubStorageRW) Rollback(_ context.Context, dataset, snapshot string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.rollbackCalls = append(s.rollbackCalls, struct {
+		Dataset  string
+		Snapshot string
+	}{dataset, snapshot})
+	return nil
+}
+func (s *stubStorageRW) SetQuota(_ context.Context, dataset string, bytes int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.quotaCalls = append(s.quotaCalls, struct {
+		Dataset string
+		Bytes   int64
+	}{dataset, bytes})
+	return nil
+}
 func (s *stubStorageRW) ImportPool(_ context.Context, name string, opts storage.ImportOpts) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -276,3 +323,146 @@ func TestAcceptance_StoragePage_RepeatedRequestsRender(t *testing.T) {
 }
 
 func min(a, b int) int { if a < b { return a }; return b }
+
+// [AC-S9db742-2-1] Volume can be created from the UI New Volume form, and
+// the chosen preset propagates as VolumeOpts.Preset to the engine — which
+// in turn applies recordsize / compression / special_small_blocks per
+// engine/storage/presets.go (covered by engine unit tests). Here we verify
+// the UI wiring: form submission → engine.CreateVolume call.
+func TestAcceptance_StorageCreateVolumeFromUI(t *testing.T) {
+	eng := &stubStorageRW{stubStorage: stubStorage{
+		pools: storageFixturePools(),
+	}}
+	srv, _ := newServerWithStorageRW(t, eng)
+
+	c := loginAs(t, srv, "root", "longenoughpw")
+	form := url.Values{}
+	form.Set("dataset", "tank/photos")
+	form.Set("preset", "media")
+	form.Set("quota", "1073741824")
+	form.Set("mountpoint", "/tank/photos")
+	resp, err := c.PostForm(srv.URL+"/ui/admin/storage/volumes", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", resp.StatusCode)
+	}
+	if len(eng.volumeCalls) != 1 {
+		t.Fatalf("want 1 volume call, got %d", len(eng.volumeCalls))
+	}
+	got := eng.volumeCalls[0]
+	if got.Dataset != "tank/photos" || got.Opts.Preset != "media" || got.Opts.QuotaBytes != 1073741824 || got.Opts.MountPoint != "/tank/photos" {
+		t.Errorf("got = %+v", got)
+	}
+}
+
+// [AC-S9db742-2-2] Snapshot create / list / rollback are reachable from the
+// UI. The Snapshot tab's New Snapshot form posts to the snapshots endpoint;
+// the per-row Rollback button posts to /snapshots/rollback. Both must round-
+// trip the dataset+name fields untouched.
+func TestAcceptance_StorageSnapshotFromUI(t *testing.T) {
+	eng := &stubStorageRW{stubStorage: stubStorage{
+		pools: storageFixturePools(),
+		volumes: []storage.VolumeInfo{
+			{Name: "tank/photos", UsedBytes: 1024 * 1024, AvailableBytes: 1024 * 1024 * 1024},
+		},
+		snapshots: map[string][]storage.SnapshotInfo{
+			"tank/photos": {{Dataset: "tank/photos", Name: "auto-2026-05-08", UsedBytes: 1024}},
+		},
+	}}
+	srv, _ := newServerWithStorageRW(t, eng)
+
+	c := loginAs(t, srv, "root", "longenoughpw")
+
+	// Snapshot tab renders the existing snapshot row + New Snapshot button.
+	resp, err := c.Get(srv.URL + "/ui/admin/storage?tab=snapshots")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	body := readBody(t, resp)
+	resp.Body.Close()
+	if !strings.Contains(body, `data-testid="storage-snapshots-panel"`) {
+		t.Errorf("snapshot panel missing")
+	}
+	if !strings.Contains(body, `data-testid="storage-snapshot-new-btn"`) {
+		t.Errorf("new snapshot button missing")
+	}
+	if !strings.Contains(body, "auto-2026-05-08") {
+		t.Errorf("existing snapshot row missing")
+	}
+	if !strings.Contains(body, `data-testid="storage-snapshot-rollback-btn"`) {
+		t.Errorf("rollback button missing")
+	}
+
+	// Create snapshot via the form.
+	form := url.Values{"dataset": {"tank/photos"}, "name": {"manual-1"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/snapshots", form)
+	if err != nil {
+		t.Fatalf("POST snap: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("snap status = %d, want 303", resp.StatusCode)
+	}
+	if len(eng.snapshotCalls) != 1 ||
+		eng.snapshotCalls[0].Dataset != "tank/photos" ||
+		eng.snapshotCalls[0].Name != "manual-1" {
+		t.Errorf("snapshot call mismatch: %+v", eng.snapshotCalls)
+	}
+
+	// Rollback via the per-snapshot modal.
+	form = url.Values{"dataset": {"tank/photos"}, "snapshot": {"auto-2026-05-08"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/snapshots/rollback", form)
+	if err != nil {
+		t.Fatalf("POST rollback: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("rollback status = %d, want 303", resp.StatusCode)
+	}
+	if len(eng.rollbackCalls) != 1 ||
+		eng.rollbackCalls[0].Dataset != "tank/photos" ||
+		eng.rollbackCalls[0].Snapshot != "auto-2026-05-08" {
+		t.Errorf("rollback call mismatch: %+v", eng.rollbackCalls)
+	}
+}
+
+// [AC-S9db742-2-3] Set Quota from the UI. quota=0 unsets via SetQuota.
+func TestAcceptance_StorageSetQuotaFromUI(t *testing.T) {
+	eng := &stubStorageRW{stubStorage: stubStorage{
+		pools: storageFixturePools(),
+		volumes: []storage.VolumeInfo{
+			{Name: "tank/photos", UsedBytes: 0, AvailableBytes: 1024 * 1024},
+		},
+	}}
+	srv, _ := newServerWithStorageRW(t, eng)
+
+	c := loginAs(t, srv, "root", "longenoughpw")
+	form := url.Values{"dataset": {"tank/photos"}, "quota": {"5368709120"}}
+	resp, err := c.PostForm(srv.URL+"/ui/admin/storage/quota", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", resp.StatusCode)
+	}
+	if len(eng.quotaCalls) != 1 ||
+		eng.quotaCalls[0].Dataset != "tank/photos" ||
+		eng.quotaCalls[0].Bytes != 5368709120 {
+		t.Errorf("quota call mismatch: %+v", eng.quotaCalls)
+	}
+
+	// 0 unsets.
+	form = url.Values{"dataset": {"tank/photos"}, "quota": {"0"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/quota", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if len(eng.quotaCalls) != 2 || eng.quotaCalls[1].Bytes != 0 {
+		t.Errorf("quota=0 call mismatch: %+v", eng.quotaCalls)
+	}
+}

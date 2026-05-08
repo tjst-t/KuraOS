@@ -274,7 +274,10 @@ func (r *Renderer) Routes() http.Handler {
 		// Specific routes win over the read handler at /ui/admin/storage.
 		mux.Handle("/ui/admin/storage/pools", r.storageWriteHandler)
 		mux.Handle("/ui/admin/storage/import", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/volumes", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/quota", r.storageWriteHandler)
 		mux.Handle("/ui/admin/storage/snapshots", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/snapshots/rollback", r.storageWriteHandler)
 	}
 	if r.sharesHandler != nil {
 		mux.Handle("/ui/admin/shares", r.sharesHandler)

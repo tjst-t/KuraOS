@@ -105,5 +105,27 @@
     "Docker / ZFS / SMB の CLI 出力を直接画面に表示しない (i18n 経由で構造化メッセージに変換)",
     ".env / リポジトリ内に本番シークレットをコミットしない",
     "アプリの内部パスワード / DB password / OIDC client secret を config.json export 時に平文で含めない (env 参照のみを記録)"
+  ],
+  "verification_rules": [
+    {
+      "rule": "AC の description が UI / 画面 / フォーム / ボタン / リダイレクト 等のユーザー操作面に言及する場合、test 参照には UI レベルのテストパスを必ず含める (tests/e2e/*.spec.ts / tests/mock/*.spec.ts / tests/acceptance/*_test.go (httptest 経由) / internal/ui/*_test.go のいずれか)",
+      "rationale": "engine_test.go だけで AC done にすると、operator が触れる経路が無いまま機能が『動く』と判定される。S9db742-2-2 (Snapshot UI) でこの抜けが発覚した。",
+      "enforcement": "tests/acceptance/ac-surface-coverage.sh が ROADMAP.json を走査して mismatch を fail させる。sprint verify と CI で必ず実行する。"
+    },
+    {
+      "rule": "AC の description が CLI / `kura ...` / make コマンド等に言及する場合、test 参照には実バイナリを呼ぶ shell テスト (tests/acceptance/*.sh) または cmd/kura/*_test.go を含める",
+      "rationale": "engine 経由で動くロジックと、cmd/kura/main.go のフラグパース＆ディスパッチが正しく繋がっているかは別問題。",
+      "enforcement": "ac-surface-coverage.sh の CLI 検出ロジック。"
+    },
+    {
+      "rule": "Story に紐づく task が AC 抜きで done になっていないか毎 sprint verify でチェック。task が AC を持たない場合、Story 完了前に AC を追加する",
+      "rationale": "S9db742-2-3 task (Quota 設定) のように、task は実装されているが AC が無く UI/CLI も無い、という状態を検出するため。",
+      "enforcement": "sprint verify の手順書 (sprint/references/sprint-verify.md) に項目追加。"
+    },
+    {
+      "rule": "Story を done にする前に make serve で実 binary を起動し、AC が言及する操作を実 UI/CLI で 1 回は手動実行する (sprint demo の最低条件)",
+      "rationale": "テストが通っても prototype と乖離した HTML / 壊れた wire-up は手動デモでしか検出できないことが S464e47 の `--bg-1` typo / `.tbl` CSS 未移植で複数回起きた。",
+      "enforcement": "sprint demo phase で `make serve` を実行し、acceptance criteria の操作を画面/CLI で 1 回ずつ通すことを必須とする。"
+    }
   ]
 }

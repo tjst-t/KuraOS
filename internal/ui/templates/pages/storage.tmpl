@@ -119,8 +119,75 @@ in storage.go so the template stays free of CLI-output tokens.
 </div>
 {{ end }}
 
+{{- /* ===== Tabs strip + active tab content ===== */ -}}
+{{ if $v.Tabs }}
+<nav class="tabs" data-testid="storage-tabs" style="margin-top:24px">
+  {{ range $v.Tabs }}
+  <a class="tab" href="{{ .Href }}" data-active="{{ if .Active }}true{{ else }}false{{ end }}" data-tab-id="{{ .ID }}">{{ .Label }}</a>
+  {{ end }}
+</nav>
+{{ end }}
+
+{{ if eq $v.ActiveTab "volumes" }}
+<section data-testid="storage-volumes-panel">
+  <div class="card">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.volumes.heading" }}</h3>
+      {{ if $v.WriteEnabled }}
+      <button type="button" class="btn btn-sm btn-primary" data-testid="storage-volume-new-btn"
+        data-modal-open="new-volume-modal">{{ T "page.storage.volume.new" }}</button>
+      {{ end }}
+    </div>
+    {{ if $v.HasVolumes }}
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ T "page.storage.volume.col.name" }}</th>
+          <th class="td-num">{{ T "page.storage.volume.col.used" }}</th>
+          <th class="td-num">{{ T "page.storage.volume.col.avail" }}</th>
+          <th class="td-num">{{ T "page.storage.volume.col.quota" }}</th>
+          <th>{{ T "page.storage.volume.col.preset" }}</th>
+          <th>{{ T "page.storage.volume.col.mount" }}</th>
+          {{ if $v.WriteEnabled }}<th>{{ T "page.storage.volume.col.actions" }}</th>{{ end }}
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $v.Volumes }}
+        <tr data-testid="storage-volume-row" data-dataset="{{ .Name }}">
+          <td><span class="mono">{{ .Name }}</span>{{ if .IsPoolRoot }} <span class="badge">{{ T "page.storage.volume.pool_root" }}</span>{{ end }}</td>
+          <td class="td-num">{{ .UsedDisplay }}</td>
+          <td class="td-num">{{ .AvailDisplay }}</td>
+          <td class="td-num">{{ .QuotaDisplay }}</td>
+          <td>
+            {{ if .Compression }}<span class="mono" style="font-size:11px">{{ .Compression }}</span>{{ end }}
+            {{ if .RecordSize }}<span class="mono" style="font-size:11px;color:var(--text-3);margin-left:4px">{{ .RecordSize }}</span>{{ end }}
+          </td>
+          <td><span class="mono" style="font-size:11px">{{ if .MountPoint }}{{ .MountPoint }}{{ else }}—{{ end }}</span></td>
+          {{ if $v.WriteEnabled }}
+          <td class="row gap-sm" style="display:flex;gap:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm" data-testid="storage-volume-quota-btn"
+              data-modal-open="quota-modal-{{ .Name }}">{{ T "page.storage.volume.quota.set" }}</button>
+            <button type="button" class="btn btn-sm" data-testid="storage-volume-snapshot-btn"
+              data-modal-open="new-snapshot-modal" data-volume-name="{{ .Name }}"
+              onclick="(function(){var d=document.getElementById('new-snapshot-modal');if(!d)return;var s=d.querySelector('select[name=&quot;dataset&quot;]');if(s){s.value='{{ .Name }}';}})();">{{ T "page.storage.snapshot.new" }}</button>
+          </td>
+          {{ end }}
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    {{ else }}
+    <div class="card-body" data-testid="storage-volumes-empty">
+      <p class="muted" style="margin:0">{{ T "page.storage.volumes.empty" }}</p>
+    </div>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+{{ if eq $v.ActiveTab "disks" }}
 {{ if $v.HasDisks }}
-<section data-testid="storage-disks" style="margin-top:24px">
+<section data-testid="storage-disks">
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.disks_heading" }}</h3>
@@ -159,9 +226,60 @@ in storage.go so the template stays free of CLI-output tokens.
   </div>
 </section>
 {{ end }}
+{{ end }}
 
+{{ if eq $v.ActiveTab "snapshots" }}
+<section data-testid="storage-snapshots-panel">
+  <div class="card">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.snapshots.heading" }}</h3>
+      {{ if $v.WriteEnabled }}
+      <button type="button" class="btn btn-sm btn-primary" data-testid="storage-snapshot-new-btn"
+        data-modal-open="new-snapshot-modal">{{ T "page.storage.snapshot.new" }}</button>
+      {{ end }}
+    </div>
+    {{ if $v.HasSnapshots }}
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ T "page.storage.snapshot.col.dataset" }}</th>
+          <th>{{ T "page.storage.snapshot.col.name" }}</th>
+          <th class="td-num">{{ T "page.storage.snapshot.col.used" }}</th>
+          <th class="td-num">{{ T "page.storage.snapshot.col.refer" }}</th>
+          <th>{{ T "page.storage.snapshot.col.created" }}</th>
+          {{ if $v.WriteEnabled }}<th>{{ T "page.storage.snapshot.col.actions" }}</th>{{ end }}
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $v.Snapshots }}
+        <tr data-testid="storage-snapshot-row" data-dataset="{{ .Dataset }}" data-snapshot="{{ .Name }}">
+          <td><span class="mono">{{ .Dataset }}</span></td>
+          <td><span class="mono">@{{ .Name }}</span></td>
+          <td class="td-num">{{ .UsedDisplay }}</td>
+          <td class="td-num">{{ .ReferDisplay }}</td>
+          <td><span class="mono" style="font-size:11px">{{ .CreatedLabel }}</span></td>
+          {{ if $v.WriteEnabled }}
+          <td>
+            <button type="button" class="btn btn-sm" data-testid="storage-snapshot-rollback-btn"
+              data-modal-open="rollback-modal-{{ .Dataset }}-{{ .Name }}">{{ T "page.storage.snapshot.rollback" }}</button>
+          </td>
+          {{ end }}
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    {{ else }}
+    <div class="card-body" data-testid="storage-snapshots-empty">
+      <p class="muted" style="margin:0">{{ T "page.storage.snapshots.empty" }}</p>
+    </div>
+    {{ end }}
+  </div>
+</section>
+{{ end }}
+
+{{ if eq $v.ActiveTab "imports" }}
 {{ if $v.HasImports }}
-<section data-testid="storage-import" style="margin-top:24px">
+<section data-testid="storage-import">
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.import_heading" }}</h3>
@@ -200,6 +318,13 @@ in storage.go so the template stays free of CLI-output tokens.
     </table>
   </div>
 </section>
+{{ else }}
+<div class="card" data-testid="storage-imports-empty">
+  <div class="card-body">
+    <p class="muted" style="margin:0">{{ T "page.storage.import.empty" }}</p>
+  </div>
+</div>
+{{ end }}
 {{ end }}
 
 {{- /* ===== Modals (rendered via reusable partial) ===== */ -}}
@@ -224,6 +349,48 @@ in storage.go so the template stays free of CLI-output tokens.
     "bodyTpl" "storage-new-pool-body"
     "footTpl" "storage-new-pool-foot"
     "ctx"     $v }}
+
+{{ template "modal" dict
+    "id"      "new-volume-modal"
+    "testid"  "storage-new-volume-modal"
+    "title"   (T "page.storage.volume.new.title")
+    "action"  "/ui/admin/storage/volumes"
+    "bodyTpl" "storage-new-volume-body"
+    "footTpl" "storage-new-volume-foot"
+    "ctx"     $v }}
+
+{{ template "modal" dict
+    "id"      "new-snapshot-modal"
+    "testid"  "storage-new-snapshot-modal"
+    "title"   (T "page.storage.snapshot.new.title")
+    "action"  "/ui/admin/storage/snapshots"
+    "bodyTpl" "storage-new-snapshot-body"
+    "footTpl" "storage-new-snapshot-foot"
+    "ctx"     $v }}
+
+{{ range $v.Volumes }}
+{{ if not .IsPoolRoot }}
+{{ template "modal" dict
+    "id"      (printf "quota-modal-%s" .Name)
+    "testid"  "storage-quota-modal"
+    "title"   (printf "%s: %s" (T "page.storage.volume.quota.set") .Name)
+    "action"  "/ui/admin/storage/quota"
+    "bodyTpl" "storage-quota-body"
+    "footTpl" "storage-quota-foot"
+    "ctx"     . }}
+{{ end }}
+{{ end }}
+
+{{ range $v.Snapshots }}
+{{ template "modal" dict
+    "id"      (printf "rollback-modal-%s-%s" .Dataset .Name)
+    "testid"  "storage-rollback-modal"
+    "title"   (T "page.storage.snapshot.rollback.title")
+    "action"  "/ui/admin/storage/snapshots/rollback"
+    "bodyTpl" "storage-rollback-body"
+    "footTpl" "storage-rollback-foot"
+    "ctx"     . }}
+{{ end }}
 
 {{- /* ===== Pool-form validation script (page-specific) =====
    The validation rules depend on which layout is selected, so the logic
@@ -426,5 +593,117 @@ in storage.go so the template stays free of CLI-output tokens.
   data-validate-submit
   aria-disabled="true" title="">
   {{ T "page.storage.new_pool.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== New Volume modal body / foot ===== */ -}}
+{{ define "storage-new-volume-body" }}
+{{ $v := . }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.name" }}</label>
+    <input class="input mono" name="dataset" required placeholder="tank/photos" data-testid="storage-new-volume-name">
+    <div class="field-hint">{{ T "page.storage.volume.new.name_hint" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.preset" }}</label>
+    <select name="preset" class="input" data-testid="storage-new-volume-preset">
+      <option value="">—</option>
+      {{ range $v.Presets }}
+      <option value="{{ .ID }}">{{ .Label }}</option>
+      {{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.quota" }}</label>
+    <input class="input mono" name="quota" type="number" min="0" placeholder="0" data-testid="storage-new-volume-quota">
+    <div class="field-hint">{{ T "page.storage.volume.new.quota_hint" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.mountpoint" }}</label>
+    <input class="input mono" name="mountpoint" placeholder="/tank/photos" data-testid="storage-new-volume-mount">
+  </div>
+</div>
+{{ end }}
+
+{{ define "storage-new-volume-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="storage-new-volume-submit">
+  {{ T "page.storage.volume.new.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== New Snapshot modal body / foot ===== */ -}}
+{{ define "storage-new-snapshot-body" }}
+{{ $v := . }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <div class="field">
+    <label>{{ T "page.storage.snapshot.new.dataset" }}</label>
+    <select name="dataset" class="input mono" required data-testid="storage-new-snapshot-dataset">
+      {{ range $v.Volumes }}
+      <option value="{{ .Name }}">{{ .Name }}</option>
+      {{ end }}
+    </select>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.snapshot.new.name" }}</label>
+    <input class="input mono" name="name" required placeholder="auto-2026-05-08" data-testid="storage-new-snapshot-name">
+  </div>
+</div>
+{{ end }}
+
+{{ define "storage-new-snapshot-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="storage-new-snapshot-submit">
+  {{ T "page.storage.snapshot.new.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== Set Quota modal body / foot ===== Per-volume; ctx is a VolumeView */ -}}
+{{ define "storage-quota-body" }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <input type="hidden" name="dataset" value="{{ .Name }}">
+  <div class="field">
+    <label>{{ T "page.storage.volume.col.name" }}</label>
+    <div class="mono">{{ .Name }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.quota" }}</label>
+    <input class="input mono" name="quota" type="number" min="0" value="{{ .QuotaBytes }}" data-testid="storage-quota-input">
+    <div class="field-hint">{{ T "page.storage.volume.new.quota_hint" }}</div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "storage-quota-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="storage-quota-submit">
+  {{ T "page.storage.volume.quota.set" }}
+</button>
+{{ end }}
+
+{{- /* ===== Snapshot rollback modal body / foot ===== ctx is a SnapshotView */ -}}
+{{ define "storage-rollback-body" }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <input type="hidden" name="dataset" value="{{ .Dataset }}">
+  <input type="hidden" name="snapshot" value="{{ .Name }}">
+  <div class="banner crit" style="border-left-color:var(--crit)">
+    <div style="flex:1">{{ T "page.storage.snapshot.rollback.warn" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.snapshot.col.dataset" }}</label>
+    <div class="mono">{{ .Dataset }}@{{ .Name }}</div>
+  </div>
+  <label class="row center" style="display:flex;gap:8px;align-items:center;font-size:13px">
+    <input type="checkbox" required data-testid="storage-rollback-ack">
+    <span>{{ T "page.storage.snapshot.rollback.confirm" }}</span>
+  </label>
+</div>
+{{ end }}
+
+{{ define "storage-rollback-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="storage-rollback-submit">
+  {{ T "page.storage.snapshot.rollback.submit" }}
 </button>
 {{ end }}

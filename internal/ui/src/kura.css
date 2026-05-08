@@ -511,6 +511,38 @@
     font-family: var(--font-mono);
   }
 
+  /* Tabs — ported from prototype/claude_design/shared/shared.css. Used by
+     the Storage page (Pools / Volumes / Snapshots / Disks / Imports) and any
+     future page that swaps content within one card. Server-rendered: each
+     tab is an <a> link to a query-string variant of the same URL, the
+     active state lives in data-active="true" on the link. */
+  .tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+  }
+  .tab {
+    padding: 8px 12px;
+    font-size: 13px;
+    color: var(--text-3);
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    cursor: pointer;
+    transition: color .12s, border-color .12s;
+    background: none;
+    border-top: none;
+    border-left: none;
+    border-right: none;
+    font-weight: 500;
+    text-decoration: none;
+  }
+  .tab:hover { color: var(--text-2); }
+  .tab[data-active="true"] {
+    color: var(--text);
+    border-bottom-color: var(--text);
+  }
+
   /* Stats / progress bar / vdev tree */
   .stat-value { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
   .stat-value .unit { font-size: 12px; color: var(--text-3); margin-left: 4px; font-weight: 400; }

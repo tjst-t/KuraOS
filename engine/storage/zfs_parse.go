@@ -575,3 +575,50 @@ func parseSnapshotList(raw []byte) ([]SnapshotInfo, error) {
 	}
 	return out, nil
 }
+
+// parseVolumeList consumes
+//   `zfs list -H -p -t filesystem -o name,used,available,referenced,mountpoint,quota,recordsize,compression`.
+// Numeric fields come back as raw bytes (-p), quota=0 means "no quota set".
+// recordsize and compression are stringified ZFS values ("128K", "zstd").
+func parseVolumeList(raw []byte) ([]VolumeInfo, error) {
+	if len(bytes.TrimSpace(raw)) == 0 {
+		return nil, nil
+	}
+	var out []VolumeInfo
+	sc := bufio.NewScanner(bytes.NewReader(raw))
+	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	lineNo := 0
+	for sc.Scan() {
+		lineNo++
+		line := strings.TrimRight(sc.Text(), "\r")
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		fields := strings.Split(line, "\t")
+		if len(fields) < 8 {
+			return nil, fmt.Errorf("zfs list filesystem: line %d: want 8 fields, got %d", lineNo, len(fields))
+		}
+		used, _ := strconv.ParseInt(strings.TrimSpace(fields[1]), 10, 64)
+		avail, _ := strconv.ParseInt(strings.TrimSpace(fields[2]), 10, 64)
+		refer, _ := strconv.ParseInt(strings.TrimSpace(fields[3]), 10, 64)
+		quota, _ := strconv.ParseInt(strings.TrimSpace(fields[5]), 10, 64)
+		mp := strings.TrimSpace(fields[4])
+		if mp == "-" || mp == "none" {
+			mp = ""
+		}
+		out = append(out, VolumeInfo{
+			Name:            fields[0],
+			UsedBytes:       used,
+			AvailableBytes:  avail,
+			ReferencedBytes: refer,
+			MountPoint:      mp,
+			QuotaBytes:      quota,
+			RecordSize:      strings.TrimSpace(fields[6]),
+			Compression:     strings.TrimSpace(fields[7]),
+		})
+	}
+	if err := sc.Err(); err != nil {
+		return nil, fmt.Errorf("zfs list filesystem: scan: %w", err)
+	}
+	return out, nil
+}

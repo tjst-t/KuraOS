@@ -17,7 +17,7 @@
       "S9db742",
       "Sd64f38"
     ],
-    "updated_at": "2026-05-08T02:43:00Z"
+    "updated_at": "2026-05-08T13:20:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -474,34 +474,41 @@
           "title": "Volume / プリセット / Snapshot",
           "status": "done",
           "user_story": "管理者として、用途プリセットからデータセットを作成し定期スナップショットを設定できるようにしたい。なぜなら、recordsize/compression の最適値を意識せず安全な構成を組むため。",
+          "regression_note": "AC-S9db742-2-1 / 2-2 は engine_test.go のみで done と判定されたが、operator が Volume / Snapshot を作成・一覧・rollback する UI / CLI 経路が実装されていなかった。再発防止策として tests/acceptance/ac-surface-coverage.sh を追加 (DESIGN_PRINCIPLES.verification_rules 参照)。本 sprint 内で UI / CLI の実装を完了し、AC を再検証する。",
           "acceptance_criteria": [
             {
               "id": "AC-S9db742-2-1",
-              "description": "general/media/database プリセットから Volume を作成すると、対応する recordsize と compression=zstd が適用される",
-              "test": "[AC-S9db742-2-1] in tests/acceptance/storage-presets.sh (engine/storage/create_test.go::TestBuildCreateVolumeArgs_presetExpansion)",
+              "description": "general/media/database プリセットから UI の New Volume フォームと CLI (kura storage create-volume) で dataset を作成すると、対応する recordsize と compression=zstd が ZFS プロパティに適用される",
+              "test": "[AC-S9db742-2-1] in tests/acceptance/storage_volume_test.go::TestAcceptance_StorageCreateVolumeFromUI + tests/acceptance/storage-volume-cli.sh + engine/storage/create_test.go::TestBuildCreateVolumeArgs_presetExpansion",
               "status": "done"
             },
             {
               "id": "AC-S9db742-2-2",
-              "description": "Volume の手動スナップショット作成・一覧・rollback が UI から実行できる",
-              "test": "[AC-S9db742-2-2] in engine/storage/create_test.go (TestCreateSnapshot, TestRollback, TestListSnapshots_parsesTSV)",
+              "description": "Volume の手動スナップショット作成・一覧・rollback が UI から (Storage 画面の Snapshot タブ) と CLI (kura storage create-snapshot / list-snapshots / rollback) の両方から実行できる",
+              "test": "[AC-S9db742-2-2] in tests/acceptance/storage_volume_test.go::TestAcceptance_StorageSnapshotFromUI + tests/acceptance/storage-snapshot-cli.sh + engine/storage/create_test.go (TestCreateSnapshot, TestRollback, TestListSnapshots_parsesTSV)",
+              "status": "done"
+            },
+            {
+              "id": "AC-S9db742-2-3",
+              "description": "Volume の Quota が UI フォームと CLI (kura storage set-quota) から設定でき、0 を渡すと quota=none で解除される",
+              "test": "[AC-S9db742-2-3] in tests/acceptance/storage_volume_test.go::TestAcceptance_StorageSetQuotaFromUI + tests/acceptance/storage-quota-cli.sh + engine/storage/create_test.go::TestSetQuota_unsetsWhenZero",
               "status": "done"
             }
           ],
           "tasks": {
             "S9db742-2-1": {
-              "title": "CreateVolume + プリセット適用",
-              "description": "VolumeOpts.Preset → zfs プロパティに展開",
+              "title": "CreateVolume + プリセット適用 (engine + UI form + CLI subcommand)",
+              "description": "VolumeOpts.Preset → zfs プロパティに展開。internal/ui/storage_write.go に handleCreateVolume を追加、storage.tmpl に Volume タブ + 作成 form を追加、cmd/kura/storage.go に create-volume サブコマンドを追加。",
               "status": "done"
             },
             "S9db742-2-2": {
-              "title": "Snapshot CRUD + Rollback",
-              "description": "CreateSnapshot/ListSnapshots/Rollback の実装と UI",
+              "title": "Snapshot CRUD + Rollback (engine + UI tab + CLI subcommand)",
+              "description": "engine 側はすでに完成。Snapshot タブ UI + 一覧テーブル + 作成ダイアログ + rollback 確認モーダルを実装。CLI: create-snapshot / list-snapshots / rollback サブコマンド。",
               "status": "done"
             },
             "S9db742-2-3": {
-              "title": "Quota 設定",
-              "description": "SetQuota の実装と UI フィールド",
+              "title": "Quota 設定 (engine + UI field + CLI subcommand)",
+              "description": "SetQuota engine は完成。Volume 詳細 / 作成 form に Quota 入力欄を追加。CLI: set-quota サブコマンド。",
               "status": "done"
             }
           }
@@ -538,7 +545,8 @@
             }
           }
         }
-      }
+      },
+      "regression_note": "S9db742-2 は engine_test.go のみで AC done と判定されたが UI/CLI 経路が欠落。tests/acceptance/ac-surface-coverage.sh で再発防止 (2026-05-08 hotfix)。"
     },
     "Sd64f38": {
       "title": "Share 管理 (SMB/NFS) と smb.conf テンプレート",
@@ -1691,6 +1699,20 @@
       "description": "ansible-nas + apt から、宣言的構成 (NixOS) または mkosi/systemd-sysext によるイメージベースに移行。UI/API/Engine はそのまま流用。",
       "added_in": "S99702c",
       "reason": "Phase 2 の課題。Phase 1 の運用が辛くなったタイミングで開始。"
+    },
+    {
+      "id": "BL-2026-05-08-ac-surface",
+      "title": "AC verification process: ac-surface-coverage.sh を CI と sprint verify に組み込む",
+      "added_in": "hotfix-2026-05-08",
+      "reason": "S9db742-2 で engine_test.go のみで done と判定された AC が UI/CLI 経路を持たないまま放置された。tests/acceptance/ac-surface-coverage.sh は ROADMAP.json 全 AC を走査して mismatch を fail させる。CI の標準 step に追加し、/sprint verify の最後でも実行する。",
+      "status": "open"
+    },
+    {
+      "id": "BL-2026-05-08-sprint-demo-rule",
+      "title": "Sprint demo: AC が言及する全操作を make serve 上で 1 回ずつ実行することを必須化",
+      "added_in": "hotfix-2026-05-08",
+      "reason": "Storage の `--bg-1` typo / `.tbl` CSS 未移植は engine + UI test 全 pass でも残った。テスト通過と prototype との実体一致は別問題。sprint demo phase で実 binary を起動して acceptance criteria の操作を一通りなぞる手順を sprint/references/sprint-demo.md にも明記する。",
+      "status": "open"
     }
   ]
 }

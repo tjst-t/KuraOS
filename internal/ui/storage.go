@@ -38,6 +38,8 @@ type StorageEngineReader interface {
 	ListPools(ctx context.Context) ([]storage.Pool, error)
 	ListDisks(ctx context.Context) ([]storage.Disk, error)
 	ListImportable(ctx context.Context) ([]storage.ImportablePool, error)
+	ListVolumes(ctx context.Context, pool string) ([]storage.VolumeInfo, error)
+	ListSnapshots(ctx context.Context, dataset string) ([]storage.SnapshotInfo, error)
 }
 
 // StorageEngineWriter is the mutation surface the New Pool / Snapshot /
@@ -48,6 +50,7 @@ type StorageEngineWriter interface {
 	CreateVolume(ctx context.Context, dataset string, opts storage.VolumeOpts) error
 	CreateSnapshot(ctx context.Context, dataset, name string) error
 	Rollback(ctx context.Context, dataset, snapshot string) error
+	SetQuota(ctx context.Context, dataset string, bytes int64) error
 	ImportPool(ctx context.Context, name string, opts storage.ImportOpts) error
 }
 
@@ -59,13 +62,24 @@ type StorageView struct {
 	HasPools     bool
 	HasDisks     bool
 	HasImports   bool
+	HasVolumes   bool
+	HasSnapshots bool
 	ImportError  string
 	WriteEnabled bool
 
-	Pools    []PoolView
-	Disks    []DiskView
-	Imports  []ImportableView
-	Importer ImportBanner
+	// ActiveTab drives which panel renders below the pool cards. Values:
+	// "volumes" (default) | "disks" | "snapshots" | "imports". Selected by
+	// the ?tab= query param so each tab has a real URL — operators can
+	// bookmark "tank's snapshots", and back/forward navigation works.
+	ActiveTab string
+	Tabs      []TabOption
+
+	Pools     []PoolView
+	Disks     []DiskView
+	Imports   []ImportableView
+	Volumes   []VolumeView
+	Snapshots []SnapshotView
+	Importer  ImportBanner
 
 	// Layouts / Presets are surfaced to the New Pool dialog and Volume form.
 	Layouts []LayoutOption
@@ -77,11 +91,45 @@ type StorageView struct {
 	FreeDisks []DiskView
 }
 
+// VolumeView is one row in the Volume tab. Numeric byte values are
+// pre-formatted to "12.4 TB"-style strings; raw bytes stay on UsedBytes /
+// QuotaBytes so tests / form pre-fill have a stable shape.
+type VolumeView struct {
+	Name        string
+	UsedBytes   int64
+	QuotaBytes  int64
+	UsedDisplay string
+	AvailDisplay string
+	QuotaDisplay string
+	MountPoint  string
+	RecordSize  string
+	Compression string
+	IsPoolRoot  bool
+}
+
+// SnapshotView is one row in the Snapshot tab.
+type SnapshotView struct {
+	Dataset      string
+	Name         string
+	UsedBytes    int64
+	UsedDisplay  string
+	ReferDisplay string
+	CreatedLabel string
+}
+
 // LayoutOption is one entry in the layout selector. ID is the engine-side
 // VdevLayout string (mirror / raidz1 / ...); Label is the translated copy.
 type LayoutOption struct {
 	ID    string
 	Label string
+}
+
+// TabOption is one entry in the Storage page's tab strip.
+type TabOption struct {
+	ID     string
+	Label  string
+	Active bool
+	Href   string
 }
 
 // PresetOption is one entry in the preset selector for the volume form.
@@ -173,11 +221,42 @@ func (r *Renderer) StorageHandler(d StorageDeps) http.Handler {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 			return
 		}
+		tab := normalizeStorageTab(req.URL.Query().Get("tab"))
 		view := r.buildStorageView(req.Context(), d)
+		view.ActiveTab = tab
+		view.Tabs = storageTabs(r.tr, tab)
 		data := r.buildPageData("storage", i18n.MsgStorageTitle)
 		data.Extra = view
 		r.render(w, "templates/pages/storage.tmpl", data)
 	})
+}
+
+func normalizeStorageTab(s string) string {
+	switch s {
+	case "volumes", "disks", "snapshots", "imports":
+		return s
+	}
+	return "volumes"
+}
+
+func storageTabs(tr translator, active string) []TabOption {
+	ids := []string{"volumes", "disks", "snapshots", "imports"}
+	labels := map[string]i18n.MessageID{
+		"volumes":   i18n.MsgStorageTabVolumes,
+		"disks":     i18n.MsgStorageTabDisks,
+		"snapshots": i18n.MsgStorageTabSnapshots,
+		"imports":   i18n.MsgStorageTabImports,
+	}
+	out := make([]TabOption, 0, len(ids))
+	for _, id := range ids {
+		out = append(out, TabOption{
+			ID:     id,
+			Label:  tr.T(labels[id]),
+			Active: id == active,
+			Href:   "/ui/admin/storage?tab=" + id,
+		})
+	}
+	return out
 }
 
 // buildStorageView is broken out from the handler so unit tests can
@@ -187,6 +266,29 @@ func (r *Renderer) buildStorageView(ctx context.Context, d StorageDeps) StorageV
 	pools, perr := d.Engine.ListPools(ctx)
 	disks, _ := d.Engine.ListDisks(ctx)
 	imports, _ := d.Engine.ListImportable(ctx)
+	volumes, _ := d.Engine.ListVolumes(ctx, "")
+
+	// Aggregate snapshots across every dataset that came back from
+	// ListVolumes. ListSnapshots is recursive per pool but takes a single
+	// argument; calling it once per dataset is acceptable at v1 scale
+	// (small dataset counts) and lets the Snapshot tab show snapshots
+	// from all volumes at once.
+	var snapshots []storage.SnapshotInfo
+	seenSnap := make(map[string]bool)
+	for _, v := range volumes {
+		got, err := d.Engine.ListSnapshots(ctx, v.Name)
+		if err != nil {
+			continue
+		}
+		for _, s := range got {
+			key := s.Dataset + "@" + s.Name
+			if seenSnap[key] {
+				continue
+			}
+			seenSnap[key] = true
+			snapshots = append(snapshots, s)
+		}
+	}
 
 	disksView := disksToView(r.tr, disks)
 	freeDisks := make([]DiskView, 0)
@@ -200,9 +302,13 @@ func (r *Renderer) buildStorageView(ctx context.Context, d StorageDeps) StorageV
 		Pools:        poolsToView(r.tr, pools),
 		Disks:        disksView,
 		Imports:      importsToView(r.tr, imports),
+		Volumes:      volumesToView(volumes, pools),
+		Snapshots:    snapshotsToView(snapshots),
 		HasPools:     len(pools) > 0,
 		HasDisks:     len(disks) > 0,
 		HasImports:   len(imports) > 0,
+		HasVolumes:   len(volumes) > 0,
+		HasSnapshots: len(snapshots) > 0,
 		WriteEnabled: d.Writer != nil,
 		Layouts:      layoutOptions(r.tr),
 		Presets:      presetOptions(r.tr),
@@ -312,6 +418,59 @@ func vdevsToView(tr translator, vs []storage.Vdev) []VdevView {
 			}}
 		}
 		out = append(out, vv)
+	}
+	return out
+}
+
+// volumesToView converts engine VolumeInfo rows into the template view-model.
+// A volume's Name == its pool's Name marks it as the pool root, which the
+// template renders specially (the operator can't delete a pool root from the
+// Volume tab — that's a Pool-level destructive op, scoped out for v1).
+func volumesToView(vols []storage.VolumeInfo, pools []storage.Pool) []VolumeView {
+	poolNames := make(map[string]bool, len(pools))
+	for _, p := range pools {
+		poolNames[p.Name] = true
+	}
+	out := make([]VolumeView, 0, len(vols))
+	for _, v := range vols {
+		quotaDisplay := "—"
+		if v.QuotaBytes > 0 {
+			quotaDisplay = formatBytes(v.QuotaBytes)
+		}
+		out = append(out, VolumeView{
+			Name:         v.Name,
+			UsedBytes:    v.UsedBytes,
+			QuotaBytes:   v.QuotaBytes,
+			UsedDisplay:  formatBytes(v.UsedBytes),
+			AvailDisplay: formatBytes(v.AvailableBytes),
+			QuotaDisplay: quotaDisplay,
+			MountPoint:   v.MountPoint,
+			RecordSize:   v.RecordSize,
+			Compression:  v.Compression,
+			IsPoolRoot:   poolNames[v.Name],
+		})
+	}
+	return out
+}
+
+// snapshotsToView converts engine SnapshotInfo rows into the template view-
+// model. The created label is RFC-3339 short form so the mono column lines
+// up; ja.json doesn't currently localize date formats — v1.x backlog.
+func snapshotsToView(snaps []storage.SnapshotInfo) []SnapshotView {
+	out := make([]SnapshotView, 0, len(snaps))
+	for _, s := range snaps {
+		created := "—"
+		if !s.Created.IsZero() {
+			created = s.Created.Format("2006-01-02 15:04")
+		}
+		out = append(out, SnapshotView{
+			Dataset:      s.Dataset,
+			Name:         s.Name,
+			UsedBytes:    s.UsedBytes,
+			UsedDisplay:  formatBytes(s.UsedBytes),
+			ReferDisplay: formatBytes(s.ReferBytes),
+			CreatedLabel: created,
+		})
 	}
 	return out
 }

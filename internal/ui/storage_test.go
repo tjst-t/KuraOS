@@ -17,6 +17,8 @@ type fakeStorageEngine struct {
 	pools     []storage.Pool
 	disks     []storage.Disk
 	imports   []storage.ImportablePool
+	volumes   []storage.VolumeInfo
+	snaps     map[string][]storage.SnapshotInfo
 	poolErr   error
 	diskErr   error
 	importErr error
@@ -30,6 +32,15 @@ func (f *fakeStorageEngine) ListDisks(_ context.Context) ([]storage.Disk, error)
 }
 func (f *fakeStorageEngine) ListImportable(_ context.Context) ([]storage.ImportablePool, error) {
 	return f.imports, f.importErr
+}
+func (f *fakeStorageEngine) ListVolumes(_ context.Context, _ string) ([]storage.VolumeInfo, error) {
+	return f.volumes, nil
+}
+func (f *fakeStorageEngine) ListSnapshots(_ context.Context, dataset string) ([]storage.SnapshotInfo, error) {
+	if f.snaps == nil {
+		return nil, nil
+	}
+	return f.snaps[dataset], nil
 }
 
 func samplePools() []storage.Pool {
@@ -96,7 +107,8 @@ func TestStoragePage_RendersDisks(t *testing.T) {
 	srv := httptest.NewServer(r.Routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/admin/storage")
+	// The disks table moved into the Disks tab; ?tab=disks selects it.
+	resp, err := http.Get(srv.URL + "/ui/admin/storage?tab=disks")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}
@@ -170,8 +182,8 @@ func TestStoragePage_RendersPoolsWithTopology(t *testing.T) {
 }
 
 // [AC-Se3b190-3-1] When ListImportable returns ≥1 pool the Storage page shows
-// the import banner plus the importable-pools table; the inspect button is
-// disabled (next-sprint feature).
+// the import banner (always) plus the importable-pools table on the Imports
+// tab; the inspect button is disabled (next-sprint feature).
 func TestStoragePage_ImportBanner(t *testing.T) {
 	r := newTestRenderer(t)
 	r.SetStorageHandler(r.StorageHandler(StorageDeps{Engine: &fakeStorageEngine{
@@ -180,7 +192,7 @@ func TestStoragePage_ImportBanner(t *testing.T) {
 	srv := httptest.NewServer(r.Routes())
 	defer srv.Close()
 
-	resp, err := http.Get(srv.URL + "/ui/admin/storage")
+	resp, err := http.Get(srv.URL + "/ui/admin/storage?tab=imports")
 	if err != nil {
 		t.Fatalf("GET: %v", err)
 	}

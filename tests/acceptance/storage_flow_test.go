@@ -24,9 +24,11 @@ import (
 // option is to mock at this layer and assert the wiring (auth + handler +
 // template).
 type stubStorage struct {
-	pools   []storage.Pool
-	disks   []storage.Disk
-	imports []storage.ImportablePool
+	pools     []storage.Pool
+	disks     []storage.Disk
+	imports   []storage.ImportablePool
+	volumes   []storage.VolumeInfo
+	snapshots map[string][]storage.SnapshotInfo
 }
 
 func (s *stubStorage) ListPools(_ context.Context) ([]storage.Pool, error) {
@@ -37,6 +39,15 @@ func (s *stubStorage) ListDisks(_ context.Context) ([]storage.Disk, error) {
 }
 func (s *stubStorage) ListImportable(_ context.Context) ([]storage.ImportablePool, error) {
 	return s.imports, nil
+}
+func (s *stubStorage) ListVolumes(_ context.Context, _ string) ([]storage.VolumeInfo, error) {
+	return s.volumes, nil
+}
+func (s *stubStorage) ListSnapshots(_ context.Context, dataset string) ([]storage.SnapshotInfo, error) {
+	if s.snapshots == nil {
+		return nil, nil
+	}
+	return s.snapshots[dataset], nil
 }
 
 func storageFixturePools() []storage.Pool {
@@ -172,7 +183,8 @@ func TestAcceptance_Storage_Wiring(t *testing.T) {
 
 	t.Run("AC-Se3b190-2-1 admin sees disks table with pool/SMART columns", func(t *testing.T) {
 		c := loginAs(t, srv, "root", "longenoughpw")
-		resp, err := c.Get(srv.URL + "/ui/admin/storage")
+		// The disks table lives in the Disks tab now (S9db742-2 follow-up).
+		resp, err := c.Get(srv.URL + "/ui/admin/storage?tab=disks")
 		if err != nil {
 			t.Fatalf("GET: %v", err)
 		}
@@ -200,7 +212,9 @@ func TestAcceptance_Storage_Wiring(t *testing.T) {
 
 	t.Run("AC-Se3b190-3-1 import banner visible with deferred copy", func(t *testing.T) {
 		c := loginAs(t, srv, "root", "longenoughpw")
-		resp, err := c.Get(srv.URL + "/ui/admin/storage")
+		// Import banner is rendered above the tab strip (always visible).
+		// The importable-pools table moved into the Imports tab.
+		resp, err := c.Get(srv.URL + "/ui/admin/storage?tab=imports")
 		if err != nil {
 			t.Fatalf("GET: %v", err)
 		}

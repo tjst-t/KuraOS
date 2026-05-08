@@ -248,6 +248,25 @@ type SnapshotInfo struct {
 	Created    time.Time `json:"created,omitempty"`
 }
 
+// VolumeInfo is one row in `zfs list -t filesystem`. Used by ListVolumes for
+// the Storage page's Volume tab and `kura storage list-volumes` CLI. Pool
+// roots (e.g. just "tank") appear alongside children — callers decide
+// whether to filter them out.
+type VolumeInfo struct {
+	Name            string `json:"name"`
+	UsedBytes       int64  `json:"used_bytes"`
+	AvailableBytes  int64  `json:"available_bytes"`
+	ReferencedBytes int64  `json:"referenced_bytes"`
+	MountPoint      string `json:"mountpoint,omitempty"`
+	// QuotaBytes is the configured quota in bytes. ZFS reports 0 when no
+	// quota is set; the UI / CLI render this as "—" rather than literal 0.
+	QuotaBytes int64 `json:"quota_bytes,omitempty"`
+	// RecordSize / Compression are exposed so the operator can verify which
+	// preset is in effect after creation.
+	RecordSize  string `json:"recordsize,omitempty"`
+	Compression string `json:"compression,omitempty"`
+}
+
 // ImportOpts maps to the zpool import flags. Force corresponds to -f and is
 // only set after explicit user confirmation in the UI (single dedicated
 // checkbox + warning copy — DESIGN_PRINCIPLES forbidden #14: force flow not

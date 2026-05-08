@@ -137,6 +137,25 @@ func (c *CLI) SetQuota(ctx context.Context, dataset string, quotaBytes int64) er
 	return nil
 }
 
+// ListVolumes returns the dataset rows from `zfs list -t filesystem`. When
+// pool is non-empty, the listing is scoped to that pool with -r. Pool root
+// datasets are included (caller decides whether to filter); recordsize +
+// compression are surfaced so the UI can show which preset is in effect.
+func (c *CLI) ListVolumes(ctx context.Context, pool string) ([]VolumeInfo, error) {
+	args := []string{
+		"list", "-H", "-p", "-t", "filesystem",
+		"-o", "name,used,available,referenced,mountpoint,quota,recordsize,compression",
+	}
+	if pool != "" {
+		args = append(args, "-r", pool)
+	}
+	stdout, _, err := c.exec.Run(ctx, "zfs", args...)
+	if err != nil {
+		return nil, fmt.Errorf("storage: zfs list filesystem: %w", err)
+	}
+	return parseVolumeList(stdout)
+}
+
 // CreateSnapshot runs `zfs snapshot pool/dataset@name`.
 func (c *CLI) CreateSnapshot(ctx context.Context, dataset, name string) error {
 	if !isValidDatasetName(dataset) {

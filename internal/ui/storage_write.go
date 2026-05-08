@@ -26,7 +26,10 @@ func (r *Renderer) StorageWriteHandler(d StorageDeps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/ui/admin/storage/pools", r.handleCreatePool(d))
 	mux.HandleFunc("/ui/admin/storage/import", r.handleImportPool(d))
+	mux.HandleFunc("/ui/admin/storage/volumes", r.handleCreateVolume(d))
+	mux.HandleFunc("/ui/admin/storage/quota", r.handleSetQuota(d))
 	mux.HandleFunc("/ui/admin/storage/snapshots", r.handleCreateSnapshot(d))
+	mux.HandleFunc("/ui/admin/storage/snapshots/rollback", r.handleRollback(d))
 	return mux
 }
 
@@ -114,6 +117,111 @@ func (r *Renderer) handleCreateSnapshot(d StorageDeps) http.HandlerFunc {
 		dataset := strings.TrimSpace(req.FormValue("dataset"))
 		name := strings.TrimSpace(req.FormValue("name"))
 		if err := d.Writer.CreateSnapshot(req.Context(), dataset, name); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleCreateVolume serves POST /ui/admin/storage/volumes.
+//
+// Form fields:
+//
+//	dataset    — full dataset path (e.g. tank/photos), required
+//	preset     — general | media | database (or empty for raw fields)
+//	quota      — quota in bytes ("0" or empty = no quota)
+//	mountpoint — optional mountpoint override
+func (r *Renderer) handleCreateVolume(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		opts := storage.VolumeOpts{
+			Preset:     storage.PresetID(strings.TrimSpace(req.FormValue("preset"))),
+			MountPoint: strings.TrimSpace(req.FormValue("mountpoint")),
+		}
+		if v := strings.TrimSpace(req.FormValue("quota")); v != "" {
+			if n, err := parseInt64(v); err == nil {
+				opts.QuotaBytes = n
+			}
+		}
+		if err := d.Writer.CreateVolume(req.Context(), dataset, opts); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleSetQuota serves POST /ui/admin/storage/quota with `dataset` + `quota`
+// (bytes). 0 unsets. The CLI subcommand `kura storage set-quota` exposes the
+// same engine call.
+func (r *Renderer) handleSetQuota(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		var bytes int64
+		if v := strings.TrimSpace(req.FormValue("quota")); v != "" {
+			if n, err := parseInt64(v); err == nil {
+				bytes = n
+			}
+		}
+		if err := d.Writer.SetQuota(req.Context(), dataset, bytes); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleRollback serves POST /ui/admin/storage/snapshots/rollback. Form
+// fields: dataset, snapshot. Confirmation is the responsibility of the
+// dialog calling this — the engine doesn't double-prompt.
+func (r *Renderer) handleRollback(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		snap := strings.TrimSpace(req.FormValue("snapshot"))
+		if err := d.Writer.Rollback(req.Context(), dataset, snap); err != nil {
 			r.writeStorageError(w, err)
 			return
 		}
