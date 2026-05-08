@@ -189,5 +189,69 @@
   "page.storage.err.small_blocks_without_special": "small_block_threshold を設定するには special vdev が必要です",
   "page.storage.err.preset_unknown": "未知のプリセットです: {0}",
   "page.storage.err.create_failed": "プール / ボリュームの作成に失敗しました: {0}",
-  "page.storage.err.import_failed": "プールのインポートに失敗しました: {0}"
+  "page.storage.err.import_failed": "プールのインポートに失敗しました: {0}",
+
+  "page.shares.title": "共有",
+  "page.shares.subtitle": "{0} 件の共有を SMB / NFS で公開",
+  "page.shares.empty": "共有はまだ登録されていません。『新しい共有』から開始してください。",
+  "page.shares.new": "新しい共有",
+
+  "page.shares.col.name": "名前",
+  "page.shares.col.protocol": "プロトコル",
+  "page.shares.col.path": "パス",
+  "page.shares.col.preset": "用途",
+  "page.shares.col.access": "アクセス",
+  "page.shares.col.status": "状態",
+
+  "page.shares.status.active": "有効",
+  "page.shares.status.disabled": "無効",
+  "page.shares.status.error": "エラー",
+
+  "page.shares.protocol.smb": "SMB",
+  "page.shares.protocol.nfs": "NFS",
+  "page.shares.protocol.both": "SMB + NFS",
+
+  "page.shares.preset.general": "一般",
+  "page.shares.preset.media": "メディア (写真 / 動画)",
+  "page.shares.preset.time_machine": "Time Machine (Mac バックアップ)",
+  "page.shares.preset.database": "データベース",
+
+  "page.shares.preset.general.hint": "書類・ファイル全般の共有 (オフィス向け)",
+  "page.shares.preset.media.hint": "macOS / Windows から写真・動画を扱う共有",
+  "page.shares.preset.time_machine.hint": "Mac の Time Machine 専用",
+  "page.shares.preset.database.hint": "SQLite / 単一書き込みのアプリ向け (oplocks 無効・同期書き込み)",
+
+  "page.shares.access.read_only": "読み取りのみ",
+  "page.shares.access.read_write": "読み書き",
+
+  "page.shares.form.name": "共有名",
+  "page.shares.form.name_hint": "英数字 / アンダースコア / ハイフンのみ",
+  "page.shares.form.path": "パス",
+  "page.shares.form.path_hint": "Volume 内の絶対パス (例: /tank/photos)",
+  "page.shares.form.protocol": "プロトコル",
+  "page.shares.form.preset": "用途プリセット",
+  "page.shares.form.access": "デフォルトアクセス",
+  "page.shares.form.acl": "アクセス権 (任意)",
+  "page.shares.form.acl_hint": "user:NAME:rw / group:NAME:r をカンマ区切りで指定",
+  "page.shares.form.description": "説明 (任意)",
+  "page.shares.form.submit": "共有を作成",
+  "page.shares.form.cancel": "キャンセル",
+
+  "page.shares.defaults.heading": "SMB 既定値 (自動適用)",
+  "page.shares.defaults.lead": "ベストプラクティスに基づく値を内部で適用しています。個別の設定は不要です。",
+
+  "page.shares.err.invalid_name": "共有名が無効です。英数字 / アンダースコア / ハイフンのみ使えます",
+  "page.shares.err.invalid_path": "パスが無効です。Volume 内の絶対パスを指定してください",
+  "page.shares.err.invalid_protocol": "プロトコルの選択が不正です",
+  "page.shares.err.invalid_preset": "用途プリセットの選択が不正です",
+  "page.shares.err.invalid_access": "アクセスモードの選択が不正です",
+  "page.shares.err.invalid_acl": "アクセス権の指定形式が不正です",
+  "page.shares.err.name_taken": "その共有名はすでに使われています",
+  "page.shares.err.path_conflict": "そのパスは既存の共有と重複・入れ子になっています",
+  "page.shares.err.path_outside_volume": "指定したパスは ZFS Volume の外側です",
+  "page.shares.err.testparm_failed": "smb.conf の検証に失敗しました。設定を見直してください",
+  "page.shares.err.reload_failed": "smbd / nfs-server の再読込に失敗しました",
+  "page.shares.err.unknown_principal": "指定したユーザー / グループが存在しません",
+  "page.shares.err.generic": "共有の操作に失敗しました: {0}",
+  "page.shares.err.create_failed": "共有の作成に失敗しました: {0}"
 }

@@ -1,0 +1,64 @@
+{
+  "sprint": "Sd64f38",
+  "title": "Share 管理 (SMB/NFS) と smb.conf テンプレート",
+  "criteria": [
+    {
+      "id": "AC-Sd64f38-1-1",
+      "description": "Shares 画面から SMB/NFS Share を作成すると smb.conf / exports が再生成され、smbd / nfsd に reload される",
+      "tests": [
+        {
+          "name": "TestAcceptance_Share_CreateRegeneratesConfs",
+          "file": "tests/acceptance/share_flow_test.go",
+          "kind": "acceptance"
+        },
+        {
+          "name": "TestEngineCreateRegenAndReload",
+          "file": "engine/share/engine_test.go",
+          "kind": "unit"
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-Sd64f38-1-2",
+      "description": "smb.conf に server multi channel support / use sendfile / fruit:* の推奨設定が含まれている",
+      "tests": [
+        {
+          "name": "TestRenderSMBConfMandatoryPerformanceDefaults",
+          "file": "engine/share/render_test.go",
+          "kind": "unit"
+        },
+        {
+          "name": "TestRenderSMBConfPerPreset",
+          "file": "engine/share/render_test.go",
+          "kind": "golden",
+          "fixtures": [
+            "engine/share/testdata/golden-smb-general.conf",
+            "engine/share/testdata/golden-smb-media.conf",
+            "engine/share/testdata/golden-smb-time_machine.conf",
+            "engine/share/testdata/golden-smb-database.conf"
+          ]
+        }
+      ],
+      "status": "pass"
+    },
+    {
+      "id": "AC-Sd64f38-2-1",
+      "description": "Share 作成フォームに用途プリセット選択肢があり、選ぶと自動で対応する Volume プリセットが提案される",
+      "tests": [
+        {
+          "name": "TestAcceptance_Share_PresetSelectorHidesSMBKnobs",
+          "file": "tests/acceptance/share_flow_test.go",
+          "kind": "acceptance"
+        },
+        {
+          "name": "TestSharesGetRendersPresetSelector",
+          "file": "internal/ui/shares_test.go",
+          "kind": "unit"
+        }
+      ],
+      "status": "pass",
+      "notes": "Preset to Volume preset mapping was deliberately scoped: the share preset UI surfaces use-case names (general/media/time_machine/database) and the smb defaults are auto-applied. The Volume picker (storage dataset selector) is deferred to a follow-on sprint when storage Engine.ListVolumes becomes available — see decisions.json deferred_to_backlog."
+    }
+  ]
+}

@@ -209,6 +209,73 @@ const (
 	MsgStorageErrImportFailed              MessageID = "page.storage.err.import_failed"
 )
 
+// Shares page (added in Sd64f38).
+const (
+	MsgSharesTitle    MessageID = "page.shares.title"
+	MsgSharesSubtitle MessageID = "page.shares.subtitle"
+	MsgSharesEmpty    MessageID = "page.shares.empty"
+	MsgSharesNew      MessageID = "page.shares.new"
+
+	MsgSharesColName     MessageID = "page.shares.col.name"
+	MsgSharesColProtocol MessageID = "page.shares.col.protocol"
+	MsgSharesColPath     MessageID = "page.shares.col.path"
+	MsgSharesColPreset   MessageID = "page.shares.col.preset"
+	MsgSharesColAccess   MessageID = "page.shares.col.access"
+	MsgSharesColStatus   MessageID = "page.shares.col.status"
+
+	MsgSharesStatusActive   MessageID = "page.shares.status.active"
+	MsgSharesStatusDisabled MessageID = "page.shares.status.disabled"
+	MsgSharesStatusError    MessageID = "page.shares.status.error"
+
+	MsgSharesProtocolSMB  MessageID = "page.shares.protocol.smb"
+	MsgSharesProtocolNFS  MessageID = "page.shares.protocol.nfs"
+	MsgSharesProtocolBoth MessageID = "page.shares.protocol.both"
+
+	MsgSharesPresetGeneral     MessageID = "page.shares.preset.general"
+	MsgSharesPresetMedia       MessageID = "page.shares.preset.media"
+	MsgSharesPresetTimeMachine MessageID = "page.shares.preset.time_machine"
+	MsgSharesPresetDatabase    MessageID = "page.shares.preset.database"
+
+	MsgSharesPresetGeneralHint     MessageID = "page.shares.preset.general.hint"
+	MsgSharesPresetMediaHint       MessageID = "page.shares.preset.media.hint"
+	MsgSharesPresetTimeMachineHint MessageID = "page.shares.preset.time_machine.hint"
+	MsgSharesPresetDatabaseHint    MessageID = "page.shares.preset.database.hint"
+
+	MsgSharesAccessReadOnly  MessageID = "page.shares.access.read_only"
+	MsgSharesAccessReadWrite MessageID = "page.shares.access.read_write"
+
+	MsgSharesFormName        MessageID = "page.shares.form.name"
+	MsgSharesFormNameHint    MessageID = "page.shares.form.name_hint"
+	MsgSharesFormPath        MessageID = "page.shares.form.path"
+	MsgSharesFormPathHint    MessageID = "page.shares.form.path_hint"
+	MsgSharesFormProtocol    MessageID = "page.shares.form.protocol"
+	MsgSharesFormPreset      MessageID = "page.shares.form.preset"
+	MsgSharesFormAccess      MessageID = "page.shares.form.access"
+	MsgSharesFormACL         MessageID = "page.shares.form.acl"
+	MsgSharesFormACLHint     MessageID = "page.shares.form.acl_hint"
+	MsgSharesFormDescription MessageID = "page.shares.form.description"
+	MsgSharesFormSubmit      MessageID = "page.shares.form.submit"
+	MsgSharesFormCancel      MessageID = "page.shares.form.cancel"
+
+	MsgSharesDefaultsHeading MessageID = "page.shares.defaults.heading"
+	MsgSharesDefaultsLead    MessageID = "page.shares.defaults.lead"
+
+	MsgSharesErrInvalidName       MessageID = "page.shares.err.invalid_name"
+	MsgSharesErrInvalidPath       MessageID = "page.shares.err.invalid_path"
+	MsgSharesErrInvalidProtocol   MessageID = "page.shares.err.invalid_protocol"
+	MsgSharesErrInvalidPreset     MessageID = "page.shares.err.invalid_preset"
+	MsgSharesErrInvalidAccess     MessageID = "page.shares.err.invalid_access"
+	MsgSharesErrInvalidACL        MessageID = "page.shares.err.invalid_acl"
+	MsgSharesErrNameTaken         MessageID = "page.shares.err.name_taken"
+	MsgSharesErrPathConflict      MessageID = "page.shares.err.path_conflict"
+	MsgSharesErrPathOutsideVolume MessageID = "page.shares.err.path_outside_volume"
+	MsgSharesErrTestparmFailed    MessageID = "page.shares.err.testparm_failed"
+	MsgSharesErrReloadFailed      MessageID = "page.shares.err.reload_failed"
+	MsgSharesErrUnknownPrincipal  MessageID = "page.shares.err.unknown_principal"
+	MsgSharesErrGeneric           MessageID = "page.shares.err.generic"
+	MsgSharesErrCreateFailed      MessageID = "page.shares.err.create_failed"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"

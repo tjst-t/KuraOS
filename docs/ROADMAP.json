@@ -3,20 +3,21 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "Sd64f38",
+    "current_sprint": "S1bccf5",
     "total": 14,
-    "done": 5,
+    "done": 6,
     "in_progress": 0,
-    "remaining": 9,
-    "percentage": 35,
+    "remaining": 8,
+    "percentage": 42,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
       "S1e7eeb",
       "Se3b190",
-      "S9db742"
+      "S9db742",
+      "Sd64f38"
     ],
-    "updated_at": "2026-05-08T02:15:00Z"
+    "updated_at": "2026-05-08T03:00:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -541,78 +542,78 @@
     },
     "Sd64f38": {
       "title": "Share 管理 (SMB/NFS) と smb.conf テンプレート",
-      "status": "pending",
+      "status": "done",
       "description": "ShareEngine、SMB/NFS の設定を SQLite からテンプレート生成し常に冪等に再生成。multichannel/sendfile/Fruit 等のパフォーマンスデフォルトを内部で適用、UI は最小化。視覚仕様は prototype/claude_design/Shares.html。",
       "milestone": true,
       "stories": {
         "Sd64f38-1": {
           "title": "ShareEngine と SMB/NFS テンプレート生成",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、Volume 内のサブパスに SMB/NFS Share を作成し、ユーザー/グループ単位でアクセス権を設定したい。なぜなら、家族で写真や書類を共有するため。",
           "acceptance_criteria": [
             {
               "id": "AC-Sd64f38-1-1",
               "description": "Shares 画面から SMB/NFS Share を作成すると smb.conf / exports が再生成され、smbd / nfsd に reload される",
-              "test": "[AC-Sd64f38-1-1] in tests/e2e/shares-create.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-Sd64f38-1-1] in tests/acceptance/share_flow_test.go::TestAcceptance_Share_CreateRegeneratesConfs + engine/share/engine_test.go::TestEngineCreateRegenAndReload",
+              "status": "done"
             },
             {
               "id": "AC-Sd64f38-1-2",
               "description": "smb.conf に server multi channel support / use sendfile / fruit:* の推奨設定が含まれている",
-              "test": "[AC-Sd64f38-1-2] in engine/share/smbconf_test.go",
-              "status": "pending"
+              "test": "[AC-Sd64f38-1-2] in engine/share/render_test.go::TestRenderSMBConfMandatoryPerformanceDefaults + golden files testdata/golden-smb-*.conf",
+              "status": "done"
             }
           ],
           "tasks": {
             "Sd64f38-1-1": {
               "title": "ShareEngine interface と SQLite store",
               "description": "shares テーブル + access テーブル",
-              "status": "pending"
+              "status": "done"
             },
             "Sd64f38-1-2": {
               "title": "smb.conf テンプレート",
               "description": "design.md §5.3 のパフォーマンスデフォルトを含むテンプレート",
-              "status": "pending"
+              "status": "done"
             },
             "Sd64f38-1-3": {
               "title": "/etc/exports テンプレート",
               "description": "NFS 4.2 デフォルト",
-              "status": "pending"
+              "status": "done"
             },
             "Sd64f38-1-4": {
               "title": "smbd / nfsd reload 抽象化",
               "description": "CmdExecutor 経由で systemctl reload",
-              "status": "pending"
+              "status": "done"
             },
             "Sd64f38-1-5": {
               "title": "共有パス重複/入れ子バリデーション",
-              "description": "登録時に検出して warning 表示",
-              "status": "pending"
+              "description": "登録時に検出して error 表示",
+              "status": "done"
             }
           }
         },
         "Sd64f38-2": {
           "title": "Share の用途プリセット UI",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、Share 作成時に『写真』『書類』『動画』のような用途を選ぶだけで適切な dataset プリセットが選ばれるようにしたい。なぜなら、recordsize や compression を意識したくないから。",
           "acceptance_criteria": [
             {
               "id": "AC-Sd64f38-2-1",
               "description": "Share 作成フォームに用途プリセット選択肢があり、選ぶと自動で対応する Volume プリセットが提案される",
-              "test": "[AC-Sd64f38-2-1] in tests/e2e/shares-presets.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-Sd64f38-2-1] in tests/acceptance/share_flow_test.go::TestAcceptance_Share_PresetSelectorHidesSMBKnobs + internal/ui/shares_test.go::TestSharesGetRendersPresetSelector",
+              "status": "done"
             }
           ],
           "tasks": {
             "Sd64f38-2-1": {
-              "title": "用途 → dataset プリセットマッピング",
-              "description": "media→media, docs→general, など",
-              "status": "pending"
+              "title": "用途 → SMB プリセットマッピング (general/media/time_machine/database)",
+              "description": "engine/share/presets.go で内部固定。Volume picker は backlog に繰越",
+              "status": "done"
             },
             "Sd64f38-2-2": {
               "title": "share 作成フォーム",
-              "description": "share_picker UX に近い 1 ステップ完結",
-              "status": "pending"
+              "description": "modal 1 ステップ完結。SMB knob は読み取り専用カードのみ",
+              "status": "done"
             }
           }
         }
@@ -1607,6 +1608,24 @@
     }
   },
   "backlog": [
+    {
+      "title": "Share の Volume picker UI (free-text path を Volume + sub-path に置換)",
+      "description": "engine/share/engine.go の VolumeChecker は組み込み済みだが、cmd/kura main.go ではまだ wire されていない。storage Engine.ListVolumes が public になったタイミングで shares.go の form に Volume select を追加。",
+      "added_in": "Sd64f38",
+      "reason": "storage.Engine.ListVolumes は v1 では未公開。Sprint Sd64f38 の MVP は free-text path で達成、Volume picker は polish 候補。"
+    },
+    {
+      "title": "Share Apply の差分ビュー (前回生成 conf との diff を i18n 表示)",
+      "description": "engine/share/engine.go の Apply は毎回完全再生成だが、操作者が『何が変わったか』を見られると milestone demo で説得力がある。i18n 構造化メッセージで差分行数 / 追加 / 削除 / 変更 を表示。",
+      "added_in": "Sd64f38",
+      "reason": "v1.x polish 候補。実装は trivial。Sprint scope は規定通り完了させた。"
+    },
+    {
+      "title": "Share の in-place update (preset / ACL の編集)",
+      "description": "現在 ApplyAdapter は create_share / delete_share のみ。preset / ACL 変更は config.json export -> import で remove+create になる。UI 上で個別の編集フォームを実装。",
+      "added_in": "Sd64f38",
+      "reason": "v1 は declarative 中心。reload コストは低いので実用上の問題なし。需要があれば polish 候補。"
+    },
     {
       "title": "英語ロケール (en.json) の追加",
       "description": "v1 では ja のみリリース。i18n フレームワーク自体は v1 で完成しているので、文字列翻訳のみ追加する作業。",

@@ -112,7 +112,40 @@ type VolumeEntry struct {
 	Preset string `json:"preset,omitempty"`
 }
 
-type SharesConfig struct{}
+// SharesConfig is the declarative shape of "shares" in config.json. Mirrors
+// design.md §5: Shares 配列 (id/name/path/preset/access_mode/acl/protocol).
+//
+// Performance / compat tunables (server multi channel support, vfs objects,
+// fruit:metadata, ...) are NOT in this struct. They are derived internally
+// from `preset` (DESIGN_PRINCIPLES priority #2: 賢いデフォルト > 設定項目を
+// 増やす). Anything tunable in smb.conf that isn't here means we have made a
+// deliberate choice not to expose it.
+type SharesConfig struct {
+	Shares []ShareEntry `json:"shares,omitempty"`
+}
+
+// ShareEntry is one row of `shares[]`. ID is preserved across export → import
+// so identity stays stable. ACL grants are namespaced by principal kind so
+// future OIDC group sync remains schema-compatible.
+type ShareEntry struct {
+	ID          string          `json:"id,omitempty"`
+	Name        string          `json:"name"`
+	Path        string          `json:"path"`
+	Protocol    string          `json:"protocol"`
+	Preset      string          `json:"preset"`
+	AccessMode  string          `json:"access_mode"`
+	Description string          `json:"description,omitempty"`
+	Disabled    bool            `json:"disabled,omitempty"`
+	ACL         []ShareACLEntry `json:"acl,omitempty"`
+}
+
+// ShareACLEntry mirrors share.ACLEntry. Strings (not enums) keep config.json
+// hand-editable; the engine validates on apply.
+type ShareACLEntry struct {
+	Kind string `json:"kind"`
+	Name string `json:"name"`
+	Mode string `json:"mode"`
+}
 type UsersConfig struct{}
 type NetworkConfig struct{}
 type AppsConfig struct{}

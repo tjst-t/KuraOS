@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kuraos-org/kura/engine/auth/session"
+	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
 	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
@@ -96,6 +97,19 @@ func run() error {
 	// to recreate pools/volumes the UI created. The storage adapter is
 	// registered against the global config.registry once per process.
 	storage.RegisterApplyAdapter(storageEngine)
+
+	// Share engine — SQLite-backed, regenerates /etc/samba/conf.d/kura.conf
+	// + /etc/exports.d/kura.exports on every Apply, then reloads via
+	// systemctl. CmdExecutor is the same Real seam Storage uses; on a dev
+	// box without smbd, Apply will fail at testparm/reload — the UI surfaces
+	// a translated message rather than crashing.
+	shareStore := share.NewStore(st.DB())
+	shareEngine := share.NewManager(shareStore, cmdexec.NewReal(), share.Options{})
+	share.RegisterApplyAdapter(shareEngine)
+	uiRenderer.SetSharesHandlers(
+		uiRenderer.SharesHandler(ui.SharesDeps{Engine: shareEngine}),
+		uiRenderer.SharesDeleteHandler(ui.SharesDeps{Engine: shareEngine}),
+	)
 
 	users := user.NewStore(st.DB(), nil)
 	sessions := session.NewStore(st.DB())
