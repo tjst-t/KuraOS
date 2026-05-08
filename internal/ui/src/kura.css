@@ -549,19 +549,36 @@
   }
   .modal > .card,
   .modal > form.card {
+    display: flex;
+    flex-direction: column;
     width: min(640px, 100%);
     max-height: calc(100vh - 48px);
-    overflow: auto;
+    overflow: hidden;
     background: var(--surface);
     border-radius: var(--radius-lg);
     border: 1px solid var(--border);
     box-shadow: var(--shadow-lg);
   }
+  /* Pin header / footer; only the body scrolls when the form runs tall.
+     min-height:0 unblocks flex children from their content's intrinsic
+     height, otherwise the body refuses to shrink and the foot is pushed
+     off-screen. */
+  .modal > .card > .card-head,
+  .modal > form.card > .card-head,
+  .modal > .card > .card-foot,
+  .modal > form.card > .card-foot { flex: 0 0 auto; }
+  .modal > .card > .card-body,
+  .modal > form.card > .card-body {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    min-height: 0;
+  }
 
-  /* Disk picker (storage New Pool modal) — checklist of free disks. */
+  /* Disk picker (storage New Pool modal) — checklist of free disks.
+     Expands to fit all rows; the modal body is the single scrolling region
+     so we never stack two scrollbars (page → modal panel → disk picker). */
   .disk-picker {
     display: flex; flex-direction: column; gap: 6px;
-    max-height: 220px; overflow-y: auto;
     border: 1px solid var(--border); border-radius: var(--radius-sm);
     background: var(--bg); padding: 6px;
   }
