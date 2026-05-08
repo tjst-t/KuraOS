@@ -1,5 +1,40 @@
 {
   "system.startup": "kura を起動しています (port {0})",
   "system.healthy": "正常稼働中",
-  "system.shutdown": "kura を停止しています"
+  "system.shutdown": "kura を停止しています",
+
+  "brand.name": "KuraOS",
+  "brand.tagline": "管理コンソール",
+
+  "nav.section.admin": "システム管理",
+  "nav.section.overview": "概要",
+  "nav.dashboard": "ダッシュボード",
+  "nav.storage": "ストレージ",
+  "nav.shares": "共有",
+  "nav.users": "ユーザー",
+  "nav.network": "ネットワーク",
+  "nav.apps": "アプリ",
+  "nav.settings": "設定",
+
+  "header.toggle_sidebar": "サイドバーを切り替え",
+  "header.toggle_theme": "テーマを切り替え",
+  "header.notifications": "通知",
+  "header.search": "検索",
+  "header.search.keyboard": "検索 (⌘K)",
+
+  "role.admin": "管理者",
+  "role.user": "ユーザー",
+
+  "page.dashboard.title": "ダッシュボード",
+  "page.dashboard.subtitle": "システム全体の状況",
+  "page.dashboard.empty": "Engine が未接続のため、ここには後続スプリントで指標が表示されます。",
+
+  "btn.refresh": "更新",
+  "btn.save": "保存",
+  "btn.cancel": "キャンセル",
+  "btn.apply": "適用",
+
+  "config.export.empty_state": "空の状態です。設定はまだ何も保存されていません。",
+  "config.invalid_json": "config.json のパースに失敗しました: {0}",
+  "config.diff.no_changes": "変更はありません"
 }

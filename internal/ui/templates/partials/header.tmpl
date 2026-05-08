@@ -1,0 +1,36 @@
+{{- /*
+header partial. Sticky top bar with sidebar toggle, breadcrumbs, header actions
+slot, and theme toggle. The language toggle is JA-only in v1; the EN button is
+present but disabled, marked aria-disabled, to keep the visual layout from the
+prototype while honoring VISION.deferred_to_later_versions.
+*/ -}}
+{{ define "header" }}
+<header class="header">
+  <button id="btn-toggle-sidebar" type="button" class="btn btn-icon btn-ghost" aria-label="{{ T "header.toggle_sidebar" }}">
+    {{ template "icon-sidebar" . }}
+  </button>
+  {{ if .Breadcrumbs }}
+  <div class="crumbs">
+    {{ range $i, $c := .Breadcrumbs }}
+      {{ if gt $i 0 }}{{ template "icon-chevron-right" . }}{{ end }}
+      {{ if $c.Last }}<strong>{{ $c.Label }}</strong>{{ else }}<span>{{ $c.Label }}</span>{{ end }}
+    {{ end }}
+  </div>
+  {{ else }}
+  <h1>{{ .PageTitle }}</h1>
+  {{ end }}
+  <div class="header-actions">
+    {{ block "header-actions" . }}{{ end }}
+    <div class="icon-toggle" role="group" aria-label="Language">
+      <button type="button" data-on="true" data-lang="ja">JA</button>
+      <button type="button" data-on="false" data-lang="en" aria-disabled="true" disabled title="v1.x">EN</button>
+    </div>
+    <button id="btn-toggle-theme" type="button" class="btn btn-icon btn-ghost" aria-label="{{ T "header.toggle_theme" }}">
+      {{ template "icon-theme" . }}
+    </button>
+    <button type="button" class="btn btn-icon btn-ghost" aria-label="{{ T "header.notifications" }}">
+      {{ template "icon-bell" . }}
+    </button>
+  </div>
+</header>
+{{ end }}

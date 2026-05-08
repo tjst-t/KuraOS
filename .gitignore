@@ -42,3 +42,7 @@ go.work.sum
 # Coverage
 coverage.out
 coverage.html
+
+# Node / Tailwind
+/node_modules/
+npm-debug.log*

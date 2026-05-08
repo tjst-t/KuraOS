@@ -1,0 +1,42 @@
+{{- /*
+sidebar partial. Mirrors prototype/claude_design/shared/shared.jsx Sidebar()
+output: brand head + nav groups + sidebar foot. NavItems come from .Sidebar
+on the page data so the active item is decided server-side.
+*/ -}}
+{{ define "sidebar" }}
+<aside class="sidebar" aria-label="{{ T "nav.section.admin" }}">
+  <div class="sidebar-head">
+    <div class="brand-mark">
+      {{ template "brand-mark" . }}
+    </div>
+    <div>
+      <div class="brand-name">{{ T "brand.name" }}</div>
+      <div class="brand-sub">v{{ .Version }}</div>
+    </div>
+  </div>
+  <nav class="nav" data-testid="sidebar-nav">
+    {{ range .Sidebar.Groups }}
+    <div class="nav-section-label">{{ T .LabelID }}</div>
+    {{ range .Items }}
+    <a
+      href="{{ .Href }}"
+      class="nav-item"
+      data-active="{{ if .Active }}true{{ else }}false{{ end }}"
+      data-nav-id="{{ .ID }}"
+    >
+      {{ template "icon" .Icon }}
+      <span class="nav-label">{{ T .LabelID }}</span>
+      {{ if .Badge }}<span class="nav-badge">{{ .Badge }}</span>{{ end }}
+    </a>
+    {{ end }}
+    {{ end }}
+  </nav>
+  <div class="sidebar-foot">
+    <div class="avatar">{{ .User.Initials }}</div>
+    <div class="sidebar-foot-info">
+      <div class="name">{{ .User.Name }}</div>
+      <div class="role">{{ T .User.RoleID }}</div>
+    </div>
+  </div>
+</aside>
+{{ end }}

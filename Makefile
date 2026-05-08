@@ -6,15 +6,37 @@ PID_FILE     := /tmp/$(PROJECT_NAME)-dev.pid
 LOG_FILE     := /tmp/$(PROJECT_NAME)-dev.log
 PORTMAN_ENV  := /tmp/$(PROJECT_NAME)-portman.env
 
-.PHONY: build serve stop test lint tidy fmt vet clean
+# Tailwind output that gets embedded into the kura binary.
+TAILWIND_OUT := internal/ui/dist/kura.css
+TAILWIND_IN  := internal/ui/src/kura.css
+TAILWIND_CFG := tailwind.config.js
 
-build:
+.PHONY: build serve stop test lint tidy fmt vet clean ui-css ui-deps
+
+build: ui-css
 	@mkdir -p $(BIN_DIR)
 	@if [ -f go.mod ]; then \
 	  go build -o $(BIN) $(CMD); \
 	else \
 	  echo "==> go.mod not found yet — skip build (project bootstrap pending)"; \
 	fi
+
+# ui-deps installs Tailwind into node_modules. We avoid running it on every
+# build by checking whether the binary already exists (idempotent).
+ui-deps:
+	@if [ ! -x node_modules/.bin/tailwindcss ]; then \
+	  echo "==> Installing Tailwind CLI (first run)"; \
+	  npm install --no-audit --no-fund --silent; \
+	fi
+
+# ui-css recompiles Tailwind only if the source CSS or templates changed.
+# The output is committed so a fresh `go build` works without Node.js.
+ui-css: ui-deps $(TAILWIND_OUT)
+
+$(TAILWIND_OUT): $(TAILWIND_IN) $(TAILWIND_CFG) $(shell find internal/ui/templates -type f 2>/dev/null)
+	@mkdir -p $(dir $(TAILWIND_OUT))
+	@echo "==> Building Tailwind -> $(TAILWIND_OUT)"
+	@./node_modules/.bin/tailwindcss -c $(TAILWIND_CFG) -i $(TAILWIND_IN) -o $(TAILWIND_OUT) --minify
 
 serve: build
 	@if [ -f $(PID_FILE) ]; then \
@@ -72,4 +94,4 @@ tidy:
 	@if [ -f go.mod ]; then go mod tidy; fi
 
 clean:
-	@rm -rf $(BIN_DIR) $(PID_FILE) $(LOG_FILE) $(PORTMAN_ENV)
+	@rm -rf $(BIN_DIR) $(PID_FILE) $(LOG_FILE) $(PORTMAN_ENV) $(TAILWIND_OUT)

@@ -1,0 +1,18 @@
+{{- /*
+placeholder.tmpl — generic empty-state page used by Storage / Shares / Users /
+Network / Apps / Settings until each engine sprint replaces it.
+*/ -}}
+{{ define "content" }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T .PageTitleID }}</h1>
+    <p class="page-sub">{{ T "page.dashboard.empty" }}</p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <p class="muted" style="margin:0">{{ T "page.dashboard.empty" }}</p>
+  </div>
+</div>
+{{ end }}

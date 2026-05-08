@@ -1,0 +1,43 @@
+{
+  "sprint_id": "S464e47",
+  "criteria": [
+    {
+      "id": "AC-S464e47-1-1",
+      "description": "/ui/admin にアクセスすると Tailwind ベースのレイアウトが表示され、サイドバーの 7 項目をクリックできる",
+      "tests": [
+        {"file": "tests/e2e/admin-shell.e2e.spec.ts", "status": "written"},
+        {"file": "internal/ui/ui_test.go::TestAdminDashboard_RendersJaStrings", "status": "passing"},
+        {"file": "internal/ui/ui_test.go::TestAdminPaths_ReturnHTML", "status": "passing"}
+      ]
+    },
+    {
+      "id": "AC-S464e47-1-2",
+      "description": "全 UI 文字列が i18n.T 経由で出力されており、ja.json にキーが存在する",
+      "tests": [
+        {"file": "tests/acceptance/i18n-coverage.sh", "status": "passing (2/2)"},
+        {"file": "internal/ui/ui_test.go::TestAdminDashboard_HasNoRawMessageIDs", "status": "passing"},
+        {"file": "internal/ui/ui_test.go::TestAllSidebarMessageIDsPresent", "status": "passing"}
+      ]
+    },
+    {
+      "id": "AC-S464e47-2-1",
+      "description": "kura config export が現在の SQLite 状態を反映した config.json を出力する (空 SQLite なら空セクション)",
+      "tests": [
+        {"file": "tests/acceptance/config-roundtrip.sh", "status": "passing (3/3)"},
+        {"file": "internal/config/config_test.go::TestRoundTrip_EmptyConfigPreservesEnvelope", "status": "passing"},
+        {"file": "internal/config/config_test.go::TestMarshal_AlwaysIncludesSchemaVersion", "status": "passing"}
+      ]
+    },
+    {
+      "id": "AC-S464e47-2-2",
+      "description": "kura config apply <file> --dry-run で diff が表示される",
+      "tests": [
+        {"file": "tests/acceptance/config-roundtrip.sh", "status": "passing"},
+        {"file": "internal/config/config_test.go::TestDiff_TableDriven", "status": "passing"},
+        {"file": "internal/config/config_test.go::TestFormatPlan_StableOrder", "status": "passing"}
+      ]
+    }
+  ],
+  "go_test_summary": "ok i18n internal/config internal/gateway internal/store internal/ui — 0 failures",
+  "lint_summary": "gofmt: clean; go vet: clean"
+}

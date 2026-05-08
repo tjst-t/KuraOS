@@ -1,0 +1,114 @@
+{
+  "sprint_id": "S464e47",
+  "title": "UI シェル と config.json import/export 雛形",
+  "branch": "autopilot/main/S464e47",
+  "mode": "auto",
+  "started_at": "2026-05-08T00:30:00Z",
+  "planning_decisions": [
+    {
+      "topic": "Sprint scope as defined",
+      "decision": "Execute the two Stories (S464e47-1 UI shell + S464e47-2 config.json skeleton) without splitting. Each maps to one user-facing behavior: navigating the admin shell vs. round-tripping config.json.",
+      "rationale": "DESIGN_PRINCIPLES priority 7 (段階的実装) + ROADMAP scope already constrained; Engine implementation is deliberately deferred to later sprints."
+    },
+    {
+      "topic": "Visual SSOT",
+      "decision": "Port HTML structure + class names verbatim from prototype/claude_design/Dashboard.html and shared/shared.css. Replace React state/handlers with htmx attributes and server-side template includes.",
+      "rationale": "VISION.json visual_spec_source + DESIGN_PRINCIPLES ui_ux #1 — prototype is approved SSOT. Sidebar layout, header layout, .card/.btn/.tbl/.badge tokens reused as-is."
+    },
+    {
+      "topic": "Tailwind vs vanilla CSS",
+      "decision": "Use Tailwind v3 with @layer base for the prototype's design tokens (CSS variables) imported from a kura.css file. Tailwind config theme.extend exposes Fog palette, jade accent, and spacing as utility classes for new code; existing prototype class names kept under @layer components for verbatim reuse.",
+      "rationale": "Sprint description explicitly mandates Tailwind. DESIGN_PRINCIPLES ui_ux #5 says 独自 CSS は最小限に, but verbatim prototype port requires keeping the prototype's CSS class vocabulary available."
+    },
+    {
+      "topic": "Theme switching mechanism",
+      "decision": "html[data-theme] toggle controlled by a tiny inline script that persists to localStorage. Server-side default = 'light'. No SSE/round-trip on toggle.",
+      "rationale": "Prototype convention. ui_ux #6 (light/dark v1)."
+    },
+    {
+      "topic": "i18n strings centralization",
+      "decision": "Add UI MessageIDs (Msg* constants) for sidebar labels, page titles, common buttons. Templates call .T MessageID through a template func map. ja.json gets all keys; en stays absent (deferred to v1.x).",
+      "rationale": "DESIGN_PRINCIPLES forbidden #2 — ハードコード日本語禁止. VISION deferred_to_later_versions: 'v1.x: en.json'."
+    },
+    {
+      "topic": "config.json schema scope",
+      "decision": "Define the top-level Config struct with all engine sections (Storage, Shares, Users, Network, Apps, Auth, Backup, Notifications, etc.) as empty/optional placeholder structs. Sub-fields are added in subsequent sprints. JSON tags use snake_case + omitempty so empty SQLite roundtrips to empty sections.",
+      "rationale": "Priority #1 (config.json SSOT). Sprint description: 'Engine 抜きで先に作る'. Round-trip invariant must hold from day one."
+    },
+    {
+      "topic": "Engine ApplyAdapter interface",
+      "decision": "Define ApplyAdapter interface in internal/config that exposes Plan(ctx, old, new) -> []DiffEntry and Apply(ctx, plan) error. A central registry collects engine-supplied implementations; for this sprint no engines register but the contract is locked.",
+      "rationale": "Priority #9 (副作用は interface の裏に隠す). Forbidden: 外部プラグインローディング — registry-based central dispatch only."
+    },
+    {
+      "topic": "GUI spec mode",
+      "decision": "Run gui-spec autonomously: derive scenarios for clickable sidebar (7 items), light/dark toggle, ja-only baseline. Produce admin-shell.mock.spec.ts + admin-shell.e2e.spec.ts.",
+      "rationale": "Sprint runner contract. Two-tier testing: mock for error/edge, e2e against real server."
+    },
+    {
+      "topic": "Tailwind build integration",
+      "decision": "Tailwind compiled at build time via npx tailwindcss CLI, output to ui/dist/kura.css. Makefile build target invokes Tailwind before go build. ui/dist embedded via embed.FS. node_modules ignored in git; package.json + package-lock.json committed.",
+      "rationale": "Sprint description requirement. Single CSS bundle minimizes deploy complexity."
+    }
+  ],
+  "implementation_decisions": [
+    {
+      "topic": "internal/ui package boundary",
+      "decision": "Move ui/templates and ui/dist under internal/ui/ so embed.FS can find them (Go embed paths cannot escape the package dir). Tailwind config + Makefile updated to use the new paths. Templates and CSS sources stay together with their renderer.",
+      "rationale": "Practical embed constraint. No design impact; prototype path under prototype/claude_design/ is unchanged."
+    },
+    {
+      "topic": "Two-level template parsing",
+      "decision": "Renderer parses every .tmpl file at construction into a single tree, then for each request clones the tree and re-parses the page template into the clone. This keeps templates concurrency-safe without needing a per-page tree at startup, and surfaces template parse errors with the file path that broke.",
+      "rationale": "html/template Clone() is the documented way to share a parsed tree across goroutines while still letting a request override a {{ define }} block."
+    },
+    {
+      "topic": "Dashboard placeholder banner instead of fake stat data",
+      "decision": "The dashboard page shows an empty-state banner ('Engine が未接続のため、ここには後続スプリントで指標が表示されます。') rather than the prototype's fake CPU/MEM/Pool data. Engines are intentionally empty in this sprint.",
+      "rationale": "DESIGN_PRINCIPLES coding_conventions: TODO/FIXME would lie. An honest empty state matches the actual binary behaviour and points to the sprint that will fill it in."
+    },
+    {
+      "topic": "Subcommand dispatch in cmd/kura",
+      "decision": "Top-level args[0] is now the subcommand: 'config', 'version', or empty (server). 'config export' and 'config apply [--dry-run] <file>' avoid binding KURA_PORT so they can be invoked safely while a live kura instance is running.",
+      "rationale": "Makes the acceptance script (tests/acceptance/config-roundtrip.sh) trivial: one shell call per assertion, no port juggling. Leaves room for 'kura config diff', 'kura config validate' in later sprints."
+    },
+    {
+      "topic": "Unknown-field rejection on Unmarshal",
+      "decision": "config.Unmarshal uses DisallowUnknownFields. A typo in a hand-written config.json fails loudly instead of silently dropping data on apply.",
+      "rationale": "DESIGN_PRINCIPLES priority #8 (明示的 > 暗黙的). Forbidden #1 (config.json export で復元できない状態を作らない) — silent field drops would create state drift."
+    },
+    {
+      "topic": "Theme persistence client-side only",
+      "decision": "Theme and sidebar collapsed flag use localStorage with an inline boot script that runs before paint. No server round-trip, no cookie. The user-scoped persistence (per ui_ux #6) lands when ユーザー account model arrives in S1e7eeb.",
+      "rationale": "Avoids fake user sessions in this sprint. Round-trip invariant is preserved (theme is a UI preference, not config.json state)."
+    },
+    {
+      "topic": "EN button visible but disabled",
+      "decision": "JA/EN toggle is part of the prototype's header. EN button is rendered but aria-disabled to honor VISION.deferred_to_later_versions (en.json is v1.x).",
+      "rationale": "Prototype fidelity (visual SSOT) without lying about runtime capability."
+    },
+    {
+      "topic": "Tailwind output committed",
+      "decision": "internal/ui/dist/kura.css is the compiled stylesheet and is committed to git. node_modules/ is ignored. A fresh `go build` works on hosts without Node.js because the embed only needs the .css.",
+      "rationale": "Phase 1 priority — bin/kura must build standalone. The Makefile rule still rebuilds CSS when sources change, so the committed output stays fresh on dev hosts."
+    }
+  ],
+  "review_decisions": [
+    {
+      "topic": "Forbidden-rule scan",
+      "decision": "No raw Japanese in templates: confirmed via tests/acceptance/i18n-coverage.sh and TestAdminDashboard_HasNoRawMessageIDs. No SPA framework introduced. No external plugin loading. config.json export does not contain secrets (engines are empty). UI does not expose ZFS dedup / SLOG controls (no Engine yet).",
+      "rationale": "DESIGN_PRINCIPLES forbidden list, items 2/4/9/15."
+    },
+    {
+      "topic": "Test coverage check",
+      "decision": "Each acceptance criterion has at least one Go unit test + at least one shell/E2E test. See docs/sprint-logs/S464e47/acceptance-matrix.json.",
+      "rationale": "Sprint runner contract: every AC must be tagged in a test."
+    }
+  ],
+  "warnings": [
+    {
+      "topic": "Playwright not yet installed",
+      "detail": "tests/e2e/admin-shell.e2e.spec.ts and tests/mock/admin-shell.mock.spec.ts are written but Playwright + browsers are not installed in this environment. The e2e runner is expected to land in a follow-up tooling sprint or via the gui-spec skill execution; until then E2E is covered by Go integration tests in internal/ui/ui_test.go which exercise the same routes via httptest."
+    }
+  ]
+}

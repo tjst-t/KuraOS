@@ -14,14 +14,31 @@ type Deps struct {
 	Translator *i18n.Translator
 	Version    string
 	StartedAt  time.Time
+	// UIHandler serves /ui/* (admin shell, static assets). Optional so
+	// tests that only care about /healthz can skip wiring it.
+	UIHandler http.Handler
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
-// exposes. In bootstrap (Sprint S0ff37f) this is just /healthz; subsequent
-// sprints add /api/v1/... and /ui/... here.
+// exposes. /healthz lives here; /ui/* is delegated to the UI subtree which is
+// owned by internal/ui. Subsequent sprints add /api/v1/... here as well.
 func New(d Deps) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", healthz(d))
+	if d.UIHandler != nil {
+		mux.Handle("/ui/", d.UIHandler)
+		mux.Handle("/ui", d.UIHandler)
+		// "/" redirects to the admin dashboard so a fresh browser hit lands
+		// somewhere meaningful instead of 404. We avoid mounting the UI
+		// handler on "/" itself because that would shadow /healthz.
+		mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path != "/" {
+				http.NotFound(w, r)
+				return
+			}
+			http.Redirect(w, r, "/ui/admin/dashboard", http.StatusFound)
+		})
+	}
 	return mux
 }
 

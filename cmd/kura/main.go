@@ -14,15 +14,35 @@ import (
 	"github.com/kuraos-org/kura/i18n"
 	"github.com/kuraos-org/kura/internal/gateway"
 	"github.com/kuraos-org/kura/internal/store"
+	"github.com/kuraos-org/kura/internal/ui"
 )
 
 // Version is overridable at link time: -ldflags "-X main.Version=v0.1.0".
 var Version = "dev"
 
 func main() {
-	if err := run(); err != nil {
+	if err := dispatch(os.Args[1:]); err != nil {
 		// developer-facing error message stays English (DESIGN_PRINCIPLES coding_conventions)
 		log.Fatalf("kura: %v", err)
+	}
+}
+
+// dispatch routes the top-level subcommand. With no args, kura falls through
+// to the long-running server (`run`). Subcommands like `kura config export`
+// short-circuit before binding a port so they're safe to run from cron jobs
+// and CI without colliding with a live instance.
+func dispatch(args []string) error {
+	if len(args) == 0 {
+		return run()
+	}
+	switch args[0] {
+	case "config":
+		return configCmd(args[1:])
+	case "version", "--version", "-v":
+		fmt.Println(Version)
+		return nil
+	default:
+		return fmt.Errorf("unknown command %q (try: config | version)", args[0])
 	}
 }
 
@@ -53,11 +73,17 @@ func run() error {
 	}
 	defer st.Close()
 
+	uiRenderer, err := ui.New(tr, Version)
+	if err != nil {
+		return fmt.Errorf("init ui: %w", err)
+	}
+
 	startedAt := time.Now().UTC()
 	handler := gateway.New(gateway.Deps{
 		Translator: tr,
 		Version:    Version,
 		StartedAt:  startedAt,
+		UIHandler:  uiRenderer.Routes(),
 	})
 
 	srv := &http.Server{
