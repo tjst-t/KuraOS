@@ -157,6 +157,7 @@ const (
 	MsgStorageNewPoolLayout      MessageID = "page.storage.new_pool.layout"
 	MsgStorageNewPoolDisks       MessageID = "page.storage.new_pool.disks"
 	MsgStorageNewPoolDisksHint   MessageID = "page.storage.new_pool.disks_hint"
+	MsgStorageNewPoolDisksNone   MessageID = "page.storage.new_pool.disks_none"
 	MsgStorageNewPoolSpecial     MessageID = "page.storage.new_pool.special"
 	MsgStorageNewPoolSpecialHint MessageID = "page.storage.new_pool.special_hint"
 	MsgStorageNewPoolSpares      MessageID = "page.storage.new_pool.spares"

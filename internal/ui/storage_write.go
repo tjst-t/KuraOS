@@ -124,11 +124,11 @@ func (r *Renderer) handleCreateSnapshot(d StorageDeps) http.HandlerFunc {
 
 // parsePoolForm turns the New Pool form into a PoolConfig.
 //
-// disks[]:    one disk path per textarea line.
-// special:    same shape but optional. ForceNoRedundancy is *deliberately*
-//
-//	not parsed — the form has no field for it. CLI-only escape
-//	hatch (DESIGN_PRINCIPLES forbidden #14).
+// The form uses multi-value checkbox inputs (one <input name="data_disks">
+// per free disk), so disks arrive as req.PostForm["data_disks"] rather than
+// a single textarea blob. ForceNoRedundancy is *deliberately* not parsed —
+// the form has no field for it. CLI-only escape hatch
+// (DESIGN_PRINCIPLES forbidden #14).
 func parsePoolForm(req *http.Request) (storage.PoolConfig, error) {
 	cfg := storage.PoolConfig{
 		Name: strings.TrimSpace(req.FormValue("name")),
@@ -136,11 +136,11 @@ func parsePoolForm(req *http.Request) (storage.PoolConfig, error) {
 	dataLayout := storage.VdevLayout(strings.TrimSpace(req.FormValue("data_layout")))
 	cfg.Data = storage.VdevSpec{
 		Layout: dataLayout,
-		Disks:  splitLines(req.FormValue("data_disks")),
+		Disks:  trimAll(req.PostForm["data_disks"]),
 	}
 
 	specialLayout := strings.TrimSpace(req.FormValue("special_layout"))
-	specialDisks := splitLines(req.FormValue("special_disks"))
+	specialDisks := trimAll(req.PostForm["special_disks"])
 	if specialLayout != "" && len(specialDisks) > 0 {
 		cfg.Special = &storage.VdevSpec{
 			Layout: storage.VdevLayout(specialLayout),
@@ -148,7 +148,7 @@ func parsePoolForm(req *http.Request) (storage.PoolConfig, error) {
 		}
 	}
 
-	cfg.Spares = splitLines(req.FormValue("spares"))
+	cfg.Spares = trimAll(req.PostForm["spares"])
 	if v := strings.TrimSpace(req.FormValue("small_block_threshold")); v != "" {
 		// Accept simple bytes; values like "32K" stay encoded into ZFS
 		// directly via SmallBlockThreshold. For UI simplicity we only accept
@@ -161,10 +161,13 @@ func parsePoolForm(req *http.Request) (storage.PoolConfig, error) {
 	return cfg, nil
 }
 
-func splitLines(s string) []string {
-	var out []string
-	for _, line := range strings.Split(s, "\n") {
-		t := strings.TrimSpace(line)
+// trimAll returns ss with leading/trailing whitespace stripped from each
+// element and empty entries dropped. Used by the multi-value disk-picker
+// fields where each checkbox produces one PostForm value.
+func trimAll(ss []string) []string {
+	out := make([]string, 0, len(ss))
+	for _, s := range ss {
+		t := strings.TrimSpace(s)
 		if t != "" {
 			out = append(out, t)
 		}

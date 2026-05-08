@@ -118,7 +118,7 @@ func TestAcceptance_StorageCreatePool_Raidz2(t *testing.T) {
 	form := url.Values{}
 	form.Set("name", "tank")
 	form.Set("data_layout", "raidz2")
-	form.Set("data_disks", "/dev/sda\n/dev/sdb\n/dev/sdc\n/dev/sdd\n")
+	form["data_disks"] = []string{"/dev/sda", "/dev/sdb", "/dev/sdc", "/dev/sdd"}
 	resp, err := c.PostForm(srv.URL+"/ui/admin/storage/pools", form)
 	if err != nil {
 		t.Fatalf("POST: %v", err)
@@ -145,9 +145,9 @@ func TestAcceptance_StorageCreatePool_RejectsSingleSSDSpecial(t *testing.T) {
 	form := url.Values{}
 	form.Set("name", "tank")
 	form.Set("data_layout", "mirror")
-	form.Set("data_disks", "/dev/sda\n/dev/sdb")
+	form["data_disks"] = []string{"/dev/sda", "/dev/sdb"}
 	form.Set("special_layout", "single")
-	form.Set("special_disks", "/dev/nvme0n1")
+	form["special_disks"] = []string{"/dev/nvme0n1"}
 	resp, err := c.PostForm(srv.URL+"/ui/admin/storage/pools", form)
 	if err != nil {
 		t.Fatalf("POST: %v", err)

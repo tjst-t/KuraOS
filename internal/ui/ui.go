@@ -61,6 +61,23 @@ func New(tr *i18n.Translator, version string) (*Renderer, error) {
 		"T": func(id string, args ...any) string {
 			return tr.T(i18n.MessageID(id), args...)
 		},
+		// dict packs k/v pairs into a map so partial templates ({{ template ... }})
+		// can receive multiple named arguments (Go html/template only passes one
+		// pipeline value to a partial).
+		"dict": func(values ...any) (map[string]any, error) {
+			if len(values)%2 != 0 {
+				return nil, fmt.Errorf("dict requires an even number of arguments")
+			}
+			m := make(map[string]any, len(values)/2)
+			for i := 0; i < len(values); i += 2 {
+				key, ok := values[i].(string)
+				if !ok {
+					return nil, fmt.Errorf("dict key %d must be a string, got %T", i, values[i])
+				}
+				m[key] = values[i+1]
+			}
+			return m, nil
+		},
 	}
 	t := template.New("kura").Funcs(funcs)
 

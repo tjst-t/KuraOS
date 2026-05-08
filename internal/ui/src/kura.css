@@ -458,6 +458,106 @@
     padding-top: 32px;
   }
 
+  /* Table — ported verbatim from prototype/claude_design/shared/shared.css
+     so the disks table and similar tabular layouts get their padding,
+     borders, and hover states. Without this block, <table class="tbl">
+     renders with no spacing and adjacent columns visually collide. */
+  .tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .tbl th {
+    text-align: left;
+    font-weight: 500;
+    font-size: 11px;
+    color: var(--text-3);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 18px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg);
+  }
+  .tbl td { padding: 12px 18px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  .tbl tr:last-child td { border-bottom: none; }
+  .tbl tr:hover td { background: var(--bg); }
+  .tbl .td-mono { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
+  .tbl .td-num,
+  .tbl th.td-num,
+  .tbl td.td-num {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-family: var(--font-mono);
+  }
+
+  /* Stats / progress bar / vdev tree */
+  .stat-value { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }
+  .stat-value .unit { font-size: 12px; color: var(--text-3); margin-left: 4px; font-weight: 400; }
+  .bar { width: 100%; height: 6px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--accent); border-radius: inherit; transition: width .3s ease; }
+  .bar.ok > span { background: var(--ok); }
+  .bar.warn > span { background: var(--warn); }
+  .bar.crit > span { background: var(--crit); }
+  .vdev-tree { font-size: 12px; }
+  .vdev-row { font-size: 12px; line-height: 1.5; }
+
+  /* Grid / row helpers */
+  .grid { display: grid; gap: 16px; }
+  .grid-2 { display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .grid-3 { display: grid; gap: 16px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .row { display: flex; gap: 16px; align-items: stretch; }
+  .row.center { align-items: center; }
+  .row.between { justify-content: space-between; }
+  .row.wrap { flex-wrap: wrap; }
+  .col { display: flex; flex-direction: column; gap: 16px; }
+  .gap-sm { gap: 8px; }
+  .gap-lg { gap: 24px; }
+  .flex-1 { flex: 1; }
+
+  /* Modal — ported from prototype with a single-element variant.
+     Templates use one <div class="modal"> with inline display:flex toggle:
+     the same element is both the dimming backdrop AND the centering layout.
+     The inner .card panel renders on top of the dimmed overlay. */
+  .modal {
+    position: fixed; inset: 0; z-index: 100;
+    background: oklch(0% 0 0 / 0.45);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    align-items: center; justify-content: center;
+    padding: 24px;
+  }
+  .modal > .card,
+  .modal > form.card {
+    width: min(640px, 100%);
+    max-height: calc(100vh - 48px);
+    overflow: auto;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* Disk picker (storage New Pool modal) — checklist of free disks. */
+  .disk-picker {
+    display: flex; flex-direction: column; gap: 6px;
+    max-height: 220px; overflow-y: auto;
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    background: var(--bg); padding: 6px;
+  }
+  .disk-picker-row {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 10px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-size: 12px;
+    transition: background .12s, border-color .12s;
+    cursor: pointer;
+  }
+  .disk-picker-row:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .disk-picker-row input[type="checkbox"] { flex: none; accent-color: var(--accent); }
+  .disk-picker-row .dp-path { font-family: var(--font-mono); font-size: 12px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .disk-picker-row .dp-meta { font-size: 11px; color: var(--text-3); display: flex; gap: 10px; align-items: center; flex: none; }
+  .disk-picker-empty {
+    padding: 16px; text-align: center; font-size: 12px; color: var(--text-3);
+  }
+
   /* Helpers */
   .muted { color: var(--text-3); }
   .mono { font-family: var(--font-mono); font-size: 12px; }

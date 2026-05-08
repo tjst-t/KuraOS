@@ -201,8 +201,8 @@ in storage.go so the template stays free of CLI-output tokens.
 {{ if $v.WriteEnabled }}
 {{ range $v.Imports }}
 <div id="import-modal-{{ .Name }}" class="modal" data-testid="storage-import-modal" data-pool="{{ .Name }}"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:50">
-  <form method="post" action="/ui/admin/storage/import" class="card" style="min-width:420px;max-width:560px;background:var(--bg-1)">
+  style="display:none">
+  <form method="post" action="/ui/admin/storage/import" class="card" style="min-width:420px;max-width:560px">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.import.confirm" }}: <span class="mono">{{ .Name }}</span></h3>
     </div>
@@ -232,9 +232,8 @@ in storage.go so the template stays free of CLI-output tokens.
 </div>
 {{ end }}
 
-<div id="new-pool-modal" class="modal" data-testid="storage-new-pool-modal"
-  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:50">
-  <form method="post" action="/ui/admin/storage/pools" class="card" style="min-width:520px;max-width:760px;background:var(--bg-1)">
+<div id="new-pool-modal" class="modal" data-testid="storage-new-pool-modal" style="display:none">
+  <form method="post" action="/ui/admin/storage/pools" class="card" style="min-width:520px;max-width:760px">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.new_pool.title" }}</h3>
     </div>
@@ -254,8 +253,7 @@ in storage.go so the template stays free of CLI-output tokens.
       </div>
       <div class="field">
         <label>{{ T "page.storage.new_pool.disks" }}</label>
-        <textarea class="input mono" name="data_disks" rows="4" required data-testid="storage-new-pool-disks"
-          placeholder="/dev/disk/by-id/wwn-..."></textarea>
+        {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "data_disks" "Required" true "Testid" "storage-new-pool-disks" }}
         <div class="field-hint">{{ T "page.storage.new_pool.disks_hint" }}</div>
       </div>
       <details>
@@ -272,14 +270,14 @@ in storage.go so the template stays free of CLI-output tokens.
         </div>
         <div class="field">
           <label>{{ T "page.storage.new_pool.disks" }}</label>
-          <textarea class="input mono" name="special_disks" rows="2" data-testid="storage-new-pool-special-disks"></textarea>
+          {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "special_disks" "Required" false "Testid" "storage-new-pool-special-disks" }}
           <div class="field-hint">{{ T "page.storage.new_pool.special_hint" }}</div>
         </div>
       </details>
       <details>
         <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.spares" }}</summary>
         <div class="field" style="margin-top:8px">
-          <textarea class="input mono" name="spares" rows="2"></textarea>
+          {{ template "disk-picker" dict "Disks" $v.FreeDisks "Field" "spares" "Required" false "Testid" "storage-new-pool-spares" }}
         </div>
       </details>
     </div>

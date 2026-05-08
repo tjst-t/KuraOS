@@ -1,0 +1,35 @@
+{{- /*
+disk-picker — checkbox list of free disks for the New Pool / special vdev /
+spares fields. Renders <input type="checkbox" name="{Field}" value="/dev/...">
+rows so the form posts a multi-value list; storage_write reads it via
+req.PostForm["data_disks"] etc. Empty state is shown when no free disks
+exist so operators see why they can't proceed.
+
+Inputs (passed via {{ template "disk-picker" dict ... }}):
+  Disks    — []DiskView (typically StorageView.FreeDisks)
+  Field    — form field name (data_disks / special_disks / spares)
+  Required — bool, sets HTML5 required on each checkbox label group
+  Testid   — data-testid for the wrapping element
+*/ -}}
+{{ define "disk-picker" }}
+{{ $field := .Field }}{{ $required := .Required }}{{ $testid := .Testid }}
+{{ if .Disks }}
+<div class="disk-picker" data-testid="{{ $testid }}" data-field="{{ $field }}">
+  {{ range .Disks }}
+  <label class="disk-picker-row" data-testid="{{ $testid }}-row" data-path="{{ .Path }}">
+    <input type="checkbox" name="{{ $field }}" value="{{ .Path }}"{{ if $required }} data-required-group="{{ $field }}"{{ end }}>
+    <span class="dp-path">{{ .Path }}</span>
+    <span class="dp-meta">
+      <span>{{ .Model }}</span>
+      <span class="mono">{{ .SizeDisplay }}</span>
+      {{ if .SMARTBadge }}<span class="badge {{ .SMARTClass }}"><span class="badge-dot"></span>{{ .SMARTBadge }}</span>{{ end }}
+    </span>
+  </label>
+  {{ end }}
+</div>
+{{ else }}
+<div class="disk-picker-empty" data-testid="{{ $testid }}-empty">
+  {{ T "page.storage.new_pool.disks_none" }}
+</div>
+{{ end }}
+{{ end }}
