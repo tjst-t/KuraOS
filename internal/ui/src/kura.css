@@ -272,6 +272,31 @@
   .btn-lg { padding: 9px 16px; font-size: 14px; }
   .btn-icon { width: 30px; height: 30px; padding: 0; display: grid; place-items: center; }
 
+  /* aria-disabled is preferred over the disabled attribute for buttons that
+     should still surface a hover tooltip describing why they're unavailable
+     (browsers suppress mouse events on truly disabled controls). The submit
+     button on the New Pool dialog uses this. Hover overrides keep each
+     variant's non-hover background so the disabled appearance stays stable
+     under the cursor. */
+  .btn[aria-disabled="true"] {
+    opacity: 0.5;
+    cursor: not-allowed;
+    pointer-events: auto;
+  }
+  .btn[aria-disabled="true"]:hover {
+    opacity: 0.5;
+    background: var(--surface);
+    border-color: var(--border);
+  }
+  .btn-primary[aria-disabled="true"]:hover {
+    background: var(--text);
+    border-color: var(--text);
+  }
+  [data-theme="dark"] .btn-primary[aria-disabled="true"]:hover {
+    background: var(--fog-50);
+    border-color: var(--fog-50);
+  }
+
   /* Card */
   .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
   .card-head {
@@ -551,6 +576,14 @@
     cursor: pointer;
   }
   .disk-picker-row:hover { background: var(--surface-2); border-color: var(--border-strong); }
+  .disk-picker-row[aria-disabled="true"],
+  .disk-picker-row[aria-disabled="true"]:hover {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: var(--bg);
+    border-color: var(--border);
+  }
+  .disk-picker-row[aria-disabled="true"] input[type="checkbox"] { cursor: not-allowed; }
   .disk-picker-row input[type="checkbox"] { flex: none; accent-color: var(--accent); }
   .disk-picker-row .dp-path { font-family: var(--font-mono); font-size: 12px; color: var(--text); flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .disk-picker-row .dp-meta { font-size: 11px; color: var(--text-3); display: flex; gap: 10px; align-items: center; flex: none; }

@@ -285,11 +285,141 @@ in storage.go so the template stays free of CLI-output tokens.
       <button type="button" class="btn" onclick="document.getElementById('new-pool-modal').style.display='none';">
         {{ T "page.storage.new_pool.cancel" }}
       </button>
-      <button type="submit" class="btn btn-primary" data-testid="storage-new-pool-submit">
+      <button type="submit" class="btn btn-primary" data-testid="storage-new-pool-submit"
+        aria-disabled="true" title="">
         {{ T "page.storage.new_pool.submit" }}
       </button>
     </div>
   </form>
 </div>
+
+{{- /* Client-side validation + cross-picker disk dedup. The browser is the
+       only source of truth for live UX feedback; the server still performs
+       authoritative validation in engine/storage/validation.go (priority #5
+       reliability), so this script is presentational only — never a security
+       boundary. Strings are i18n via storage-validation-msgs JSON island. */ -}}
+<script type="application/json" id="storage-validation-msgs">
+{
+  "name_required":           "{{ T "page.storage.new_pool.err.name_required" }}",
+  "data_layout_required":    "{{ T "page.storage.new_pool.err.data_layout_required" }}",
+  "data_too_few":            "{{ T "page.storage.new_pool.err.data_too_few" }}",
+  "special_layout_required": "{{ T "page.storage.new_pool.err.special_layout_required" }}",
+  "special_too_few":         "{{ T "page.storage.new_pool.err.special_too_few" }}",
+  "duplicate_disk":          "{{ T "page.storage.new_pool.err.duplicate_disk" }}"
+}
+</script>
+<script>
+(function() {
+  var modal = document.getElementById('new-pool-modal');
+  if (!modal) return;
+  var form = modal.querySelector('form');
+  if (!form) return;
+  var submit = form.querySelector('[data-testid="storage-new-pool-submit"]');
+  if (!submit) return;
+
+  var msgs = {};
+  try {
+    msgs = JSON.parse(document.getElementById('storage-validation-msgs').textContent);
+  } catch (_) {}
+
+  var layoutMin = { single: 1, mirror: 2, raidz1: 3, raidz2: 4, raidz3: 5 };
+  var fields = ['data_disks', 'special_disks', 'spares'];
+
+  function fmt(tpl, params) {
+    return (tpl || '').replace(/\{(\w+)\}/g, function(_, k) {
+      return (params[k] != null) ? params[k] : '{' + k + '}';
+    });
+  }
+
+  function selectedSet(name) {
+    var nodes = form.querySelectorAll('input[type="checkbox"][name="' + name + '"]:checked');
+    var s = new Set();
+    for (var i = 0; i < nodes.length; i++) s.add(nodes[i].value);
+    return s;
+  }
+
+  function update() {
+    var sel = {};
+    fields.forEach(function(f) { sel[f] = selectedSet(f); });
+
+    // Cross-picker dedup: any disk selected in one picker is grayed-out in
+    // the other two. The selected row in its own picker stays interactive
+    // so the operator can deselect it without first unchecking elsewhere.
+    fields.forEach(function(f) {
+      var rows = form.querySelectorAll('[data-field="' + f + '"] .disk-picker-row');
+      rows.forEach(function(row) {
+        var cb = row.querySelector('input[type="checkbox"]');
+        if (!cb) return;
+        var path = cb.value;
+        var elsewhere = false;
+        for (var i = 0; i < fields.length; i++) {
+          if (fields[i] !== f && sel[fields[i]].has(path)) { elsewhere = true; break; }
+        }
+        if (elsewhere && !cb.checked) {
+          row.setAttribute('aria-disabled', 'true');
+          cb.disabled = true;
+          row.title = msgs.duplicate_disk || '';
+        } else {
+          row.removeAttribute('aria-disabled');
+          cb.disabled = false;
+          row.removeAttribute('title');
+        }
+      });
+    });
+
+    // Validate. Spares are always optional, so no rule fires for them.
+    var errs = [];
+    var nameInput = form.querySelector('input[name="name"]');
+    if (!nameInput || !(nameInput.value || '').trim()) errs.push(msgs.name_required);
+
+    var dataLayoutEl = form.querySelector('select[name="data_layout"]');
+    var dataLayout = dataLayoutEl ? dataLayoutEl.value : '';
+    if (!dataLayout) {
+      errs.push(msgs.data_layout_required);
+    } else {
+      var dmin = layoutMin[dataLayout] || 1;
+      var dgot = sel.data_disks.size;
+      if (dgot < dmin) {
+        errs.push(fmt(msgs.data_too_few, { layout: dataLayout, min: dmin, got: dgot }));
+      }
+    }
+
+    var specialLayoutEl = form.querySelector('select[name="special_layout"]');
+    var specialLayout = specialLayoutEl ? specialLayoutEl.value : '';
+    var sgot = sel.special_disks.size;
+    if (specialLayout || sgot > 0) {
+      if (!specialLayout) {
+        errs.push(msgs.special_layout_required);
+      } else {
+        var smin = layoutMin[specialLayout] || 0;
+        if (sgot < smin) {
+          errs.push(fmt(msgs.special_too_few, { layout: specialLayout, min: smin, got: sgot }));
+        }
+      }
+    }
+
+    if (errs.length === 0) {
+      submit.removeAttribute('aria-disabled');
+      submit.removeAttribute('title');
+    } else {
+      submit.setAttribute('aria-disabled', 'true');
+      submit.setAttribute('title', errs.map(function(e) { return '• ' + e; }).join('\n'));
+    }
+  }
+
+  form.addEventListener('change', update);
+  form.addEventListener('input', update);
+  // Block submission if validation failed. Server-side validation still
+  // exists; this is just the UX guard that matches the visible disabled
+  // state of the button.
+  form.addEventListener('submit', function(e) {
+    if (submit.getAttribute('aria-disabled') === 'true') {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+  });
+  update();
+})();
+</script>
 {{ end }}
 {{ end }}

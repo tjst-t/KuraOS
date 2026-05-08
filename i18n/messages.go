@@ -158,6 +158,13 @@ const (
 	MsgStorageNewPoolDisks       MessageID = "page.storage.new_pool.disks"
 	MsgStorageNewPoolDisksHint   MessageID = "page.storage.new_pool.disks_hint"
 	MsgStorageNewPoolDisksNone   MessageID = "page.storage.new_pool.disks_none"
+
+	MsgStorageNewPoolErrNameRequired         MessageID = "page.storage.new_pool.err.name_required"
+	MsgStorageNewPoolErrDataLayoutRequired   MessageID = "page.storage.new_pool.err.data_layout_required"
+	MsgStorageNewPoolErrDataTooFew           MessageID = "page.storage.new_pool.err.data_too_few"
+	MsgStorageNewPoolErrSpecialLayoutNeeded  MessageID = "page.storage.new_pool.err.special_layout_required"
+	MsgStorageNewPoolErrSpecialTooFew        MessageID = "page.storage.new_pool.err.special_too_few"
+	MsgStorageNewPoolErrDuplicateDisk        MessageID = "page.storage.new_pool.err.duplicate_disk"
 	MsgStorageNewPoolSpecial     MessageID = "page.storage.new_pool.special"
 	MsgStorageNewPoolSpecialHint MessageID = "page.storage.new_pool.special_hint"
 	MsgStorageNewPoolSpares      MessageID = "page.storage.new_pool.spares"
