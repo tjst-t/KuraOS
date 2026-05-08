@@ -70,7 +70,48 @@ type Config struct {
 // a stable target.
 
 type SystemConfig struct{}
-type StorageConfig struct{}
+
+// StorageConfig is the declarative shape of "storage" in config.json.
+// Mirrors design.md §3.1: pools[], volumes[], snapshots[].
+//
+// Fields use simple string types for vdev layout / preset because config.json
+// is the authoritative SSOT — engines validate values when applying. Keeping
+// JSON loose here lets us add fields (e.g. dedup once supported) without a
+// breaking schema bump.
+type StorageConfig struct {
+	Pools   []PoolEntry   `json:"pools,omitempty"`
+	Volumes []VolumeEntry `json:"volumes,omitempty"`
+}
+
+// PoolEntry mirrors the one entry of `pools[]` in design.md §3.1. `mode`
+// distinguishes create-from-scratch (default, omitted) from importing an
+// existing pool ("import"). The latter triggers `zpool import` instead of
+// `zpool create`.
+type PoolEntry struct {
+	Name                string         `json:"name"`
+	Mode                string         `json:"mode,omitempty"` // "" | "create" | "import"
+	Topology            *TopologyEntry `json:"topology,omitempty"`
+	Special             *TopologyEntry `json:"special,omitempty"`
+	SmallBlockThreshold string         `json:"small_block_threshold,omitempty"`
+	Spares              []string       `json:"spares,omitempty"`
+	AutoShare           bool           `json:"auto_share,omitempty"`
+}
+
+// TopologyEntry maps to the design.md `topology` sub-object and `special`.
+type TopologyEntry struct {
+	Type  string   `json:"type"`
+	Disks []string `json:"disks"`
+}
+
+// VolumeEntry mirrors the one entry of `volumes[]` in design.md §3.1. The
+// `quota` field is a human string ("500G", "2T"); engines parse it when
+// applying.
+type VolumeEntry struct {
+	Name   string `json:"name"`
+	Quota  string `json:"quota,omitempty"`
+	Preset string `json:"preset,omitempty"`
+}
+
 type SharesConfig struct{}
 type UsersConfig struct{}
 type NetworkConfig struct{}

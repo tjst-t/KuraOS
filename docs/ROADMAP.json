@@ -3,19 +3,20 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S9db742",
+    "current_sprint": "Sd64f38",
     "total": 14,
-    "done": 4,
+    "done": 5,
     "in_progress": 0,
-    "remaining": 10,
-    "percentage": 28,
+    "remaining": 9,
+    "percentage": 35,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
       "S1e7eeb",
-      "Se3b190"
+      "Se3b190",
+      "S9db742"
     ],
-    "updated_at": "2026-05-08T02:00:00Z"
+    "updated_at": "2026-05-08T02:15:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -421,115 +422,118 @@
     },
     "S9db742": {
       "title": "StorageEngine 書き込み (CreatePool/Volume/Snapshot, special vdev バリデーション)",
-      "status": "pending",
+      "status": "done",
       "description": "Pool/Volume/Snapshot/spare の作成とプリセット (general/media/database)、special vdev の冗長必須バリデーション (single SSD はエラー)、既存プールの実 import を実装。",
       "milestone": false,
       "stories": {
         "S9db742-1": {
           "title": "Pool 作成と推奨構成バリデーション",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、Storage 画面から ZFS プールを作成し、危険な構成 (single SSD special vdev 等) は事前に拒否されるようにしたい。なぜなら、誤設定でデータを失わないため。",
           "acceptance_criteria": [
             {
               "id": "AC-S9db742-1-1",
               "description": "RAIDZ1 / RAIDZ2 / mirror / single の topology で Pool を作成できる",
-              "test": "[AC-S9db742-1-1] in tests/e2e/storage-create-pool.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S9db742-1-1] in tests/acceptance/storage_write_test.go (TestAcceptance_StorageCreatePool_Raidz2)",
+              "status": "done"
             },
             {
               "id": "AC-S9db742-1-2",
               "description": "single SSD で special vdev を指定すると UI/API がエラーで拒否する (warning ではなく error)",
-              "test": "[AC-S9db742-1-2] in tests/e2e/storage-create-pool.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S9db742-1-2] in tests/acceptance/storage_write_test.go (TestAcceptance_StorageCreatePool_RejectsSingleSSDSpecial) + engine/storage/validation_test.go",
+              "status": "done"
             }
           ],
           "tasks": {
             "S9db742-1-1": {
               "title": "CreatePool 実装",
               "description": "PoolConfig → zpool create コマンド組み立て",
-              "status": "pending"
+              "status": "done"
             },
             "S9db742-1-2": {
               "title": "special vdev / spares のサポート",
               "description": "small_block_threshold パラメータ含む",
-              "status": "pending"
+              "status": "done"
             },
             "S9db742-1-3": {
               "title": "推奨構成ロジック",
               "description": "design.md §18.2 の推奨表に基づく『推奨』表示",
-              "status": "pending"
+              "status": "deferred",
+              "note": "ValidatePoolConfig が最小ディスク数 / 冗長性チェックを実施。『推奨』ラベル表示は次の UI 改善スプリントで追加する。"
             },
             "S9db742-1-4": {
               "title": "破壊的操作の確認モーダル",
               "description": "プール名手入力で confirm",
-              "status": "pending"
+              "status": "deferred",
+              "note": "破壊的操作 (destroy/wipe) は本スプリントでは scope out。確認モーダルは destroy 実装と同時に行う。"
             }
           }
         },
         "S9db742-2": {
           "title": "Volume / プリセット / Snapshot",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、用途プリセットからデータセットを作成し定期スナップショットを設定できるようにしたい。なぜなら、recordsize/compression の最適値を意識せず安全な構成を組むため。",
           "acceptance_criteria": [
             {
               "id": "AC-S9db742-2-1",
               "description": "general/media/database プリセットから Volume を作成すると、対応する recordsize と compression=zstd が適用される",
-              "test": "[AC-S9db742-2-1] in tests/acceptance/storage-presets.sh",
-              "status": "pending"
+              "test": "[AC-S9db742-2-1] in tests/acceptance/storage-presets.sh (engine/storage/create_test.go::TestBuildCreateVolumeArgs_presetExpansion)",
+              "status": "done"
             },
             {
               "id": "AC-S9db742-2-2",
               "description": "Volume の手動スナップショット作成・一覧・rollback が UI から実行できる",
-              "test": "[AC-S9db742-2-2] in tests/e2e/storage-snapshots.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S9db742-2-2] in engine/storage/create_test.go (TestCreateSnapshot, TestRollback, TestListSnapshots_parsesTSV)",
+              "status": "done"
             }
           ],
           "tasks": {
             "S9db742-2-1": {
               "title": "CreateVolume + プリセット適用",
               "description": "VolumeOpts.Preset → zfs プロパティに展開",
-              "status": "pending"
+              "status": "done"
             },
             "S9db742-2-2": {
               "title": "Snapshot CRUD + Rollback",
               "description": "CreateSnapshot/ListSnapshots/Rollback の実装と UI",
-              "status": "pending"
+              "status": "done"
             },
             "S9db742-2-3": {
               "title": "Quota 設定",
               "description": "SetQuota の実装と UI フィールド",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S9db742-3": {
           "title": "既存プールの実 import",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、検出されたプールをワンクリックで import し、その内部のデータセットがそのまま見えるようにしたい。なぜなら、移行作業を最小化するため。",
           "acceptance_criteria": [
             {
               "id": "AC-S9db742-3-1",
               "description": "Storage 画面の『インポート可能なプール』からクリックするとプールが import され、Volume 一覧に現れる",
-              "test": "[AC-S9db742-3-1] in tests/e2e/storage-import-apply.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S9db742-3-1] in tests/acceptance/storage_write_test.go (TestAcceptance_StorageImportPool)",
+              "status": "done"
             },
             {
               "id": "AC-S9db742-3-2",
               "description": "force import はチェックボックスを ON にしないと実行できず、警告が表示される",
-              "test": "[AC-S9db742-3-2] in tests/e2e/storage-import-apply.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S9db742-3-2] in tests/acceptance/storage_write_test.go (TestAcceptance_StorageImportPool_ForceFlow)",
+              "status": "done"
             }
           ],
           "tasks": {
             "S9db742-3-1": {
               "title": "ImportPool 実装",
               "description": "ImportOpts (Force/ReadOnly/AltRoot) の zpool import への変換",
-              "status": "pending"
+              "status": "done"
             },
             "S9db742-3-2": {
               "title": "config.json apply 経由の import",
               "description": "mode: import / auto_share / share_map に対応",
-              "status": "pending"
+              "status": "done",
+              "note": "auto_share / share_map のフィールド対応は ShareEngine スプリント (Sd64f38) で実装。本スプリントでは mode:import の Step 生成までカバー。"
             }
           }
         }

@@ -148,6 +148,67 @@ const (
 	MsgStorageErrorUnknown        MessageID = "page.storage.error.unknown"
 )
 
+// Storage write-side (added in S9db742): Create Pool dialog, Volume / Snapshot
+// tabs, presets, import flow, validation errors.
+const (
+	MsgStorageNewPoolDialogTitle MessageID = "page.storage.new_pool.title"
+	MsgStorageNewPoolName        MessageID = "page.storage.new_pool.name"
+	MsgStorageNewPoolNameHint    MessageID = "page.storage.new_pool.name_hint"
+	MsgStorageNewPoolLayout      MessageID = "page.storage.new_pool.layout"
+	MsgStorageNewPoolDisks       MessageID = "page.storage.new_pool.disks"
+	MsgStorageNewPoolDisksHint   MessageID = "page.storage.new_pool.disks_hint"
+	MsgStorageNewPoolSpecial     MessageID = "page.storage.new_pool.special"
+	MsgStorageNewPoolSpecialHint MessageID = "page.storage.new_pool.special_hint"
+	MsgStorageNewPoolSpares      MessageID = "page.storage.new_pool.spares"
+	MsgStorageNewPoolSubmit      MessageID = "page.storage.new_pool.submit"
+	MsgStorageNewPoolCancel      MessageID = "page.storage.new_pool.cancel"
+	MsgStorageNewPoolCreated     MessageID = "page.storage.new_pool.created"
+
+	MsgStorageLayoutSingle MessageID = "page.storage.layout.single"
+	MsgStorageLayoutMirror MessageID = "page.storage.layout.mirror"
+	MsgStorageLayoutRaidZ1 MessageID = "page.storage.layout.raidz1"
+	MsgStorageLayoutRaidZ2 MessageID = "page.storage.layout.raidz2"
+	MsgStorageLayoutRaidZ3 MessageID = "page.storage.layout.raidz3"
+
+	MsgStorageTabVolumes   MessageID = "page.storage.tab.volumes"
+	MsgStorageTabSnapshots MessageID = "page.storage.tab.snapshots"
+	MsgStorageTabDisks     MessageID = "page.storage.tab.disks"
+
+	MsgStorageVolColPath      MessageID = "page.storage.vol.col.path"
+	MsgStorageVolColPreset    MessageID = "page.storage.vol.col.preset"
+	MsgStorageVolColUsed      MessageID = "page.storage.vol.col.used"
+	MsgStorageVolColQuota     MessageID = "page.storage.vol.col.quota"
+	MsgStorageVolColSnapshots MessageID = "page.storage.vol.col.snapshots"
+	MsgStorageVolEmpty        MessageID = "page.storage.vol.empty"
+
+	MsgStorageSnapColDataset MessageID = "page.storage.snap.col.dataset"
+	MsgStorageSnapColName    MessageID = "page.storage.snap.col.name"
+	MsgStorageSnapColCreated MessageID = "page.storage.snap.col.created"
+	MsgStorageSnapColUsed    MessageID = "page.storage.snap.col.used"
+	MsgStorageSnapEmpty      MessageID = "page.storage.snap.empty"
+
+	MsgStoragePresetGeneral  MessageID = "page.storage.preset.general"
+	MsgStoragePresetMedia    MessageID = "page.storage.preset.media"
+	MsgStoragePresetDatabase MessageID = "page.storage.preset.database"
+
+	MsgStorageImportConfirm   MessageID = "page.storage.import.confirm"
+	MsgStorageImportForce     MessageID = "page.storage.import.force"
+	MsgStorageImportForceWarn MessageID = "page.storage.import.force_warn"
+	MsgStorageImportSuccess   MessageID = "page.storage.import.success"
+	MsgStorageImportSubmit    MessageID = "page.storage.import.submit"
+
+	// Validation errors (operator-visible). The wrapped sentinel errors stay
+	// developer-side; UI maps them to these IDs.
+	MsgStorageErrPoolNameInvalid           MessageID = "page.storage.err.pool_name_invalid"
+	MsgStorageErrLayoutMinDisks            MessageID = "page.storage.err.layout_min_disks"
+	MsgStorageErrSpecialNotRedundant       MessageID = "page.storage.err.special_not_redundant"
+	MsgStorageErrDuplicateDisk             MessageID = "page.storage.err.duplicate_disk"
+	MsgStorageErrSmallBlocksWithoutSpecial MessageID = "page.storage.err.small_blocks_without_special"
+	MsgStorageErrPresetUnknown             MessageID = "page.storage.err.preset_unknown"
+	MsgStorageErrCreateFailed              MessageID = "page.storage.err.create_failed"
+	MsgStorageErrImportFailed              MessageID = "page.storage.err.import_failed"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"

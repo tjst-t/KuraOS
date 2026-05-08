@@ -16,9 +16,16 @@ in storage.go so the template stays free of CLI-output tokens.
     <p class="page-sub">{{ $v.Subtitle }}</p>
   </div>
   <div class="row gap-sm" style="display:flex;gap:8px;">
+    {{ if $v.WriteEnabled }}
+    <button type="button" class="btn btn-primary" data-testid="storage-new-pool-btn"
+      onclick="document.getElementById('new-pool-modal').setAttribute('open','true');document.getElementById('new-pool-modal').style.display='flex';">
+      {{ T "page.storage.new_pool" }}
+    </button>
+    {{ else }}
     <button type="button" class="btn" disabled aria-disabled="true" title="{{ T "page.storage.new_pool_deferred" }}">
       {{ T "page.storage.new_pool" }}
     </button>
+    {{ end }}
   </div>
 </div>
 
@@ -32,9 +39,18 @@ in storage.go so the template stays free of CLI-output tokens.
 <div class="banner" data-testid="storage-import-banner" style="margin-bottom:20px">
   <div style="flex:1">
     <div style="font-weight:550">{{ $v.Importer.BannerText }}</div>
+    {{ if not $v.WriteEnabled }}
     <div style="font-size:11px;color:var(--text-3);margin-top:2px">{{ $v.Importer.Deferred }}</div>
+    {{ end }}
   </div>
+  {{ if $v.WriteEnabled }}
+  <button type="button" class="btn btn-sm" data-testid="storage-import-inspect-btn"
+    onclick="document.getElementById('import-modal-{{ $v.Importer.First }}').style.display='flex';">
+    {{ T "page.storage.import_inspect" }}
+  </button>
+  {{ else }}
   <button type="button" class="btn btn-sm" disabled aria-disabled="true">{{ T "page.storage.import_inspect" }}</button>
+  {{ end }}
 </div>
 {{ end }}
 
@@ -145,7 +161,9 @@ in storage.go so the template stays free of CLI-output tokens.
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.import_heading" }}</h3>
+      {{ if not $v.WriteEnabled }}
       <p class="card-sub">{{ T "page.storage.import_deferred" }}</p>
+      {{ end }}
     </div>
     <table class="tbl">
       <thead>
@@ -154,6 +172,7 @@ in storage.go so the template stays free of CLI-output tokens.
           <th>{{ T "page.storage.import.col.guid" }}</th>
           <th>{{ T "page.storage.import.col.state" }}</th>
           <th>{{ T "page.storage.import.col.topology" }}</th>
+          {{ if $v.WriteEnabled }}<th></th>{{ end }}
         </tr>
       </thead>
       <tbody>
@@ -163,11 +182,116 @@ in storage.go so the template stays free of CLI-output tokens.
           <td><span class="mono" style="font-size:11px">{{ .GUID }}</span></td>
           <td><span class="badge {{ .StateClass }}"><span class="badge-dot"></span>{{ .StateBadge }}</span></td>
           <td class="mono" style="font-size:12px">{{ .Topology }}</td>
+          {{ if $v.WriteEnabled }}
+          <td style="text-align:right">
+            <button type="button" class="btn btn-sm" data-testid="storage-import-row-action"
+              onclick="document.getElementById('import-modal-{{ .Name }}').style.display='flex';">
+              {{ T "page.storage.import.confirm" }}
+            </button>
+          </td>
+          {{ end }}
         </tr>
         {{ end }}
       </tbody>
     </table>
   </div>
 </section>
+{{ end }}
+
+{{ if $v.WriteEnabled }}
+{{ range $v.Imports }}
+<div id="import-modal-{{ .Name }}" class="modal" data-testid="storage-import-modal" data-pool="{{ .Name }}"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:50">
+  <form method="post" action="/ui/admin/storage/import" class="card" style="min-width:420px;max-width:560px;background:var(--bg-1)">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.import.confirm" }}: <span class="mono">{{ .Name }}</span></h3>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+      <input type="hidden" name="name" value="{{ .Name }}">
+      <div class="field">
+        <label style="font-size:12px;color:var(--text-3)">{{ T "page.storage.import.col.topology" }}</label>
+        <div class="mono" style="font-size:12px">{{ .Topology }}</div>
+      </div>
+      <label class="row center" style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
+        <input type="checkbox" name="force" value="1" data-testid="storage-import-force-checkbox">
+        <span>
+          <div>{{ T "page.storage.import.force" }}</div>
+          <div style="font-size:11px;color:var(--warn);margin-top:2px">{{ T "page.storage.import.force_warn" }}</div>
+        </span>
+      </label>
+    </div>
+    <div class="card-foot" style="justify-content:flex-end;gap:8px">
+      <button type="button" class="btn" onclick="document.getElementById('import-modal-{{ .Name }}').style.display='none';">
+        {{ T "page.storage.new_pool.cancel" }}
+      </button>
+      <button type="submit" class="btn btn-primary" data-testid="storage-import-submit-btn">
+        {{ T "page.storage.import.submit" }}
+      </button>
+    </div>
+  </form>
+</div>
+{{ end }}
+
+<div id="new-pool-modal" class="modal" data-testid="storage-new-pool-modal"
+  style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);align-items:center;justify-content:center;z-index:50">
+  <form method="post" action="/ui/admin/storage/pools" class="card" style="min-width:520px;max-width:760px;background:var(--bg-1)">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.new_pool.title" }}</h3>
+    </div>
+    <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+      <div class="field">
+        <label>{{ T "page.storage.new_pool.name" }}</label>
+        <input class="input mono" name="name" required data-testid="storage-new-pool-name">
+        <div class="field-hint">{{ T "page.storage.new_pool.name_hint" }}</div>
+      </div>
+      <div class="field">
+        <label>{{ T "page.storage.new_pool.layout" }}</label>
+        <select name="data_layout" class="input" required data-testid="storage-new-pool-layout">
+          {{ range $v.Layouts }}
+          <option value="{{ .ID }}">{{ .Label }}</option>
+          {{ end }}
+        </select>
+      </div>
+      <div class="field">
+        <label>{{ T "page.storage.new_pool.disks" }}</label>
+        <textarea class="input mono" name="data_disks" rows="4" required data-testid="storage-new-pool-disks"
+          placeholder="/dev/disk/by-id/wwn-..."></textarea>
+        <div class="field-hint">{{ T "page.storage.new_pool.disks_hint" }}</div>
+      </div>
+      <details>
+        <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.special" }}</summary>
+        <div class="field" style="margin-top:8px">
+          <label>{{ T "page.storage.new_pool.layout" }}</label>
+          <select name="special_layout" class="input">
+            <option value="">—</option>
+            <option value="mirror">mirror</option>
+            <option value="raidz1">raidz1</option>
+            <option value="raidz2">raidz2</option>
+            <option value="raidz3">raidz3</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>{{ T "page.storage.new_pool.disks" }}</label>
+          <textarea class="input mono" name="special_disks" rows="2" data-testid="storage-new-pool-special-disks"></textarea>
+          <div class="field-hint">{{ T "page.storage.new_pool.special_hint" }}</div>
+        </div>
+      </details>
+      <details>
+        <summary style="cursor:pointer;font-size:13px;color:var(--text-2)">{{ T "page.storage.new_pool.spares" }}</summary>
+        <div class="field" style="margin-top:8px">
+          <textarea class="input mono" name="spares" rows="2"></textarea>
+        </div>
+      </details>
+    </div>
+    <div class="card-foot" style="justify-content:flex-end;gap:8px">
+      <button type="button" class="btn" onclick="document.getElementById('new-pool-modal').style.display='none';">
+        {{ T "page.storage.new_pool.cancel" }}
+      </button>
+      <button type="submit" class="btn btn-primary" data-testid="storage-new-pool-submit">
+        {{ T "page.storage.new_pool.submit" }}
+      </button>
+    </div>
+  </form>
+</div>
 {{ end }}
 {{ end }}

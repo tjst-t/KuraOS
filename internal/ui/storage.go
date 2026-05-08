@@ -24,6 +24,11 @@ import (
 // storage.Engine without booting any Executor.
 type StorageDeps struct {
 	Engine StorageEngineReader
+	// Writer is the optional write surface (CreatePool / CreateVolume /
+	// CreateSnapshot / ImportPool). When nil, mutation routes return 503.
+	// Tests that only need read coverage leave it unset; the production
+	// wiring in cmd/kura passes a *storage.CLI which implements both.
+	Writer StorageEngineWriter
 }
 
 // StorageEngineReader is the read-only subset of storage.Engine the UI uses.
@@ -35,20 +40,54 @@ type StorageEngineReader interface {
 	ListImportable(ctx context.Context) ([]storage.ImportablePool, error)
 }
 
+// StorageEngineWriter is the mutation surface the New Pool / Snapshot /
+// Import flows need. It deliberately omits destroy / wipe — those are
+// scope-out for S9db742 (DESIGN_PRINCIPLES priority #5: 信頼性 > 機能).
+type StorageEngineWriter interface {
+	CreatePool(ctx context.Context, cfg storage.PoolConfig) error
+	CreateVolume(ctx context.Context, dataset string, opts storage.VolumeOpts) error
+	CreateSnapshot(ctx context.Context, dataset, name string) error
+	Rollback(ctx context.Context, dataset, snapshot string) error
+	ImportPool(ctx context.Context, name string, opts storage.ImportOpts) error
+}
+
 // StorageView is the template view-model. Pre-formatted strings live here so
 // templates stay free of business logic; raw structs travel via Pools/Disks
 // for unit tests that want to assert the underlying values.
 type StorageView struct {
-	Subtitle    string
-	HasPools    bool
-	HasDisks    bool
-	HasImports  bool
-	ImportError string
+	Subtitle     string
+	HasPools     bool
+	HasDisks     bool
+	HasImports   bool
+	ImportError  string
+	WriteEnabled bool
 
 	Pools    []PoolView
 	Disks    []DiskView
 	Imports  []ImportableView
 	Importer ImportBanner
+
+	// Layouts / Presets are surfaced to the New Pool dialog and Volume form.
+	Layouts []LayoutOption
+	Presets []PresetOption
+
+	// FreeDisks is the subset of Disks eligible to be added to a new pool
+	// (Usage = free). The New Pool dialog renders these as a checklist so
+	// the operator never has to hand-type /dev paths.
+	FreeDisks []DiskView
+}
+
+// LayoutOption is one entry in the layout selector. ID is the engine-side
+// VdevLayout string (mirror / raidz1 / ...); Label is the translated copy.
+type LayoutOption struct {
+	ID    string
+	Label string
+}
+
+// PresetOption is one entry in the preset selector for the volume form.
+type PresetOption struct {
+	ID    string
+	Label string
 }
 
 // ImportBanner aggregates the cross-pool count for the page-top banner.
@@ -149,13 +188,25 @@ func (r *Renderer) buildStorageView(ctx context.Context, d StorageDeps) StorageV
 	disks, _ := d.Engine.ListDisks(ctx)
 	imports, _ := d.Engine.ListImportable(ctx)
 
+	disksView := disksToView(r.tr, disks)
+	freeDisks := make([]DiskView, 0)
+	for i, dv := range disksView {
+		if i < len(disks) && disks[i].Usage == storage.DiskUsageFree {
+			freeDisks = append(freeDisks, dv)
+		}
+	}
+
 	view := StorageView{
-		Pools:      poolsToView(r.tr, pools),
-		Disks:      disksToView(r.tr, disks),
-		Imports:    importsToView(r.tr, imports),
-		HasPools:   len(pools) > 0,
-		HasDisks:   len(disks) > 0,
-		HasImports: len(imports) > 0,
+		Pools:        poolsToView(r.tr, pools),
+		Disks:        disksView,
+		Imports:      importsToView(r.tr, imports),
+		HasPools:     len(pools) > 0,
+		HasDisks:     len(disks) > 0,
+		HasImports:   len(imports) > 0,
+		WriteEnabled: d.Writer != nil,
+		Layouts:      layoutOptions(r.tr),
+		Presets:      presetOptions(r.tr),
+		FreeDisks:    freeDisks,
 	}
 	view.Subtitle = r.tr.T(i18n.MsgStorageSubtitle, len(pools), len(disks))
 	if len(imports) > 0 {
@@ -465,6 +516,36 @@ func barClass(capPct int) string {
 	default:
 		return "ok"
 	}
+}
+
+// layoutOptions builds the vdev-layout dropdown source. We surface the v1
+// layouts (single / mirror / raidz1-3); LayoutUnknown stays out so the form
+// can never submit a layout the validator will reject as unknown.
+func layoutOptions(tr translator) []LayoutOption {
+	return []LayoutOption{
+		{ID: string(storage.LayoutSingle), Label: tr.T(i18n.MsgStorageLayoutSingle)},
+		{ID: string(storage.LayoutMirror), Label: tr.T(i18n.MsgStorageLayoutMirror)},
+		{ID: string(storage.LayoutRaidZ1), Label: tr.T(i18n.MsgStorageLayoutRaidZ1)},
+		{ID: string(storage.LayoutRaidZ2), Label: tr.T(i18n.MsgStorageLayoutRaidZ2)},
+		{ID: string(storage.LayoutRaidZ3), Label: tr.T(i18n.MsgStorageLayoutRaidZ3)},
+	}
+}
+
+func presetOptions(tr translator) []PresetOption {
+	out := make([]PresetOption, 0, 3)
+	for _, id := range storage.AllPresets() {
+		var label string
+		switch id {
+		case storage.PresetGeneral:
+			label = tr.T(i18n.MsgStoragePresetGeneral)
+		case storage.PresetMedia:
+			label = tr.T(i18n.MsgStoragePresetMedia)
+		case storage.PresetDatabase:
+			label = tr.T(i18n.MsgStoragePresetDatabase)
+		}
+		out = append(out, PresetOption{ID: string(id), Label: label})
+	}
+	return out
 }
 
 // formatBytes prints SI units with one decimal up to TB. Above PB we'd need

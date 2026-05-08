@@ -37,6 +37,11 @@ type Renderer struct {
 	// this as an optional field rather than a constructor parameter lets the
 	// auth-only acceptance tests (S1e7eeb) keep working unchanged.
 	storageHandler http.Handler
+	// storageWriteHandler is the optional POST surface (create pool /
+	// snapshot / import). Wired by SetStorageWriteHandler. Routes mount it
+	// under /ui/admin/storage/* without the read route ever being able to
+	// shadow it (specific paths win in the storage write mux).
+	storageWriteHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -144,6 +149,11 @@ type PageData struct {
 // passing it to Routes) keeps the signature of Routes stable across sprints.
 func (r *Renderer) SetStorageHandler(h http.Handler) { r.storageHandler = h }
 
+// SetStorageWriteHandler installs the POST surface (create pool / snapshot /
+// import). Must be called before Routes(). Optional — when nil, mutation
+// routes are simply not registered.
+func (r *Renderer) SetStorageWriteHandler(h http.Handler) { r.storageWriteHandler = h }
+
 // adminNavGroups returns the sidebar definition with the active item set.
 // IDs match the prototype's NAV_GROUPS so test fixtures and screen
 // references line up. The 7-item admin row (Dashboard / Storage / Shares /
@@ -183,6 +193,12 @@ func (r *Renderer) Routes() http.Handler {
 		mux.Handle("/ui/admin/storage", r.storageHandler)
 	} else {
 		mux.HandleFunc("/ui/admin/storage", r.handlePlaceholder("storage", i18n.MsgNavStorage))
+	}
+	if r.storageWriteHandler != nil {
+		// Specific routes win over the read handler at /ui/admin/storage.
+		mux.Handle("/ui/admin/storage/pools", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/import", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/snapshots", r.storageWriteHandler)
 	}
 	mux.HandleFunc("/ui/admin/shares", r.handlePlaceholder("shares", i18n.MsgNavShares))
 	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))

@@ -134,5 +134,60 @@
   "page.storage.error.zfs_unavailable": "ZFS が利用できません (zpool コマンドが見つかりません)",
   "page.storage.error.zfs_permission": "ZFS にアクセスする権限がありません",
   "page.storage.error.timeout": "ストレージへの問い合わせがタイムアウトしました",
-  "page.storage.error.unknown": "不明な理由"
+  "page.storage.error.unknown": "不明な理由",
+
+  "page.storage.new_pool.title": "新しいプールを作成",
+  "page.storage.new_pool.name": "プール名",
+  "page.storage.new_pool.name_hint": "英字で始まる識別子 (例: tank, fast)",
+  "page.storage.new_pool.layout": "vdev レイアウト",
+  "page.storage.new_pool.disks": "ディスク",
+  "page.storage.new_pool.disks_hint": "1 行に 1 つ。/dev/disk/by-id 推奨",
+  "page.storage.new_pool.special": "special vdev (任意)",
+  "page.storage.new_pool.special_hint": "メタデータ高速化用 SSD。冗長構成 (mirror など) が必須",
+  "page.storage.new_pool.spares": "ホットスペア (任意)",
+  "page.storage.new_pool.submit": "プールを作成",
+  "page.storage.new_pool.cancel": "キャンセル",
+  "page.storage.new_pool.created": "プール {0} を作成しました",
+
+  "page.storage.layout.single": "single (冗長なし)",
+  "page.storage.layout.mirror": "mirror (2 本以上)",
+  "page.storage.layout.raidz1": "raidz1 (3 本以上、1 本まで故障可)",
+  "page.storage.layout.raidz2": "raidz2 (4 本以上、2 本まで故障可)",
+  "page.storage.layout.raidz3": "raidz3 (5 本以上、3 本まで故障可)",
+
+  "page.storage.tab.volumes": "ボリューム",
+  "page.storage.tab.snapshots": "スナップショット",
+  "page.storage.tab.disks": "ディスク",
+
+  "page.storage.vol.col.path": "ボリューム",
+  "page.storage.vol.col.preset": "プリセット",
+  "page.storage.vol.col.used": "使用量",
+  "page.storage.vol.col.quota": "クォータ",
+  "page.storage.vol.col.snapshots": "スナップショット",
+  "page.storage.vol.empty": "ボリュームはまだありません。プール作成後に追加できます。",
+
+  "page.storage.snap.col.dataset": "データセット",
+  "page.storage.snap.col.name": "名前",
+  "page.storage.snap.col.created": "作成日時",
+  "page.storage.snap.col.used": "サイズ",
+  "page.storage.snap.empty": "スナップショットはまだありません。",
+
+  "page.storage.preset.general": "汎用 (recordsize=128K, zstd)",
+  "page.storage.preset.media": "メディア (recordsize=1M, zstd)",
+  "page.storage.preset.database": "DB (recordsize=16K, zstd, special_small_blocks=64K)",
+
+  "page.storage.import.confirm": "インポート",
+  "page.storage.import.force": "強制インポート (force) を許可する",
+  "page.storage.import.force_warn": "他ホストで使用中だった可能性があります。データ破損のリスクがあるため、十分確認したうえでチェックしてください。",
+  "page.storage.import.success": "プール {0} をインポートしました",
+  "page.storage.import.submit": "インポートを実行",
+
+  "page.storage.err.pool_name_invalid": "プール名が無効です: {0}",
+  "page.storage.err.layout_min_disks": "{0} 構成にはディスクが {1} 本以上必要です (指定: {2} 本)",
+  "page.storage.err.special_not_redundant": "special vdev は冗長構成 (mirror または raidzN) が必須です。単一 SSD は許可されません",
+  "page.storage.err.duplicate_disk": "同じディスクが複数の vdev / spare に指定されています: {0}",
+  "page.storage.err.small_blocks_without_special": "small_block_threshold を設定するには special vdev が必要です",
+  "page.storage.err.preset_unknown": "未知のプリセットです: {0}",
+  "page.storage.err.create_failed": "プール / ボリュームの作成に失敗しました: {0}",
+  "page.storage.err.import_failed": "プールのインポートに失敗しました: {0}"
 }
