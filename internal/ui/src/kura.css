@@ -535,6 +535,15 @@
   .gap-lg { gap: 24px; }
   .flex-1 { flex: 1; }
 
+  /* When any modal is visible, the page beneath must not respond to wheel
+     / arrow-key / spacebar scrolling. The `modal-open` class is added to
+     <body> by the inline observer in storage.tmpl. overscroll-behavior on
+     the modal body prevents scroll chaining once internal scrolling
+     reaches its edges. */
+  body.modal-open { overflow: hidden; }
+  .modal > .card > .card-body,
+  .modal > form.card > .card-body { overscroll-behavior: contain; }
+
   /* Modal — ported from prototype with a single-element variant.
      Templates use one <div class="modal"> with inline display:flex toggle:
      the same element is both the dimming backdrop AND the centering layout.
