@@ -1,0 +1,65 @@
+{
+  "sprint_id": "S464e47",
+  "mode": "autonomous",
+  "stories_with_gui": ["S464e47-1"],
+  "scenarios": [
+    {
+      "story": "S464e47-1",
+      "name": "Sidebar 7-item navigation",
+      "ac_id": "AC-S464e47-1-1",
+      "states": [
+        "initial /ui/admin/dashboard",
+        "click nav-item 'storage' -> /ui/admin/storage",
+        "click nav-item 'shares' -> /ui/admin/shares",
+        "click nav-item 'users' -> /ui/admin/users",
+        "click nav-item 'network' -> /ui/admin/network",
+        "click nav-item 'apps' -> /ui/admin/apps",
+        "click nav-item 'settings' -> /ui/admin/settings",
+        "click nav-item 'dashboard' -> /ui/admin/dashboard"
+      ],
+      "endpoints": [
+        {"method": "GET", "path": "/ui/admin", "response": "302 Location: /ui/admin/dashboard"},
+        {"method": "GET", "path": "/ui/admin/dashboard", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/storage", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/shares", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/users", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/network", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/apps", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/admin/settings", "response": "200 text/html"},
+        {"method": "GET", "path": "/ui/static/kura.css", "response": "200 text/css"}
+      ],
+      "test_files": [
+        "tests/e2e/admin-shell.e2e.spec.ts",
+        "tests/mock/admin-shell.mock.spec.ts"
+      ]
+    },
+    {
+      "story": "S464e47-1",
+      "name": "i18n coverage on rendered output",
+      "ac_id": "AC-S464e47-1-2",
+      "states": [
+        "render dashboard -> visible text matches ja.json values",
+        "no MessageID literal appears in rendered body"
+      ],
+      "test_files": [
+        "tests/e2e/admin-shell.e2e.spec.ts",
+        "tests/acceptance/i18n-coverage.sh"
+      ]
+    },
+    {
+      "story": "S464e47-1",
+      "name": "Theme toggle (light/dark)",
+      "ac_id": "AC-S464e47-1-1 (extension)",
+      "states": [
+        "initial light",
+        "click toggle -> dark",
+        "click toggle -> light",
+        "invalid stored theme -> fallback to light"
+      ],
+      "test_files": [
+        "tests/e2e/admin-shell.e2e.spec.ts",
+        "tests/mock/admin-shell.mock.spec.ts"
+      ]
+    }
+  ]
+}

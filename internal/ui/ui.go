@@ -1,0 +1,252 @@
+// Package ui renders the htmx + html/template admin shell.
+//
+// Templates and the Tailwind-compiled stylesheet are embedded so the kura
+// binary stays self-contained. The visual SSOT is prototype/claude_design/;
+// templates here mirror that prototype's HTML structure and CSS class
+// vocabulary verbatim — design changes flow through the prototype, not
+// through these files.
+package ui
+
+import (
+	"bytes"
+	"embed"
+	"fmt"
+	"html/template"
+	"io/fs"
+	"net/http"
+	"strings"
+
+	"github.com/kuraos-org/kura/i18n"
+)
+
+//go:embed templates/layouts/*.tmpl templates/partials/*.tmpl templates/pages/*.tmpl
+var templatesFS embed.FS
+
+//go:embed dist/*
+var distFS embed.FS
+
+// Renderer owns the parsed template tree. Templates are parsed once at
+// construction and reused per request — html/template is safe for concurrent
+// Execute calls.
+type Renderer struct {
+	tr        *i18n.Translator
+	version   string
+	templates *template.Template
+}
+
+// New parses every embedded template into a single tree so {{ template ... }}
+// references between files resolve. The translator is wired into the tree's
+// FuncMap so templates can call {{ T "msg.id" }} directly.
+func New(tr *i18n.Translator, version string) (*Renderer, error) {
+	if tr == nil {
+		return nil, fmt.Errorf("ui: translator is nil")
+	}
+	r := &Renderer{tr: tr, version: version}
+	funcs := template.FuncMap{
+		"T": func(id string, args ...any) string {
+			return tr.T(i18n.MessageID(id), args...)
+		},
+	}
+	t := template.New("kura").Funcs(funcs)
+
+	files, err := collectTemplates()
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range files {
+		raw, err := fs.ReadFile(templatesFS, f)
+		if err != nil {
+			return nil, fmt.Errorf("ui: read template %q: %w", f, err)
+		}
+		// Use the file's relative path as the template name so duplicates are
+		// surfaced as "redefinition" errors at parse time rather than silently
+		// overwriting each other at execution time.
+		if _, err := t.New(f).Parse(string(raw)); err != nil {
+			return nil, fmt.Errorf("ui: parse %q: %w", f, err)
+		}
+	}
+	r.templates = t
+	return r, nil
+}
+
+func collectTemplates() ([]string, error) {
+	var out []string
+	err := fs.WalkDir(templatesFS, "templates", func(p string, d fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if strings.HasSuffix(p, ".tmpl") {
+			out = append(out, p)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("ui: walk templates: %w", err)
+	}
+	return out, nil
+}
+
+// NavItem is one entry in the sidebar.
+type NavItem struct {
+	ID      string
+	LabelID string
+	Icon    string
+	Href    string
+	Badge   string
+	Active  bool
+}
+
+// NavGroup groups related sidebar items under a section heading.
+type NavGroup struct {
+	LabelID string
+	Items   []NavItem
+}
+
+type SidebarData struct {
+	Groups []NavGroup
+}
+
+type UserData struct {
+	Name     string
+	Initials string
+	RoleID   string
+}
+
+type Crumb struct {
+	Label string
+	Last  bool
+}
+
+// PageData is what every admin template receives. Page-specific extras hang
+// off Extra so renderPage stays generic.
+type PageData struct {
+	Locale      string
+	Version     string
+	PageTitle   string
+	PageTitleID string
+	Sidebar     SidebarData
+	User        UserData
+	Breadcrumbs []Crumb
+	Extra       any
+}
+
+// adminNavGroups returns the sidebar definition with the active item set.
+// IDs match the prototype's NAV_GROUPS so test fixtures and screen
+// references line up. The 7-item admin row (Dashboard / Storage / Shares /
+// Users / Network / Apps / Settings) is fixed by AC-S464e47-1-1.
+func adminNavGroups(activeID string) []NavGroup {
+	items := []NavItem{
+		{ID: "dashboard", LabelID: string(i18n.MsgNavDashboard), Icon: "dashboard", Href: "/ui/admin/dashboard"},
+		{ID: "storage", LabelID: string(i18n.MsgNavStorage), Icon: "storage", Href: "/ui/admin/storage"},
+		{ID: "shares", LabelID: string(i18n.MsgNavShares), Icon: "share", Href: "/ui/admin/shares"},
+		{ID: "users", LabelID: string(i18n.MsgNavUsers), Icon: "users", Href: "/ui/admin/users"},
+		{ID: "network", LabelID: string(i18n.MsgNavNetwork), Icon: "network", Href: "/ui/admin/network"},
+		{ID: "apps", LabelID: string(i18n.MsgNavApps), Icon: "apps", Href: "/ui/admin/apps"},
+		{ID: "settings", LabelID: string(i18n.MsgNavSettings), Icon: "settings", Href: "/ui/admin/settings"},
+	}
+	for i := range items {
+		items[i].Active = items[i].ID == activeID
+	}
+	return []NavGroup{{LabelID: string(i18n.MsgNavSectionAdmin), Items: items}}
+}
+
+// Routes returns the http.Handler for everything under /ui/admin/* plus
+// /ui/static/*. The caller mounts this on its top-level router.
+func (r *Renderer) Routes() http.Handler {
+	mux := http.NewServeMux()
+
+	// Static assets (kura.css, htmx). Served from embedded dist/.
+	staticFS, err := fs.Sub(distFS, "dist")
+	if err == nil {
+		mux.Handle("/ui/static/", http.StripPrefix("/ui/static/", http.FileServer(http.FS(staticFS))))
+	}
+
+	// Page handlers.
+	mux.HandleFunc("/ui/admin", r.redirectToDashboard)
+	mux.HandleFunc("/ui/admin/", r.redirectToDashboard)
+	mux.HandleFunc("/ui/admin/dashboard", r.handleDashboard)
+	mux.HandleFunc("/ui/admin/storage", r.handlePlaceholder("storage", i18n.MsgNavStorage))
+	mux.HandleFunc("/ui/admin/shares", r.handlePlaceholder("shares", i18n.MsgNavShares))
+	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
+	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
+	mux.HandleFunc("/ui/admin/apps", r.handlePlaceholder("apps", i18n.MsgNavApps))
+	mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
+
+	return mux
+}
+
+func (r *Renderer) redirectToDashboard(w http.ResponseWriter, req *http.Request) {
+	http.Redirect(w, req, "/ui/admin/dashboard", http.StatusFound)
+}
+
+func (r *Renderer) handleDashboard(w http.ResponseWriter, req *http.Request) {
+	if req.Method != http.MethodGet {
+		w.Header().Set("Allow", "GET")
+		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+		return
+	}
+	data := r.buildPageData("dashboard", i18n.MsgNavDashboard)
+	r.render(w, "templates/pages/dashboard.tmpl", data)
+}
+
+func (r *Renderer) handlePlaceholder(activeID string, titleID i18n.MessageID) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		data := r.buildPageData(activeID, titleID)
+		r.render(w, "templates/pages/placeholder.tmpl", data)
+	}
+}
+
+func (r *Renderer) buildPageData(activeID string, titleID i18n.MessageID) PageData {
+	title := r.tr.T(titleID)
+	return PageData{
+		Locale:      r.tr.Locale(),
+		Version:     r.version,
+		PageTitle:   title,
+		PageTitleID: string(titleID),
+		Sidebar:     SidebarData{Groups: adminNavGroups(activeID)},
+		User:        UserData{Name: "admin", Initials: "AD", RoleID: string(i18n.MsgRoleAdmin)},
+		Breadcrumbs: []Crumb{
+			{Label: r.tr.T(i18n.MsgBrandName)},
+			{Label: title, Last: true},
+		},
+	}
+}
+
+// render executes the layout against the supplied page template. We render
+// into a buffer first so that template errors return a 500 with no partial
+// body written.
+func (r *Renderer) render(w http.ResponseWriter, pageTemplate string, data PageData) {
+	clone, err := r.templates.Clone()
+	if err != nil {
+		http.Error(w, "template clone error", http.StatusInternalServerError)
+		return
+	}
+	// Re-parse the page template into the clone so its {{ define "content" }}
+	// overrides the layout's empty block. Without this each request would race
+	// to redefine "content" on the shared tree.
+	raw, err := fs.ReadFile(templatesFS, pageTemplate)
+	if err != nil {
+		http.Error(w, "template read error", http.StatusInternalServerError)
+		return
+	}
+	if _, err := clone.New(pageTemplate).Parse(string(raw)); err != nil {
+		http.Error(w, "template parse error", http.StatusInternalServerError)
+		return
+	}
+	var buf bytes.Buffer
+	if err := clone.ExecuteTemplate(&buf, "templates/layouts/admin.tmpl", data); err != nil {
+		http.Error(w, "template execute error: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	_, _ = w.Write(buf.Bytes())
+}

@@ -1,0 +1,34 @@
+{
+  "sprint_id": "S464e47",
+  "ran_at": "2026-05-08T00:50:00Z",
+  "go_test": {
+    "command": "go test ./...",
+    "result": "pass",
+    "packages": [
+      {"name": "github.com/kuraos-org/kura/i18n", "status": "ok"},
+      {"name": "github.com/kuraos-org/kura/internal/config", "status": "ok"},
+      {"name": "github.com/kuraos-org/kura/internal/gateway", "status": "ok"},
+      {"name": "github.com/kuraos-org/kura/internal/store", "status": "ok"},
+      {"name": "github.com/kuraos-org/kura/internal/ui", "status": "ok"},
+      {"name": "github.com/kuraos-org/kura/cmd/kura", "status": "no test files"},
+      {"name": "github.com/kuraos-org/kura/tests/acceptance/listtables", "status": "no test files"}
+    ]
+  },
+  "lint": {"gofmt": "clean", "go_vet": "clean"},
+  "acceptance_scripts": [
+    {"file": "tests/acceptance/bootstrap.sh", "result": "2 passed, 0 failed"},
+    {"file": "tests/acceptance/store.sh", "result": "1 passed, 0 failed"},
+    {"file": "tests/acceptance/i18n-coverage.sh", "result": "2 passed, 0 failed"},
+    {"file": "tests/acceptance/config-roundtrip.sh", "result": "3 passed, 0 failed"}
+  ],
+  "smoke": {
+    "command": "make build && start kura with KURA_PORT, curl all routes",
+    "result": "200 /healthz, 200 /ui/admin/dashboard, 200 /ui/admin/storage, 200 /ui/admin/users, 200 /ui/static/kura.css, 302 /ui/admin -> /ui/admin/dashboard"
+  },
+  "tailwind": {
+    "input": "internal/ui/src/kura.css",
+    "output": "internal/ui/dist/kura.css",
+    "size_bytes": 12015,
+    "minified": true
+  }
+}

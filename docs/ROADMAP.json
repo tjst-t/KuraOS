@@ -123,84 +123,84 @@
     },
     "S464e47": {
       "title": "UI シェル と config.json import/export 雛形",
-      "status": "pending",
+      "status": "done",
       "description": "htmx + Tailwind の管理 UI スケルトン (左サイドバー固定)、ダッシュボード placeholder、config.json import/export/diff/apply の枠組みを Engine 抜きで先に作る。視覚仕様は prototype/claude_design/index.html, Dashboard.html, shared/shared.css 準拠。Fog palette と IBM Plex を Tailwind config に移植し、ライト/ダーク両対応をこの sprint で完成させる。",
       "milestone": false,
       "stories": {
         "S464e47-1": {
           "title": "管理 UI のレイアウトとサイドバー",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、左サイドバーから Storage/Shares/Users/Network/Apps/Settings へ遷移できる UI シェルを使いたい。なぜなら、機能を順次組み込んでいく土台が必要だから。",
           "acceptance_criteria": [
             {
               "id": "AC-S464e47-1-1",
               "description": "/ui/admin にアクセスすると Tailwind ベースのレイアウトが表示され、サイドバーの 7 項目をクリックできる",
-              "test": "[AC-S464e47-1-1] in tests/e2e/admin-shell.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S464e47-1-1] in tests/e2e/admin-shell.e2e.spec.ts; mirrored by internal/ui/ui_test.go (TestAdminPaths_ReturnHTML, TestAdminDashboard_RendersJaStrings)",
+              "status": "passing"
             },
             {
               "id": "AC-S464e47-1-2",
               "description": "全 UI 文字列が i18n.T 経由で出力されており、ja.json にキーが存在する",
-              "test": "[AC-S464e47-1-2] in tests/acceptance/i18n-coverage.sh",
-              "status": "pending"
+              "test": "[AC-S464e47-1-2] in tests/acceptance/i18n-coverage.sh + internal/ui/ui_test.go::TestAdminDashboard_HasNoRawMessageIDs / TestAllSidebarMessageIDsPresent",
+              "status": "passing"
             }
           ],
           "tasks": {
             "S464e47-1-1": {
               "title": "html/template + embed.FS UI 構成",
-              "description": "ui/templates/ にレイアウト・パーシャルを配置、embed で配信",
-              "status": "pending"
+              "description": "internal/ui/templates/ にレイアウト・パーシャルを配置、embed で配信",
+              "status": "done"
             },
             "S464e47-1-2": {
               "title": "Tailwind 統合",
-              "description": "Tailwind CLI でビルドし ui/dist/ に出力、make build から自動実行",
-              "status": "pending"
+              "description": "Tailwind CLI でビルドし internal/ui/dist/ に出力、make build から自動実行",
+              "status": "done"
             },
             "S464e47-1-3": {
               "title": "Fog パレットの token 化",
               "description": "Tailwind config に Fog パレット相当のカラーを定義",
-              "status": "pending"
+              "status": "done"
             },
             "S464e47-1-4": {
               "title": "Dashboard placeholder",
               "description": "サイドバーから到達可能な空のダッシュボードページを置く",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S464e47-2": {
           "title": "config.json import/export/diff/apply の枠組み",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、kura config export と kura config apply --dry-run が空状態で動くようにしたい。なぜなら、SSOT を config.json に置く設計を最初から徹底するため。",
           "acceptance_criteria": [
             {
               "id": "AC-S464e47-2-1",
               "description": "kura config export を実行すると、現在の SQLite 状態を反映した config.json が標準出力に出る (空 SQLite なら空セクションのまま)",
-              "test": "[AC-S464e47-2-1] in tests/acceptance/config-roundtrip.sh",
-              "status": "pending"
+              "test": "[AC-S464e47-2-1] in tests/acceptance/config-roundtrip.sh + internal/config/config_test.go::TestRoundTrip_EmptyConfigPreservesEnvelope",
+              "status": "passing"
             },
             {
               "id": "AC-S464e47-2-2",
               "description": "kura config apply <file> --dry-run で diff が表示される",
-              "test": "[AC-S464e47-2-2] in tests/acceptance/config-roundtrip.sh",
-              "status": "pending"
+              "test": "[AC-S464e47-2-2] in tests/acceptance/config-roundtrip.sh + internal/config/config_test.go::TestDiff_TableDriven / TestFormatPlan_StableOrder",
+              "status": "passing"
             }
           ],
           "tasks": {
             "S464e47-2-1": {
               "title": "config パッケージのスキーマ型定義",
               "description": "design.md §3.1 の config.json 全体構造を Go 構造体にする (空フィールドのまま)",
-              "status": "pending"
+              "status": "done"
             },
             "S464e47-2-2": {
               "title": "import/export の round-trip テスト",
               "description": "Go 構造体 ↔ JSON が損失なくラウンドトリップすることをテーブルドリブンテストで担保",
-              "status": "pending"
+              "status": "done"
             },
             "S464e47-2-3": {
               "title": "Engine ApplyAdapter interface",
               "description": "各 Engine が後で実装する Apply(ctx, oldCfg, newCfg) Diff interface を定義",
-              "status": "pending"
+              "status": "done"
             }
           }
         }

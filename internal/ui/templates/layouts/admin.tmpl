@@ -1,0 +1,62 @@
+{{- /*
+admin.tmpl — root layout for /ui/admin/*. Sticks to the prototype's structure
+verbatim: <html data-theme> wrapper, <body> with .app grid (sidebar + main).
+The inline boot script is the only client JS — it restores theme + sidebar
+collapsed state from localStorage before paint to avoid a light/dark flash.
+*/ -}}
+<!doctype html>
+<html lang="{{ .Locale }}" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ .PageTitle }} — {{ T "brand.name" }}</title>
+<link rel="stylesheet" href="/ui/static/kura.css" />
+<script src="/ui/static/htmx.min.js" defer></script>
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem('kura-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+      var collapsed = localStorage.getItem('kura-collapsed') === 'true';
+      document.addEventListener('DOMContentLoaded', function () {
+        var app = document.querySelector('.app');
+        if (app) app.setAttribute('data-collapsed', collapsed ? 'true' : 'false');
+      });
+    } catch (e) {}
+  })();
+</script>
+</head>
+<body>
+<div class="app" data-collapsed="false">
+  {{ template "sidebar" . }}
+  <div class="main">
+    {{ template "header" . }}
+    <main class="content" id="content">
+      {{ block "content" . }}{{ end }}
+    </main>
+  </div>
+</div>
+<script>
+  (function () {
+    function toggleTheme() {
+      var html = document.documentElement;
+      var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('kura-theme', next); } catch (e) {}
+      var icon = document.getElementById('theme-icon');
+      if (icon) icon.setAttribute('data-theme', next);
+    }
+    function toggleSidebar() {
+      var app = document.querySelector('.app');
+      var next = app.getAttribute('data-collapsed') !== 'true';
+      app.setAttribute('data-collapsed', next ? 'true' : 'false');
+      try { localStorage.setItem('kura-collapsed', next ? 'true' : 'false'); } catch (e) {}
+    }
+    var t = document.getElementById('btn-toggle-theme');
+    if (t) t.addEventListener('click', toggleTheme);
+    var s = document.getElementById('btn-toggle-sidebar');
+    if (s) s.addEventListener('click', toggleSidebar);
+  })();
+</script>
+</body>
+</html>

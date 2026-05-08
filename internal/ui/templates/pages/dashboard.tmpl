@@ -1,0 +1,23 @@
+{{- /*
+dashboard.tmpl — placeholder dashboard. Engines are not yet wired in
+S464e47, so this page intentionally shows the page header chrome and an
+empty-state banner that explains the gap. Subsequent sprints replace the
+banner with stat cards / pool list / recent events from the prototype.
+*/ -}}
+{{ define "content" }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.dashboard.title" }}</h1>
+    <p class="page-sub">{{ T "page.dashboard.subtitle" }}</p>
+  </div>
+  <div class="row gap-sm" style="display:flex;gap:8px;">
+    <button type="button" class="btn" disabled aria-disabled="true">{{ T "btn.refresh" }}</button>
+  </div>
+</div>
+
+<div class="banner" data-testid="dashboard-empty">
+  <div style="flex:1">
+    <div style="font-weight:550">{{ T "page.dashboard.empty" }}</div>
+  </div>
+</div>
+{{ end }}
