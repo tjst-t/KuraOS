@@ -56,9 +56,12 @@ type SharesView struct {
 	HasShares bool
 	Shares    []ShareRow
 
-	// Selected is the share currently shown in the detail card. nil when the
-	// list is empty.
+	// Selected is the share currently shown in the detail card. nil when no
+	// row has been clicked (the placeholder pane is shown instead).
 	Selected *ShareRow
+	// SelectedID is the row id from ?selected=<id>; the template uses it to
+	// mark the active row in the list (aria-selected="true").
+	SelectedID string
 
 	Presets   []SharePresetOption
 	Protocols []ShareProtocolOption
@@ -176,6 +179,24 @@ func (r *Renderer) SharesDeleteHandler(d SharesDeps) http.Handler {
 
 func (r *Renderer) handleSharesGet(w http.ResponseWriter, req *http.Request, d SharesDeps, formError string) {
 	view := r.buildSharesView(req.Context(), d, formError)
+	// ?selected=<id> picks which row's detail card is shown. Empty / absent
+	// means "show the placeholder asking the operator to pick a row" — the
+	// previous auto-select-first behaviour was confusing because the right
+	// pane didn't follow the row clicks (ROADMAP hotfix).
+	if id := strings.TrimSpace(req.URL.Query().Get("selected")); id != "" {
+		view.SelectedID = id
+		view.Selected = nil
+		for i := range view.Shares {
+			if view.Shares[i].ID == id {
+				s := view.Shares[i]
+				view.Selected = &s
+				break
+			}
+		}
+	} else {
+		view.SelectedID = ""
+		view.Selected = nil
+	}
 	data := r.buildPageData("shares", i18n.MsgSharesTitle)
 	data.Extra = view
 	r.render(w, "templates/pages/shares.tmpl", data)
@@ -265,11 +286,8 @@ func (r *Renderer) buildSharesView(ctx context.Context, d SharesDeps, formError 
 		DefaultsLead:      r.tr.T(i18n.MsgSharesDefaultsLead),
 		Defaults:          shareDefaults(),
 	}
-	if len(rows) > 0 {
-		// First row is the default selection (mirrors the prototype state).
-		s := rows[0]
-		view.Selected = &s
-	}
+	// Selection is decided by the handler's ?selected= parsing, not here —
+	// the placeholder pane on the right is the no-selection default.
 	return view
 }
 

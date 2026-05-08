@@ -301,6 +301,7 @@
   "page.shares.form.path_mode_freetext": "パスを直接入力",
   "page.shares.form.path_dataset_hint": "公開する ZFS データセットを選択。マウントパスが自動で入る",
   "page.shares.form.path_no_datasets": "選択可能なデータセットがありません。先にボリュームを作成してください。",
+  "page.shares.detail.placeholder": "左の一覧から共有を選択すると、詳細がここに表示されます。",
   "page.shares.form.protocol": "プロトコル",
   "page.shares.form.preset": "用途プリセット",
   "page.shares.form.access": "デフォルトアクセス",

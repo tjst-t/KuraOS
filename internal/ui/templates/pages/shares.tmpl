@@ -47,7 +47,12 @@ in shares.go so the template stays free of CLI-output tokens.
       </tr></thead>
       <tbody>
         {{ range $v.Shares }}
-        <tr data-testid="shares-row" data-share-id="{{ .ID }}" data-share-name="{{ .Name }}">
+        <tr data-testid="shares-row"
+            data-share-id="{{ .ID }}"
+            data-share-name="{{ .Name }}"
+            data-row-link="/ui/admin/shares?selected={{ .ID }}"
+            {{ if eq $v.SelectedID .ID }}aria-selected="true"{{ end }}
+            style="cursor:pointer">
           <td><strong>{{ .Name }}</strong></td>
           <td><span class="badge">{{ .ProtocolLabel }}</span></td>
           <td class="td-mono">{{ .Path }}</td>
@@ -64,7 +69,13 @@ in shares.go so the template stays free of CLI-output tokens.
     </table>
   </div>
 
-  {{ if $v.Selected }}
+  {{ if not $v.Selected }}
+  <div class="card" data-testid="shares-detail-empty">
+    <div class="card-body" style="padding:48px 24px;text-align:center">
+      <p class="muted" style="margin:0;font-size:13px">{{ T "page.shares.detail.placeholder" }}</p>
+    </div>
+  </div>
+  {{ else }}
   <div class="card" data-testid="shares-detail">
     <div class="card-head">
       <div>

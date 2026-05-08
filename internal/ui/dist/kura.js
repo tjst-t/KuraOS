@@ -244,10 +244,39 @@
     });
   }
 
+  // ---------- Row links ----------
+  // <tr data-row-link="/ui/admin/shares?selected=abc">…</tr> turns the row
+  // into a clickable navigation target without forcing a full <a> wrap
+  // (which is invalid inside a <tbody>). Click anywhere on the row → go.
+  // Cmd/Ctrl-click opens in a new tab. Clicks that land on a real <a>,
+  // <button>, or form control inside the row are left alone so per-row
+  // actions still work.
+  function wireRowLinks() {
+    document.querySelectorAll("[data-row-link]").forEach(function (row) {
+      row.addEventListener("click", function (e) {
+        var t = e.target;
+        // Don't hijack clicks on real interactive elements within the row.
+        while (t && t !== row) {
+          var tag = t.tagName;
+          if (tag === "A" || tag === "BUTTON" || tag === "INPUT" || tag === "SELECT" || tag === "LABEL") return;
+          t = t.parentNode;
+        }
+        var href = row.getAttribute("data-row-link");
+        if (!href) return;
+        if (e.metaKey || e.ctrlKey || e.button === 1) {
+          window.open(href, "_blank");
+        } else {
+          window.location.href = href;
+        }
+      });
+    });
+  }
+
   function init() {
     wireModals();
     wireTabs();
     wireRadioPanes();
+    wireRowLinks();
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);
