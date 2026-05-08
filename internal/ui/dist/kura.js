@@ -143,8 +143,111 @@
 
   // ---------- Boot ----------
 
+  // ---------- Server-rendered tabs with client-side switching ----------
+  //
+  //   <a class="tab" data-tab-target="volumes" href="?tab=volumes">…</a>
+  //   <section data-tab-panel="volumes" data-active="true">…</section>
+  //
+  // All panels are rendered at once; CSS hides those whose data-active is
+  // "false". Clicking a tab swaps data-active across siblings and updates
+  // the URL via History.pushState so the back button works and the URL
+  // stays bookmarkable. Server-side ?tab= still picks the initial active
+  // panel for fresh page loads, so no-JS browsers degrade to full-page
+  // reloads gracefully.
+  function wireTabs() {
+    var tabs = document.querySelectorAll("[data-tab-target]");
+    if (!tabs.length) return;
+
+    // Build a map { panelId -> panel-element } once. Panels live anywhere
+    // in the DOM (a sibling section, a child of one, …) so we look them up
+    // by [data-tab-panel] not by a relative selector.
+    var panels = {};
+    document.querySelectorAll("[data-tab-panel]").forEach(function (p) {
+      panels[p.getAttribute("data-tab-panel")] = p;
+    });
+
+    function activate(target, push) {
+      // Tab strip: only the matching tab gets data-active="true".
+      tabs.forEach(function (t) {
+        t.setAttribute(
+          "data-active",
+          t.getAttribute("data-tab-target") === target ? "true" : "false"
+        );
+      });
+      // Panels: same.
+      Object.keys(panels).forEach(function (id) {
+        panels[id].setAttribute("data-active", id === target ? "true" : "false");
+      });
+      if (push && window.history && window.history.pushState) {
+        var url = new URL(window.location.href);
+        url.searchParams.set("tab", target);
+        window.history.pushState({ tab: target }, "", url.toString());
+      }
+    }
+
+    tabs.forEach(function (tab) {
+      tab.addEventListener("click", function (e) {
+        e.preventDefault();
+        var target = tab.getAttribute("data-tab-target");
+        if (target) activate(target, true);
+      });
+    });
+
+    // Browser back/forward should also swap panels.
+    window.addEventListener("popstate", function () {
+      var url = new URL(window.location.href);
+      var t = url.searchParams.get("tab");
+      if (t && panels[t]) activate(t, false);
+    });
+  }
+
+  // ---------- Radio-driven pane swap ----------
+  //
+  // Pattern (declarative, no JS per page):
+  //
+  //   <input type="radio" name="X" value="A" data-radio-shows="pane-a">
+  //   <input type="radio" name="X" value="B" data-radio-shows="pane-b">
+  //   <div data-testid="pane-a">…</div>
+  //   <div data-testid="pane-b">…</div>
+  //
+  // When the radio changes, the pane whose data-testid matches
+  // data-radio-shows of the now-checked radio gets display:""; siblings
+  // sharing the same name get display:none. Used by the Share form's
+  // "dataset picker / free-text" toggle.
+  function wireRadioPanes() {
+    var radios = document.querySelectorAll("[data-radio-shows]");
+    if (!radios.length) return;
+
+    function panesForName(name) {
+      var ps = {};
+      document.querySelectorAll('input[type="radio"][name="' + name + '"][data-radio-shows]').forEach(function (r) {
+        var id = r.getAttribute("data-radio-shows");
+        var el = document.querySelector('[data-testid="' + id + '"]');
+        if (el) ps[id] = el;
+      });
+      return ps;
+    }
+
+    function update(radio) {
+      var panes = panesForName(radio.name);
+      var target = radio.getAttribute("data-radio-shows");
+      Object.keys(panes).forEach(function (id) {
+        panes[id].style.display = id === target ? "" : "none";
+      });
+    }
+
+    radios.forEach(function (r) {
+      r.addEventListener("change", function () {
+        if (r.checked) update(r);
+      });
+      if (r.checked) update(r);
+    });
+  }
+
   function init() {
     wireModals();
+    wireTabs();
+    wireRadioPanes();
   }
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init);

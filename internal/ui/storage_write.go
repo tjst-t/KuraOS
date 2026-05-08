@@ -30,6 +30,9 @@ func (r *Renderer) StorageWriteHandler(d StorageDeps) http.Handler {
 	mux.HandleFunc("/ui/admin/storage/quota", r.handleSetQuota(d))
 	mux.HandleFunc("/ui/admin/storage/snapshots", r.handleCreateSnapshot(d))
 	mux.HandleFunc("/ui/admin/storage/snapshots/rollback", r.handleRollback(d))
+	mux.HandleFunc("/ui/admin/storage/pools/destroy", r.handleDestroyPool(d))
+	mux.HandleFunc("/ui/admin/storage/volumes/destroy", r.handleDestroyVolume(d))
+	mux.HandleFunc("/ui/admin/storage/snapshots/destroy", r.handleDestroySnapshot(d))
 	return mux
 }
 
@@ -148,7 +151,20 @@ func (r *Renderer) handleCreateVolume(d StorageDeps) http.HandlerFunc {
 			http.Error(w, "bad form", http.StatusBadRequest)
 			return
 		}
-		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		// The form supplies pool + path separately so the operator picks
+		// the parent pool from a dropdown rather than re-typing it. Older
+		// callers (and tests written against the previous shape) still send
+		// a single `dataset` field, so we accept either.
+		var dataset string
+		if d := strings.TrimSpace(req.FormValue("dataset")); d != "" {
+			dataset = d
+		} else {
+			pool := strings.TrimSpace(req.FormValue("pool"))
+			path := strings.Trim(strings.TrimSpace(req.FormValue("path")), "/")
+			if pool != "" && path != "" {
+				dataset = pool + "/" + path
+			}
+		}
 		opts := storage.VolumeOpts{
 			Preset:     storage.PresetID(strings.TrimSpace(req.FormValue("preset"))),
 			MountPoint: strings.TrimSpace(req.FormValue("mountpoint")),
@@ -222,6 +238,105 @@ func (r *Renderer) handleRollback(d StorageDeps) http.HandlerFunc {
 		dataset := strings.TrimSpace(req.FormValue("dataset"))
 		snap := strings.TrimSpace(req.FormValue("snapshot"))
 		if err := d.Writer.Rollback(req.Context(), dataset, snap); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleDestroyPool serves POST /ui/admin/storage/pools/destroy. Form
+// fields: name (required), confirm (must equal name — the modal asks the
+// operator to retype it), force (optional checkbox). The retype check is
+// the last UI guard before the engine call; the engine itself does NO
+// re-confirmation so this layer is the safety net.
+func (r *Renderer) handleDestroyPool(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		name := strings.TrimSpace(req.FormValue("name"))
+		confirm := strings.TrimSpace(req.FormValue("confirm"))
+		if name == "" || confirm != name {
+			r.writeStorageError(w, fmt.Errorf("destroy confirmation mismatch"))
+			return
+		}
+		force := req.FormValue("force") == "1" || req.FormValue("force") == "on"
+		if err := d.Writer.DestroyPool(req.Context(), name, force); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleDestroyVolume serves POST /ui/admin/storage/volumes/destroy.
+// Form: dataset, confirm (must equal dataset), recursive (checkbox).
+func (r *Renderer) handleDestroyVolume(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		confirm := strings.TrimSpace(req.FormValue("confirm"))
+		if dataset == "" || confirm != dataset {
+			r.writeStorageError(w, fmt.Errorf("destroy confirmation mismatch"))
+			return
+		}
+		recursive := req.FormValue("recursive") == "1" || req.FormValue("recursive") == "on"
+		if err := d.Writer.DestroyVolume(req.Context(), dataset, recursive); err != nil {
+			r.writeStorageError(w, err)
+			return
+		}
+		w.Header().Set("HX-Redirect", "/ui/admin/storage")
+		http.Redirect(w, req, "/ui/admin/storage", http.StatusSeeOther)
+	}
+}
+
+// handleDestroySnapshot serves POST /ui/admin/storage/snapshots/destroy.
+// Snapshots are inherently safer than pools / volumes (deleting one does
+// not affect live data), so the modal only needs an acknowledgement
+// checkbox — no name retyping.
+func (r *Renderer) handleDestroySnapshot(d StorageDeps) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodPost {
+			w.Header().Set("Allow", "POST")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		if d.Writer == nil {
+			http.Error(w, "storage writer not configured", http.StatusServiceUnavailable)
+			return
+		}
+		if err := req.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		dataset := strings.TrimSpace(req.FormValue("dataset"))
+		name := strings.TrimSpace(req.FormValue("snapshot"))
+		if err := d.Writer.DestroySnapshot(req.Context(), dataset, name); err != nil {
 			r.writeStorageError(w, err)
 			return
 		}

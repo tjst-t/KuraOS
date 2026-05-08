@@ -19,14 +19,25 @@ import (
 	"strings"
 
 	"github.com/kuraos-org/kura/engine/share"
+	"github.com/kuraos-org/kura/engine/storage"
 	"github.com/kuraos-org/kura/i18n"
 )
 
 // SharesDeps is what the shares handler needs from the binary. Engine is the
 // share.Engine; the small interface lets tests inject a stub without booting
-// SQLite or cmdexec.
+// SQLite or cmdexec. VolumeLister, when set, is consulted to populate the
+// dataset picker in the New Share form so operators can pick from existing
+// ZFS datasets instead of typing a path. Optional — when nil the form falls
+// back to free-text entry.
 type SharesDeps struct {
-	Engine ShareEngine
+	Engine       ShareEngine
+	VolumeLister VolumeLister
+}
+
+// VolumeLister is the minimum interface the shares form needs to populate
+// its dataset dropdown. The storage engine's CLI satisfies this naturally.
+type VolumeLister interface {
+	ListVolumes(ctx context.Context, pool string) ([]storage.VolumeInfo, error)
 }
 
 // ShareEngine is the subset of share.Engine the UI consumes. Defined locally
@@ -53,6 +64,11 @@ type SharesView struct {
 	Protocols []ShareProtocolOption
 	Access    []ShareAccessOption
 
+	// AvailableDatasets is the dataset picker source for the New Share form.
+	// Empty when no VolumeLister is configured; the form then degrades to
+	// free-text path entry.
+	AvailableDatasets []DatasetOption
+
 	FormError string
 
 	DefaultsHeading string
@@ -60,6 +76,14 @@ type SharesView struct {
 	// Defaults lists the best-default knobs for the prototype's
 	// "best defaults applied" card. Read-only.
 	Defaults []ShareDefaultRow
+}
+
+// DatasetOption is one row in the New Share form's dataset dropdown.
+// MountPoint, when set, is the recommended Path the operator probably wants
+// (sharing the dataset's mountpoint rather than a sub-directory).
+type DatasetOption struct {
+	Name       string
+	MountPoint string
 }
 
 // ShareRow is one entry in the shares table.
@@ -162,9 +186,30 @@ func (r *Renderer) handleSharesPost(w http.ResponseWriter, req *http.Request, d 
 		r.handleSharesGet(w, req, d, r.tr.T(i18n.MsgSharesErrGeneric, err.Error()))
 		return
 	}
+	// The form has a radio toggle: path_mode=dataset (default when datasets
+	// are available) reads path_dataset (the selector's value); path_mode=
+	// freetext reads path_freetext. Older callers / tests still send `path`
+	// directly, so accept that as the fall-through.
+	pathMode := strings.TrimSpace(req.FormValue("path_mode"))
+	var path string
+	switch pathMode {
+	case "dataset":
+		path = strings.TrimSpace(req.FormValue("path_dataset"))
+	case "freetext":
+		path = strings.TrimSpace(req.FormValue("path_freetext"))
+	default:
+		path = strings.TrimSpace(req.FormValue("path"))
+		if path == "" {
+			if v := strings.TrimSpace(req.FormValue("path_dataset")); v != "" {
+				path = v
+			} else {
+				path = strings.TrimSpace(req.FormValue("path_freetext"))
+			}
+		}
+	}
 	in := share.CreateInput{
 		Name:        strings.TrimSpace(req.FormValue("name")),
-		Path:        strings.TrimSpace(req.FormValue("path")),
+		Path:        path,
 		Protocol:    share.Protocol(req.FormValue("protocol")),
 		Preset:      share.Preset(req.FormValue("preset")),
 		AccessMode:  share.AccessMode(req.FormValue("access_mode")),
@@ -188,17 +233,37 @@ func (r *Renderer) buildSharesView(ctx context.Context, d SharesDeps, formError 
 			rows = append(rows, shareToRow(r.tr, s))
 		}
 	}
+	// Pull dataset options for the New Share form. Pool roots (e.g. "tank")
+	// are excluded so the operator picks a child dataset like tank/photos
+	// — sharing the pool root itself is rare and surfaces the wrong
+	// mountpoint by default.
+	var datasets []DatasetOption
+	if d.VolumeLister != nil {
+		if vols, err := d.VolumeLister.ListVolumes(ctx, ""); err == nil {
+			for _, v := range vols {
+				if !strings.Contains(v.Name, "/") {
+					continue // pool root
+				}
+				datasets = append(datasets, DatasetOption{
+					Name:       v.Name,
+					MountPoint: v.MountPoint,
+				})
+			}
+		}
+	}
+
 	view := SharesView{
-		Subtitle:        r.tr.T(i18n.MsgSharesSubtitle, len(rows)),
-		HasShares:       len(rows) > 0,
-		Shares:          rows,
-		Presets:         sharePresetOptions(r.tr),
-		Protocols:       shareProtocolOptions(r.tr),
-		Access:          shareAccessOptions(r.tr),
-		FormError:       formError,
-		DefaultsHeading: r.tr.T(i18n.MsgSharesDefaultsHeading),
-		DefaultsLead:    r.tr.T(i18n.MsgSharesDefaultsLead),
-		Defaults:        shareDefaults(),
+		Subtitle:          r.tr.T(i18n.MsgSharesSubtitle, len(rows)),
+		HasShares:         len(rows) > 0,
+		Shares:            rows,
+		Presets:           sharePresetOptions(r.tr),
+		Protocols:         shareProtocolOptions(r.tr),
+		Access:            shareAccessOptions(r.tr),
+		AvailableDatasets: datasets,
+		FormError:         formError,
+		DefaultsHeading:   r.tr.T(i18n.MsgSharesDefaultsHeading),
+		DefaultsLead:      r.tr.T(i18n.MsgSharesDefaultsLead),
+		Defaults:          shareDefaults(),
 	}
 	if len(rows) > 0 {
 		// First row is the default selection (mirrors the prototype state).

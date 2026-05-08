@@ -56,6 +56,30 @@ expect_subcommand_reachable "[AC-S9db742-2-3] kura storage set-quota tank/photos
   storage set-quota tank/photos 1073741824
 expect_subcommand_reachable "[AC-S9db742-2-3] kura storage set-quota tank/photos 0 (unset)" \
   storage set-quota tank/photos 0
+expect_subcommand_reachable "[AC-S9db742-2-4] kura storage destroy-pool --confirm tank tank" \
+  storage destroy-pool --confirm tank tank
+expect_subcommand_reachable "[AC-S9db742-2-4] kura storage destroy-volume --recursive --confirm tank/photos tank/photos" \
+  storage destroy-volume --recursive --confirm tank/photos tank/photos
+expect_subcommand_reachable "[AC-S9db742-2-4] kura storage destroy-snapshot tank/photos snap1" \
+  storage destroy-snapshot tank/photos snap1
+
+# Negative path: --confirm mismatch must be caught BEFORE the engine call.
+out=$("$KURA" storage destroy-pool --confirm WRONG tank 2>&1 || true)
+if echo "$out" | grep -q '\-\-confirm must match'; then
+  echo "PASS: destroy-pool rejects mismatched --confirm"
+  pass=$((pass+1))
+else
+  echo "FAIL: destroy-pool should reject --confirm mismatch (got: $out)"
+  fail=$((fail+1))
+fi
+out=$("$KURA" storage destroy-volume --confirm WRONG tank/photos 2>&1 || true)
+if echo "$out" | grep -q '\-\-confirm must match'; then
+  echo "PASS: destroy-volume rejects mismatched --confirm"
+  pass=$((pass+1))
+else
+  echo "FAIL: destroy-volume should reject --confirm mismatch (got: $out)"
+  fail=$((fail+1))
+fi
 
 # Negative paths: missing args / invalid flags must produce a flag/usage error.
 # Capture stderr+stdout into a variable so `set -o pipefail` doesn't mask the

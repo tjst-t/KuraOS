@@ -106,9 +106,10 @@ func run() error {
 	shareStore := share.NewStore(st.DB())
 	shareEngine := share.NewManager(shareStore, cmdexec.NewReal(), share.Options{})
 	share.RegisterApplyAdapter(shareEngine)
+	sharesDeps := ui.SharesDeps{Engine: shareEngine, VolumeLister: storageEngine}
 	uiRenderer.SetSharesHandlers(
-		uiRenderer.SharesHandler(ui.SharesDeps{Engine: shareEngine}),
-		uiRenderer.SharesDeleteHandler(ui.SharesDeps{Engine: shareEngine}),
+		uiRenderer.SharesHandler(sharesDeps),
+		uiRenderer.SharesDeleteHandler(sharesDeps),
 	)
 
 	users := user.NewStore(st.DB(), nil)

@@ -37,6 +37,12 @@ func storageCmd(args []string) error {
 		return storageRollback(args[1:], os.Stdout, os.Stderr)
 	case "set-quota":
 		return storageSetQuota(args[1:], os.Stdout, os.Stderr)
+	case "destroy-pool":
+		return storageDestroyPool(args[1:], os.Stdout, os.Stderr)
+	case "destroy-volume":
+		return storageDestroyVolume(args[1:], os.Stdout, os.Stderr)
+	case "destroy-snapshot":
+		return storageDestroySnapshot(args[1:], os.Stdout, os.Stderr)
 	default:
 		return fmt.Errorf("kura storage: unknown subcommand %q", args[0])
 	}
@@ -267,6 +273,81 @@ func storageSetQuota(args []string, stdout, stderr io.Writer) error {
 	} else {
 		fmt.Fprintf(stdout, "quota=%d set on %s\n", bytes, dataset)
 	}
+	return nil
+}
+
+// storageDestroyPool runs `kura storage destroy-pool <name> [--force] --confirm <name>`.
+//
+// --confirm requires the operator to retype the pool name; mismatching
+// names cause the command to fail before any zpool call is issued. This
+// mirrors the UI's name-typing modal (priority #5 信頼性 > 機能).
+func storageDestroyPool(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("storage destroy-pool", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	force := fs.Bool("force", false, "pass -f to zpool destroy (export busy datasets first)")
+	confirm := fs.String("confirm", "", "operator retypes the pool name as a destructive-op safety check")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("kura storage destroy-pool: usage: <pool-name> [--force] --confirm <pool-name>")
+	}
+	name := strings.TrimSpace(fs.Arg(0))
+	if *confirm != name {
+		return fmt.Errorf("kura storage destroy-pool: --confirm must match the pool name (--confirm=%q, pool=%q)", *confirm, name)
+	}
+	eng := storage.NewCLI(cmdexec.NewReal())
+	if err := eng.DestroyPool(context.Background(), name, *force); err != nil {
+		return fmt.Errorf("destroy pool: %w", err)
+	}
+	fmt.Fprintf(stdout, "pool %q destroyed\n", name)
+	return nil
+}
+
+// storageDestroyVolume runs `kura storage destroy-volume <dataset> [-r] --confirm <dataset>`.
+func storageDestroyVolume(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("storage destroy-volume", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	recursive := fs.Bool("recursive", false, "pass -r to zfs destroy (also destroy descendants and snapshots)")
+	confirm := fs.String("confirm", "", "operator retypes the dataset path as a destructive-op safety check")
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 1 {
+		return fmt.Errorf("kura storage destroy-volume: usage: <dataset> [--recursive] --confirm <dataset>")
+	}
+	dataset := strings.TrimSpace(fs.Arg(0))
+	if *confirm != dataset {
+		return fmt.Errorf("kura storage destroy-volume: --confirm must match the dataset (--confirm=%q, dataset=%q)", *confirm, dataset)
+	}
+	eng := storage.NewCLI(cmdexec.NewReal())
+	if err := eng.DestroyVolume(context.Background(), dataset, *recursive); err != nil {
+		return fmt.Errorf("destroy volume: %w", err)
+	}
+	fmt.Fprintf(stdout, "volume %q destroyed\n", dataset)
+	return nil
+}
+
+// storageDestroySnapshot runs `kura storage destroy-snapshot <dataset> <snapshot>`.
+// Snapshots are inherently safer to delete than datasets/pools — they're
+// already an "extra" copy — so no name retyping is required. The CLI still
+// requires both args explicitly so a wildcard typo can't auto-match.
+func storageDestroySnapshot(args []string, stdout, stderr io.Writer) error {
+	fs := flag.NewFlagSet("storage destroy-snapshot", flag.ContinueOnError)
+	fs.SetOutput(stderr)
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+	if fs.NArg() != 2 {
+		return fmt.Errorf("kura storage destroy-snapshot: usage: <dataset> <snapshot-name>")
+	}
+	dataset := strings.TrimSpace(fs.Arg(0))
+	snap := strings.TrimSpace(fs.Arg(1))
+	eng := storage.NewCLI(cmdexec.NewReal())
+	if err := eng.DestroySnapshot(context.Background(), dataset, snap); err != nil {
+		return fmt.Errorf("destroy snapshot: %w", err)
+	}
+	fmt.Fprintf(stdout, "snapshot %s@%s destroyed\n", dataset, snap)
 	return nil
 }
 

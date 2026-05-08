@@ -185,6 +185,61 @@ func (c *CLI) ListSnapshots(ctx context.Context, dataset string) ([]SnapshotInfo
 	return parseSnapshotList(stdout)
 }
 
+// DestroyPool runs `zpool destroy [-f] <name>`. The caller is responsible
+// for confirmation (UI uses a name-typing modal, CLI requires the
+// --confirm flag) — this function does NO additional gating beyond the
+// engine call so the contract stays simple. Force passes -f, which exports
+// busy datasets first; without it the kernel refuses to destroy a pool
+// with mounted children.
+func (c *CLI) DestroyPool(ctx context.Context, name string, force bool) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("%w: pool name required", ErrPoolNameInvalid)
+	}
+	args := []string{"destroy"}
+	if force {
+		args = append(args, "-f")
+	}
+	args = append(args, name)
+	if _, _, err := c.exec.Run(ctx, "zpool", args...); err != nil {
+		return fmt.Errorf("storage: zpool destroy %s: %w", name, err)
+	}
+	return nil
+}
+
+// DestroyVolume runs `zfs destroy [-r] <dataset>`. Recursive, when true,
+// removes all child datasets and snapshots — the UI's destroy dialog
+// surfaces this as an explicit checkbox the operator must tick.
+func (c *CLI) DestroyVolume(ctx context.Context, dataset string, recursive bool) error {
+	if !isValidDatasetName(dataset) {
+		return fmt.Errorf("%w: %q", ErrVolumeNameInvalid, dataset)
+	}
+	args := []string{"destroy"}
+	if recursive {
+		args = append(args, "-r")
+	}
+	args = append(args, dataset)
+	if _, _, err := c.exec.Run(ctx, "zfs", args...); err != nil {
+		return fmt.Errorf("storage: zfs destroy %s: %w", dataset, err)
+	}
+	return nil
+}
+
+// DestroySnapshot runs `zfs destroy <dataset>@<name>`.
+func (c *CLI) DestroySnapshot(ctx context.Context, dataset, name string) error {
+	if !isValidDatasetName(dataset) {
+		return fmt.Errorf("%w: %q", ErrVolumeNameInvalid, dataset)
+	}
+	if !isValidSnapshotName(name) {
+		return fmt.Errorf("%w: %q", ErrSnapshotNameInvalid, name)
+	}
+	target := dataset + "@" + name
+	if _, _, err := c.exec.Run(ctx, "zfs", "destroy", target); err != nil {
+		return fmt.Errorf("storage: zfs destroy %s: %w", target, err)
+	}
+	return nil
+}
+
 // Rollback runs `zfs rollback`. -r (recursively destroy intermediate
 // snapshots) is left off — destructive operations require explicit user
 // confirmation (priority #5). The UI surfaces a confirmation dialog before

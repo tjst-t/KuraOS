@@ -47,6 +47,18 @@ type stubStorageRW struct {
 		Dataset string
 		Bytes   int64
 	}
+	destroyPoolCalls []struct {
+		Name  string
+		Force bool
+	}
+	destroyVolumeCalls []struct {
+		Dataset   string
+		Recursive bool
+	}
+	destroySnapCalls []struct {
+		Dataset string
+		Name    string
+	}
 	createErr error
 }
 
@@ -99,6 +111,33 @@ func (s *stubStorageRW) SetQuota(_ context.Context, dataset string, bytes int64)
 		Dataset string
 		Bytes   int64
 	}{dataset, bytes})
+	return nil
+}
+func (s *stubStorageRW) DestroyPool(_ context.Context, name string, force bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.destroyPoolCalls = append(s.destroyPoolCalls, struct {
+		Name  string
+		Force bool
+	}{name, force})
+	return nil
+}
+func (s *stubStorageRW) DestroyVolume(_ context.Context, dataset string, recursive bool) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.destroyVolumeCalls = append(s.destroyVolumeCalls, struct {
+		Dataset   string
+		Recursive bool
+	}{dataset, recursive})
+	return nil
+}
+func (s *stubStorageRW) DestroySnapshot(_ context.Context, dataset, name string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.destroySnapCalls = append(s.destroySnapCalls, struct {
+		Dataset string
+		Name    string
+	}{dataset, name})
 	return nil
 }
 func (s *stubStorageRW) ImportPool(_ context.Context, name string, opts storage.ImportOpts) error {
@@ -336,8 +375,12 @@ func TestAcceptance_StorageCreateVolumeFromUI(t *testing.T) {
 	srv, _ := newServerWithStorageRW(t, eng)
 
 	c := loginAs(t, srv, "root", "longenoughpw")
+
+	// New form shape: pool dropdown + path text. The handler combines
+	// "tank" + "photos" → "tank/photos" before calling engine.CreateVolume.
 	form := url.Values{}
-	form.Set("dataset", "tank/photos")
+	form.Set("pool", "tank")
+	form.Set("path", "photos")
 	form.Set("preset", "media")
 	form.Set("quota", "1073741824")
 	form.Set("mountpoint", "/tank/photos")
@@ -355,6 +398,19 @@ func TestAcceptance_StorageCreateVolumeFromUI(t *testing.T) {
 	got := eng.volumeCalls[0]
 	if got.Dataset != "tank/photos" || got.Opts.Preset != "media" || got.Opts.QuotaBytes != 1073741824 || got.Opts.MountPoint != "/tank/photos" {
 		t.Errorf("got = %+v", got)
+	}
+
+	// Backwards-compat: the older `dataset` field still works (handler
+	// falls through to it when pool+path are absent).
+	form = url.Values{}
+	form.Set("dataset", "tank/legacy")
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/volumes", form)
+	if err != nil {
+		t.Fatalf("POST (legacy): %v", err)
+	}
+	resp.Body.Close()
+	if len(eng.volumeCalls) != 2 || eng.volumeCalls[1].Dataset != "tank/legacy" {
+		t.Errorf("legacy dataset field not honored: %+v", eng.volumeCalls)
 	}
 }
 
@@ -426,6 +482,74 @@ func TestAcceptance_StorageSnapshotFromUI(t *testing.T) {
 		eng.rollbackCalls[0].Dataset != "tank/photos" ||
 		eng.rollbackCalls[0].Snapshot != "auto-2026-05-08" {
 		t.Errorf("rollback call mismatch: %+v", eng.rollbackCalls)
+	}
+}
+
+// [AC-S9db742-2-4] Destroy operations from the UI require name retyping
+// (pool / volume) or an acknowledgement checkbox (snapshot). Form values
+// that don't match the resource name are rejected before the engine is
+// called — the UI's confirm modal is the safety net.
+func TestAcceptance_StorageDestroyFromUI(t *testing.T) {
+	eng := &stubStorageRW{stubStorage: stubStorage{
+		pools: storageFixturePools(),
+	}}
+	srv, _ := newServerWithStorageRW(t, eng)
+	c := loginAs(t, srv, "root", "longenoughpw")
+
+	// Pool destroy with mismatched confirm — must be rejected (no engine call).
+	form := url.Values{"name": {"tank"}, "confirm": {"WRONG"}}
+	resp, err := c.PostForm(srv.URL+"/ui/admin/storage/pools/destroy", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode == http.StatusSeeOther {
+		t.Errorf("destroy with mismatched confirm should NOT redirect (would mean engine ran)")
+	}
+	if len(eng.destroyPoolCalls) != 0 {
+		t.Errorf("engine.DestroyPool must not run with mismatched confirm; calls=%+v", eng.destroyPoolCalls)
+	}
+
+	// Pool destroy with matching confirm + force=on.
+	form = url.Values{"name": {"tank"}, "confirm": {"tank"}, "force": {"on"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/pools/destroy", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != http.StatusSeeOther {
+		t.Fatalf("status = %d, want 303", resp.StatusCode)
+	}
+	if len(eng.destroyPoolCalls) != 1 ||
+		eng.destroyPoolCalls[0].Name != "tank" ||
+		!eng.destroyPoolCalls[0].Force {
+		t.Errorf("destroy pool call mismatch: %+v", eng.destroyPoolCalls)
+	}
+
+	// Volume destroy with matching confirm + recursive=on.
+	form = url.Values{"dataset": {"tank/photos"}, "confirm": {"tank/photos"}, "recursive": {"on"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/volumes/destroy", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if len(eng.destroyVolumeCalls) != 1 ||
+		eng.destroyVolumeCalls[0].Dataset != "tank/photos" ||
+		!eng.destroyVolumeCalls[0].Recursive {
+		t.Errorf("destroy volume call mismatch: %+v", eng.destroyVolumeCalls)
+	}
+
+	// Snapshot destroy: only needs dataset+snapshot fields.
+	form = url.Values{"dataset": {"tank/photos"}, "snapshot": {"snap1"}}
+	resp, err = c.PostForm(srv.URL+"/ui/admin/storage/snapshots/destroy", form)
+	if err != nil {
+		t.Fatalf("POST: %v", err)
+	}
+	resp.Body.Close()
+	if len(eng.destroySnapCalls) != 1 ||
+		eng.destroySnapCalls[0].Dataset != "tank/photos" ||
+		eng.destroySnapCalls[0].Name != "snap1" {
+		t.Errorf("destroy snapshot call mismatch: %+v", eng.destroySnapCalls)
 	}
 }
 

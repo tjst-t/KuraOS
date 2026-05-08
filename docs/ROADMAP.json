@@ -493,6 +493,12 @@
               "description": "Volume の Quota が UI フォームと CLI (kura storage set-quota) から設定でき、0 を渡すと quota=none で解除される",
               "test": "[AC-S9db742-2-3] in tests/acceptance/storage_volume_test.go::TestAcceptance_StorageSetQuotaFromUI + tests/acceptance/storage-quota-cli.sh + engine/storage/create_test.go::TestSetQuota_unsetsWhenZero",
               "status": "done"
+            },
+            {
+              "id": "AC-S9db742-2-4",
+              "description": "Pool / Volume / Snapshot を UI と CLI から削除できる。Pool / Volume の削除は名前再入力による確認を必須とし、確認失敗時は engine を呼ばずに拒否する (priority #5 信頼性)",
+              "test": "[AC-S9db742-2-4] in tests/acceptance/storage_write_test.go::TestAcceptance_StorageDestroyFromUI + tests/acceptance/storage-volume-cli.sh + engine/storage/create_test.go (after add: TestDestroyPool/Volume/Snapshot)",
+              "status": "done"
             }
           ],
           "tasks": {
@@ -509,6 +515,11 @@
             "S9db742-2-3": {
               "title": "Quota 設定 (engine + UI field + CLI subcommand)",
               "description": "SetQuota engine は完成。Volume 詳細 / 作成 form に Quota 入力欄を追加。CLI: set-quota サブコマンド。",
+              "status": "done"
+            },
+            "S9db742-2-4": {
+              "title": "Pool/Volume/Snapshot 削除 (engine + UI + CLI、名前再入力確認)",
+              "description": "DestroyPool/Volume/Snapshot を engine に追加。UI は確認モーダル + 名前再入力、CLI は --confirm <name> でガード。",
               "status": "done"
             }
           }

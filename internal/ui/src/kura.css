@@ -542,6 +542,10 @@
     color: var(--text);
     border-bottom-color: var(--text);
   }
+  /* Server renders all tab panels at once; kura.js toggles data-active to
+     show only the selected one. CSS hides everything else so the layout
+     doesn't flash when JS hooks up after parse. */
+  [data-tab-panel][data-active="false"] { display: none; }
 
   /* Stats / progress bar / vdev tree */
   .stat-value { font-size: 22px; font-weight: 500; letter-spacing: -0.02em; line-height: 1.1; }

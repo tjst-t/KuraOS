@@ -52,6 +52,9 @@ type StorageEngineWriter interface {
 	Rollback(ctx context.Context, dataset, snapshot string) error
 	SetQuota(ctx context.Context, dataset string, bytes int64) error
 	ImportPool(ctx context.Context, name string, opts storage.ImportOpts) error
+	DestroyPool(ctx context.Context, name string, force bool) error
+	DestroyVolume(ctx context.Context, dataset string, recursive bool) error
+	DestroySnapshot(ctx context.Context, dataset, name string) error
 }
 
 // StorageView is the template view-model. Pre-formatted strings live here so

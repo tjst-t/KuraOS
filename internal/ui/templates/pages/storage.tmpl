@@ -104,8 +104,14 @@ in storage.go so the template stays free of CLI-output tokens.
         </div>
         {{ end }}
       </div>
-      <div class="card-foot">
+      <div class="card-foot" style="display:flex;justify-content:space-between;align-items:center;gap:8px">
         <span>{{ T "page.storage.pool.data_intact" }}</span>
+        {{ if $v.WriteEnabled }}
+        <button type="button" class="btn btn-sm" data-testid="storage-pool-destroy-btn"
+          data-modal-open="destroy-pool-modal-{{ .Name }}" style="color:var(--crit);border-color:var(--crit)">
+          {{ T "page.storage.destroy.pool" }}
+        </button>
+        {{ end }}
       </div>
     </div>
     {{ end }}
@@ -119,17 +125,21 @@ in storage.go so the template stays free of CLI-output tokens.
 </div>
 {{ end }}
 
-{{- /* ===== Tabs strip + active tab content ===== */ -}}
+{{- /* ===== Tabs strip + active tab content =====
+   All four panels are rendered server-side; kura.js toggles visibility on
+   click via the [data-tab-panel] / [data-active] attribute swap. The <a>
+   keeps its href so right-click → "Open in new tab" still works, JS-disabled
+   browsers degrade gracefully (server picks the active panel from ?tab=),
+   and the URL stays bookmarkable via History.pushState. */ -}}
 {{ if $v.Tabs }}
 <nav class="tabs" data-testid="storage-tabs" style="margin-top:24px">
   {{ range $v.Tabs }}
-  <a class="tab" href="{{ .Href }}" data-active="{{ if .Active }}true{{ else }}false{{ end }}" data-tab-id="{{ .ID }}">{{ .Label }}</a>
+  <a class="tab" href="{{ .Href }}" data-active="{{ if .Active }}true{{ else }}false{{ end }}" data-tab-id="{{ .ID }}" data-tab-target="{{ .ID }}">{{ .Label }}</a>
   {{ end }}
 </nav>
 {{ end }}
 
-{{ if eq $v.ActiveTab "volumes" }}
-<section data-testid="storage-volumes-panel">
+<section data-testid="storage-volumes-panel" data-tab-panel="volumes" data-active="{{ if eq $v.ActiveTab "volumes" }}true{{ else }}false{{ end }}">
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.volumes.heading" }}</h3>
@@ -170,6 +180,12 @@ in storage.go so the template stays free of CLI-output tokens.
             <button type="button" class="btn btn-sm" data-testid="storage-volume-snapshot-btn"
               data-modal-open="new-snapshot-modal" data-volume-name="{{ .Name }}"
               onclick="(function(){var d=document.getElementById('new-snapshot-modal');if(!d)return;var s=d.querySelector('select[name=&quot;dataset&quot;]');if(s){s.value='{{ .Name }}';}})();">{{ T "page.storage.snapshot.new" }}</button>
+            {{ if not .IsPoolRoot }}
+            <button type="button" class="btn btn-sm" data-testid="storage-volume-destroy-btn"
+              data-modal-open="destroy-volume-modal-{{ .Name }}" style="color:var(--crit);border-color:var(--crit)">
+              {{ T "page.storage.destroy.volume" }}
+            </button>
+            {{ end }}
           </td>
           {{ end }}
         </tr>
@@ -183,9 +199,8 @@ in storage.go so the template stays free of CLI-output tokens.
     {{ end }}
   </div>
 </section>
-{{ end }}
 
-{{ if eq $v.ActiveTab "disks" }}
+<section data-testid="storage-disks-panel" data-tab-panel="disks" data-active="{{ if eq $v.ActiveTab "disks" }}true{{ else }}false{{ end }}">
 {{ if $v.HasDisks }}
 <section data-testid="storage-disks">
   <div class="card">
@@ -226,9 +241,9 @@ in storage.go so the template stays free of CLI-output tokens.
   </div>
 </section>
 {{ end }}
-{{ end }}
+</section>
 
-{{ if eq $v.ActiveTab "snapshots" }}
+<section data-testid="storage-snapshots-panel-wrap" data-tab-panel="snapshots" data-active="{{ if eq $v.ActiveTab "snapshots" }}true{{ else }}false{{ end }}">
 <section data-testid="storage-snapshots-panel">
   <div class="card">
     <div class="card-head">
@@ -259,9 +274,13 @@ in storage.go so the template stays free of CLI-output tokens.
           <td class="td-num">{{ .ReferDisplay }}</td>
           <td><span class="mono" style="font-size:11px">{{ .CreatedLabel }}</span></td>
           {{ if $v.WriteEnabled }}
-          <td>
+          <td class="row gap-sm" style="display:flex;gap:6px;flex-wrap:wrap">
             <button type="button" class="btn btn-sm" data-testid="storage-snapshot-rollback-btn"
               data-modal-open="rollback-modal-{{ .Dataset }}-{{ .Name }}">{{ T "page.storage.snapshot.rollback" }}</button>
+            <button type="button" class="btn btn-sm" data-testid="storage-snapshot-destroy-btn"
+              data-modal-open="destroy-snap-modal-{{ .Dataset }}-{{ .Name }}" style="color:var(--crit);border-color:var(--crit)">
+              {{ T "page.storage.destroy.snapshot" }}
+            </button>
           </td>
           {{ end }}
         </tr>
@@ -275,9 +294,9 @@ in storage.go so the template stays free of CLI-output tokens.
     {{ end }}
   </div>
 </section>
-{{ end }}
+</section>
 
-{{ if eq $v.ActiveTab "imports" }}
+<section data-testid="storage-imports-panel-wrap" data-tab-panel="imports" data-active="{{ if eq $v.ActiveTab "imports" }}true{{ else }}false{{ end }}">
 {{ if $v.HasImports }}
 <section data-testid="storage-import">
   <div class="card">
@@ -325,7 +344,7 @@ in storage.go so the template stays free of CLI-output tokens.
   </div>
 </div>
 {{ end }}
-{{ end }}
+</section>
 
 {{- /* ===== Modals (rendered via reusable partial) ===== */ -}}
 
@@ -390,6 +409,40 @@ in storage.go so the template stays free of CLI-output tokens.
     "bodyTpl" "storage-rollback-body"
     "footTpl" "storage-rollback-foot"
     "ctx"     . }}
+
+{{ template "modal" dict
+    "id"      (printf "destroy-snap-modal-%s-%s" .Dataset .Name)
+    "testid"  "storage-destroy-snap-modal"
+    "title"   (T "page.storage.destroy.snapshot.title")
+    "action"  "/ui/admin/storage/snapshots/destroy"
+    "bodyTpl" "storage-destroy-snap-body"
+    "footTpl" "storage-destroy-snap-foot"
+    "ctx"     . }}
+{{ end }}
+
+{{- /* Destroy modals: one per pool / one per non-pool-root volume.        */ -}}
+{{ range $v.Pools }}
+{{ template "modal" dict
+    "id"      (printf "destroy-pool-modal-%s" .Name)
+    "testid"  "storage-destroy-pool-modal"
+    "title"   (T "page.storage.destroy.pool.title")
+    "action"  "/ui/admin/storage/pools/destroy"
+    "bodyTpl" "storage-destroy-pool-body"
+    "footTpl" "storage-destroy-pool-foot"
+    "ctx"     . }}
+{{ end }}
+
+{{ range $v.Volumes }}
+{{ if not .IsPoolRoot }}
+{{ template "modal" dict
+    "id"      (printf "destroy-volume-modal-%s" .Name)
+    "testid"  "storage-destroy-volume-modal"
+    "title"   (T "page.storage.destroy.volume.title")
+    "action"  "/ui/admin/storage/volumes/destroy"
+    "bodyTpl" "storage-destroy-volume-body"
+    "footTpl" "storage-destroy-volume-foot"
+    "ctx"     . }}
+{{ end }}
 {{ end }}
 
 {{- /* ===== Pool-form validation script (page-specific) =====
@@ -601,9 +654,18 @@ in storage.go so the template stays free of CLI-output tokens.
 {{ $v := . }}
 <div style="display:flex;flex-direction:column;gap:14px">
   <div class="field">
-    <label>{{ T "page.storage.volume.new.name" }}</label>
-    <input class="input mono" name="dataset" required placeholder="tank/photos" data-testid="storage-new-volume-name">
-    <div class="field-hint">{{ T "page.storage.volume.new.name_hint" }}</div>
+    <label>{{ T "page.storage.volume.new.pool" }}</label>
+    <select name="pool" class="input mono" required data-testid="storage-new-volume-pool">
+      {{ range $v.Pools }}
+      <option value="{{ .Name }}">{{ .Name }}</option>
+      {{ end }}
+    </select>
+    <div class="field-hint">{{ T "page.storage.volume.new.pool_hint" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.volume.new.path" }}</label>
+    <input class="input mono" name="path" required placeholder="photos" data-testid="storage-new-volume-path">
+    <div class="field-hint">{{ T "page.storage.volume.new.path_hint" }}</div>
   </div>
   <div class="field">
     <label>{{ T "page.storage.volume.new.preset" }}</label>
@@ -705,5 +767,93 @@ in storage.go so the template stays free of CLI-output tokens.
 <button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
 <button type="submit" class="btn btn-primary" data-testid="storage-rollback-submit">
   {{ T "page.storage.snapshot.rollback.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== Destroy Pool modal ===== ctx is a PoolView */ -}}
+{{ define "storage-destroy-pool-body" }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <input type="hidden" name="name" value="{{ .Name }}">
+  <div class="banner crit" style="border-left-color:var(--crit)">
+    <div style="flex:1">{{ T "page.storage.destroy.warn" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.destroy.type_name" }}</label>
+    <input class="input mono" name="confirm" required
+           pattern="{{ .Name }}" placeholder="{{ .Name }}"
+           data-testid="storage-destroy-pool-confirm">
+    <div class="field-hint mono" style="font-size:11px">{{ .Name }}</div>
+  </div>
+  <label class="row center" style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
+    <input type="checkbox" name="force" value="1" data-testid="storage-destroy-pool-force">
+    <span>
+      <div>{{ T "page.storage.destroy.force" }}</div>
+      <div style="font-size:11px;color:var(--warn);margin-top:2px">{{ T "page.storage.destroy.force_warn" }}</div>
+    </span>
+  </label>
+</div>
+{{ end }}
+
+{{ define "storage-destroy-pool-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn" data-testid="storage-destroy-pool-submit"
+        style="background:var(--crit);color:white;border-color:var(--crit)">
+  {{ T "page.storage.destroy.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== Destroy Volume modal ===== ctx is a VolumeView */ -}}
+{{ define "storage-destroy-volume-body" }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <input type="hidden" name="dataset" value="{{ .Name }}">
+  <div class="banner crit" style="border-left-color:var(--crit)">
+    <div style="flex:1">{{ T "page.storage.destroy.warn" }}</div>
+  </div>
+  <div class="field">
+    <label>{{ T "page.storage.destroy.type_name" }}</label>
+    <input class="input mono" name="confirm" required
+           pattern="{{ .Name }}" placeholder="{{ .Name }}"
+           data-testid="storage-destroy-volume-confirm">
+    <div class="field-hint mono" style="font-size:11px">{{ .Name }}</div>
+  </div>
+  <label class="row center" style="display:flex;gap:8px;align-items:flex-start;font-size:13px">
+    <input type="checkbox" name="recursive" value="1" data-testid="storage-destroy-volume-recursive">
+    <span>
+      <div>{{ T "page.storage.destroy.recursive" }}</div>
+      <div style="font-size:11px;color:var(--warn);margin-top:2px">{{ T "page.storage.destroy.recurse_warn" }}</div>
+    </span>
+  </label>
+</div>
+{{ end }}
+
+{{ define "storage-destroy-volume-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn" data-testid="storage-destroy-volume-submit"
+        style="background:var(--crit);color:white;border-color:var(--crit)">
+  {{ T "page.storage.destroy.submit" }}
+</button>
+{{ end }}
+
+{{- /* ===== Destroy Snapshot modal ===== ctx is a SnapshotView */ -}}
+{{ define "storage-destroy-snap-body" }}
+<div style="display:flex;flex-direction:column;gap:14px">
+  <input type="hidden" name="dataset" value="{{ .Dataset }}">
+  <input type="hidden" name="snapshot" value="{{ .Name }}">
+  <div class="field">
+    <label>{{ T "page.storage.snapshot.col.dataset" }}</label>
+    <div class="mono">{{ .Dataset }}@{{ .Name }}</div>
+  </div>
+  <label class="row center" style="display:flex;gap:8px;align-items:center;font-size:13px">
+    <input type="checkbox" required data-testid="storage-destroy-snap-ack">
+    <span>{{ T "page.storage.destroy.snapshot.ack" }}</span>
+  </label>
+</div>
+{{ end }}
+
+{{ define "storage-destroy-snap-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.storage.new_pool.cancel" }}</button>
+<button type="submit" class="btn" data-testid="storage-destroy-snap-submit"
+        style="background:var(--crit);color:white;border-color:var(--crit)">
+  {{ T "page.storage.destroy.submit" }}
 </button>
 {{ end }}

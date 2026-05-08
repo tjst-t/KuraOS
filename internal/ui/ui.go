@@ -278,6 +278,9 @@ func (r *Renderer) Routes() http.Handler {
 		mux.Handle("/ui/admin/storage/quota", r.storageWriteHandler)
 		mux.Handle("/ui/admin/storage/snapshots", r.storageWriteHandler)
 		mux.Handle("/ui/admin/storage/snapshots/rollback", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/pools/destroy", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/volumes/destroy", r.storageWriteHandler)
+		mux.Handle("/ui/admin/storage/snapshots/destroy", r.storageWriteHandler)
 	}
 	if r.sharesHandler != nil {
 		mux.Handle("/ui/admin/shares", r.sharesHandler)
