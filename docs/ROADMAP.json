@@ -29,66 +29,94 @@
   "sprints": {
     "S0ff37f": {
       "title": "kura バイナリ ブートストラップ",
-      "status": "pending",
+      "status": "done",
       "description": "Go モジュール初期化、単一バイナリのスケルトン、Gateway の最小ルーティング、SQLite ストア、embed.FS によるロケール埋め込みの土台、make serve で起動できるところまで。",
       "milestone": false,
       "stories": {
         "S0ff37f-1": {
           "title": "Go モジュールとバイナリスケルトン",
-          "status": "pending",
+          "status": "done",
           "user_story": "KuraOS 開発者として、make build と make serve で kura バイナリを起動できるようにしたい。なぜなら、以降の機能実装の土台が必要だから。",
           "acceptance_criteria": [
             {
               "id": "AC-S0ff37f-1-1",
               "description": "make build で bin/kura が生成される",
               "test": "[AC-S0ff37f-1-1] in tests/acceptance/bootstrap.sh",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S0ff37f-1-2",
               "description": "make serve で portman が割当てたポートで kura が起動し、/healthz に 200 を返す",
               "test": "[AC-S0ff37f-1-2] in tests/acceptance/bootstrap.sh",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
-            "S0ff37f-1-1": {"title": "go mod init", "description": "github.com/kuraos-org/kura で go.mod を初期化、Go 1.22 以上をピン", "status": "pending"},
-            "S0ff37f-1-2": {"title": "cmd/kura/main.go", "description": "エントリポイントを作成。env KURA_PORT で listen、context+signal でグレースフル shutdown", "status": "pending"},
-            "S0ff37f-1-3": {"title": "/healthz エンドポイント", "description": "Gateway 雛形に /healthz を追加し、起動時間と version を JSON 返却", "status": "pending"}
+            "S0ff37f-1-1": {
+              "title": "go mod init",
+              "description": "github.com/kuraos-org/kura で go.mod を初期化、Go 1.22 以上をピン",
+              "status": "done"
+            },
+            "S0ff37f-1-2": {
+              "title": "cmd/kura/main.go",
+              "description": "エントリポイントを作成。env KURA_PORT で listen、context+signal でグレースフル shutdown",
+              "status": "done"
+            },
+            "S0ff37f-1-3": {
+              "title": "/healthz エンドポイント",
+              "description": "Gateway 雛形に /healthz を追加し、起動時間と version を JSON 返却",
+              "status": "done"
+            }
           }
         },
         "S0ff37f-2": {
           "title": "SQLite ストアと マイグレーション",
-          "status": "pending",
+          "status": "done",
           "user_story": "KuraOS 開発者として、SQLite を起動時に初期化しスキーマ migration が自動適用されるようにしたい。なぜなら、ランタイム状態を永続化する基盤が必要だから。",
           "acceptance_criteria": [
             {
               "id": "AC-S0ff37f-2-1",
               "description": "kura 起動時に /var/lib/kura/state.db が無ければ作成され、空のテーブル群が用意される",
               "test": "[AC-S0ff37f-2-1] in tests/acceptance/store.sh",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
-            "S0ff37f-2-1": {"title": "store パッケージ", "description": "modernc.org/sqlite を採用 (CGo 不要)。store.Open(path) を提供", "status": "pending"},
-            "S0ff37f-2-2": {"title": "migration 機構", "description": "embed.FS の SQL ファイル群を順序適用。schema_version テーブルで管理", "status": "pending"}
+            "S0ff37f-2-1": {
+              "title": "store パッケージ",
+              "description": "modernc.org/sqlite を採用 (CGo 不要)。store.Open(path) を提供",
+              "status": "done"
+            },
+            "S0ff37f-2-2": {
+              "title": "migration 機構",
+              "description": "embed.FS の SQL ファイル群を順序適用。schema_version テーブルで管理",
+              "status": "done"
+            }
           }
         },
         "S0ff37f-3": {
           "title": "ロケール埋め込みの基盤",
-          "status": "pending",
+          "status": "done",
           "user_story": "KuraOS 開発者として、ja.json を embed.FS でバイナリに同梱できる仕組みを作りたい。なぜなら、ユーザー向け文字列をハードコードせず i18n 経由で出力するため。",
           "acceptance_criteria": [
             {
               "id": "AC-S0ff37f-3-1",
               "description": "i18n/locales/ja.json が embed.FS で同梱され、起動時にロード成功する",
               "test": "[AC-S0ff37f-3-1] in i18n/translator_test.go",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
-            "S0ff37f-3-1": {"title": "i18n パッケージのスケルトン", "description": "MessageID 型、Translator 構造体、T(id, args...) 関数を最小実装", "status": "pending"},
-            "S0ff37f-3-2": {"title": "ja.json 雛形", "description": "i18n/locales/ja.json に system.startup, system.healthy 等の最小キーを用意", "status": "pending"}
+            "S0ff37f-3-1": {
+              "title": "i18n パッケージのスケルトン",
+              "description": "MessageID 型、Translator 構造体、T(id, args...) 関数を最小実装",
+              "status": "done"
+            },
+            "S0ff37f-3-2": {
+              "title": "ja.json 雛形",
+              "description": "i18n/locales/ja.json に system.startup, system.healthy 等の最小キーを用意",
+              "status": "done"
+            }
           }
         }
       }
@@ -118,10 +146,26 @@
             }
           ],
           "tasks": {
-            "S464e47-1-1": {"title": "html/template + embed.FS UI 構成", "description": "ui/templates/ にレイアウト・パーシャルを配置、embed で配信", "status": "pending"},
-            "S464e47-1-2": {"title": "Tailwind 統合", "description": "Tailwind CLI でビルドし ui/dist/ に出力、make build から自動実行", "status": "pending"},
-            "S464e47-1-3": {"title": "Fog パレットの token 化", "description": "Tailwind config に Fog パレット相当のカラーを定義", "status": "pending"},
-            "S464e47-1-4": {"title": "Dashboard placeholder", "description": "サイドバーから到達可能な空のダッシュボードページを置く", "status": "pending"}
+            "S464e47-1-1": {
+              "title": "html/template + embed.FS UI 構成",
+              "description": "ui/templates/ にレイアウト・パーシャルを配置、embed で配信",
+              "status": "pending"
+            },
+            "S464e47-1-2": {
+              "title": "Tailwind 統合",
+              "description": "Tailwind CLI でビルドし ui/dist/ に出力、make build から自動実行",
+              "status": "pending"
+            },
+            "S464e47-1-3": {
+              "title": "Fog パレットの token 化",
+              "description": "Tailwind config に Fog パレット相当のカラーを定義",
+              "status": "pending"
+            },
+            "S464e47-1-4": {
+              "title": "Dashboard placeholder",
+              "description": "サイドバーから到達可能な空のダッシュボードページを置く",
+              "status": "pending"
+            }
           }
         },
         "S464e47-2": {
@@ -143,9 +187,21 @@
             }
           ],
           "tasks": {
-            "S464e47-2-1": {"title": "config パッケージのスキーマ型定義", "description": "design.md §3.1 の config.json 全体構造を Go 構造体にする (空フィールドのまま)", "status": "pending"},
-            "S464e47-2-2": {"title": "import/export の round-trip テスト", "description": "Go 構造体 ↔ JSON が損失なくラウンドトリップすることをテーブルドリブンテストで担保", "status": "pending"},
-            "S464e47-2-3": {"title": "Engine ApplyAdapter interface", "description": "各 Engine が後で実装する Apply(ctx, oldCfg, newCfg) Diff interface を定義", "status": "pending"}
+            "S464e47-2-1": {
+              "title": "config パッケージのスキーマ型定義",
+              "description": "design.md §3.1 の config.json 全体構造を Go 構造体にする (空フィールドのまま)",
+              "status": "pending"
+            },
+            "S464e47-2-2": {
+              "title": "import/export の round-trip テスト",
+              "description": "Go 構造体 ↔ JSON が損失なくラウンドトリップすることをテーブルドリブンテストで担保",
+              "status": "pending"
+            },
+            "S464e47-2-3": {
+              "title": "Engine ApplyAdapter interface",
+              "description": "各 Engine が後で実装する Apply(ctx, oldCfg, newCfg) Diff interface を定義",
+              "status": "pending"
+            }
           }
         }
       }
@@ -175,8 +231,16 @@
             }
           ],
           "tasks": {
-            "S1e7eeb-1-1": {"title": "engine/user パッケージ", "description": "User / Group / AuthMethod / Role の構造体と SQLite store", "status": "pending"},
-            "S1e7eeb-1-2": {"title": "argon2id パスワードハッシュ", "description": "golang.org/x/crypto/argon2 ベースの hash/verify", "status": "pending"}
+            "S1e7eeb-1-1": {
+              "title": "engine/user パッケージ",
+              "description": "User / Group / AuthMethod / Role の構造体と SQLite store",
+              "status": "pending"
+            },
+            "S1e7eeb-1-2": {
+              "title": "argon2id パスワードハッシュ",
+              "description": "golang.org/x/crypto/argon2 ベースの hash/verify",
+              "status": "pending"
+            }
           }
         },
         "S1e7eeb-2": {
@@ -204,9 +268,21 @@
             }
           ],
           "tasks": {
-            "S1e7eeb-2-1": {"title": "engine/auth/session", "description": "セッション cookie の発行/検証、SQLite に sessions テーブル", "status": "pending"},
-            "S1e7eeb-2-2": {"title": "Gateway 認証ミドルウェア", "description": "ロールベースのルーティング (/ui/admin → admin、/ui → user 以上)", "status": "pending"},
-            "S1e7eeb-2-3": {"title": "Login UI", "description": "htmx で POST /login → cookie 発行 → /ui/admin リダイレクト", "status": "pending"}
+            "S1e7eeb-2-1": {
+              "title": "engine/auth/session",
+              "description": "セッション cookie の発行/検証、SQLite に sessions テーブル",
+              "status": "pending"
+            },
+            "S1e7eeb-2-2": {
+              "title": "Gateway 認証ミドルウェア",
+              "description": "ロールベースのルーティング (/ui/admin → admin、/ui → user 以上)",
+              "status": "pending"
+            },
+            "S1e7eeb-2-3": {
+              "title": "Login UI",
+              "description": "htmx で POST /login → cookie 発行 → /ui/admin リダイレクト",
+              "status": "pending"
+            }
           }
         },
         "S1e7eeb-3": {
@@ -228,8 +304,16 @@
             }
           ],
           "tasks": {
-            "S1e7eeb-3-1": {"title": "/setup ウィザードページ (Step1: admin 作成)", "description": "ストレージ・Share の追加ステップは S99702c で拡張予定", "status": "pending"},
-            "S1e7eeb-3-2": {"title": "admin 未作成判定ミドルウェア", "description": "User テーブルに admin が無いときだけ /setup を許可", "status": "pending"}
+            "S1e7eeb-3-1": {
+              "title": "/setup ウィザードページ (Step1: admin 作成)",
+              "description": "ストレージ・Share の追加ステップは S99702c で拡張予定",
+              "status": "pending"
+            },
+            "S1e7eeb-3-2": {
+              "title": "admin 未作成判定ミドルウェア",
+              "description": "User テーブルに admin が無いときだけ /setup を許可",
+              "status": "pending"
+            }
           }
         }
       }
@@ -253,9 +337,21 @@
             }
           ],
           "tasks": {
-            "Se3b190-1-1": {"title": "internal/cmd.Executor interface", "description": "Run(ctx, name, args...) (stdout, stderr, error) を返す抽象", "status": "pending"},
-            "Se3b190-1-2": {"title": "zpool list / status のパーサ", "description": "テーブルドリブンテストでサンプル出力を fixtures に置き検証", "status": "pending"},
-            "Se3b190-1-3": {"title": "zpool import スキャンのパーサ", "description": "ScanImportable で GUID/Status/Disks/Datasets を抽出", "status": "pending"}
+            "Se3b190-1-1": {
+              "title": "internal/cmd.Executor interface",
+              "description": "Run(ctx, name, args...) (stdout, stderr, error) を返す抽象",
+              "status": "pending"
+            },
+            "Se3b190-1-2": {
+              "title": "zpool list / status のパーサ",
+              "description": "テーブルドリブンテストでサンプル出力を fixtures に置き検証",
+              "status": "pending"
+            },
+            "Se3b190-1-3": {
+              "title": "zpool import スキャンのパーサ",
+              "description": "ScanImportable で GUID/Status/Disks/Datasets を抽出",
+              "status": "pending"
+            }
           }
         },
         "Se3b190-2": {
@@ -271,9 +367,21 @@
             }
           ],
           "tasks": {
-            "Se3b190-2-1": {"title": "ListDisks 実装", "description": "lsblk + smartctl の出力をマージ", "status": "pending"},
-            "Se3b190-2-2": {"title": "GetSMART 実装", "description": "smartctl -A -j で JSON 取得 → SMARTInfo 構造体", "status": "pending"},
-            "Se3b190-2-3": {"title": "Storage 画面の Disk セクション", "description": "htmx でリスト表示、HTMX-Refresh で 30s 自動更新", "status": "pending"}
+            "Se3b190-2-1": {
+              "title": "ListDisks 実装",
+              "description": "lsblk + smartctl の出力をマージ",
+              "status": "pending"
+            },
+            "Se3b190-2-2": {
+              "title": "GetSMART 実装",
+              "description": "smartctl -A -j で JSON 取得 → SMARTInfo 構造体",
+              "status": "pending"
+            },
+            "Se3b190-2-3": {
+              "title": "Storage 画面の Disk セクション",
+              "description": "htmx でリスト表示、HTMX-Refresh で 30s 自動更新",
+              "status": "pending"
+            }
           }
         },
         "Se3b190-3": {
@@ -289,8 +397,16 @@
             }
           ],
           "tasks": {
-            "Se3b190-3-1": {"title": "ScanImportable 実装", "description": "zpool import のドライランで候補一覧を取得", "status": "pending"},
-            "Se3b190-3-2": {"title": "UI セクション追加", "description": "ボタンは置くが import 実装は Sprint 5 で完成させる旨の表示", "status": "pending"}
+            "Se3b190-3-1": {
+              "title": "ScanImportable 実装",
+              "description": "zpool import のドライランで候補一覧を取得",
+              "status": "pending"
+            },
+            "Se3b190-3-2": {
+              "title": "UI セクション追加",
+              "description": "ボタンは置くが import 実装は Sprint 5 で完成させる旨の表示",
+              "status": "pending"
+            }
           }
         }
       }
@@ -320,10 +436,26 @@
             }
           ],
           "tasks": {
-            "S9db742-1-1": {"title": "CreatePool 実装", "description": "PoolConfig → zpool create コマンド組み立て", "status": "pending"},
-            "S9db742-1-2": {"title": "special vdev / spares のサポート", "description": "small_block_threshold パラメータ含む", "status": "pending"},
-            "S9db742-1-3": {"title": "推奨構成ロジック", "description": "design.md §18.2 の推奨表に基づく『推奨』表示", "status": "pending"},
-            "S9db742-1-4": {"title": "破壊的操作の確認モーダル", "description": "プール名手入力で confirm", "status": "pending"}
+            "S9db742-1-1": {
+              "title": "CreatePool 実装",
+              "description": "PoolConfig → zpool create コマンド組み立て",
+              "status": "pending"
+            },
+            "S9db742-1-2": {
+              "title": "special vdev / spares のサポート",
+              "description": "small_block_threshold パラメータ含む",
+              "status": "pending"
+            },
+            "S9db742-1-3": {
+              "title": "推奨構成ロジック",
+              "description": "design.md §18.2 の推奨表に基づく『推奨』表示",
+              "status": "pending"
+            },
+            "S9db742-1-4": {
+              "title": "破壊的操作の確認モーダル",
+              "description": "プール名手入力で confirm",
+              "status": "pending"
+            }
           }
         },
         "S9db742-2": {
@@ -345,9 +477,21 @@
             }
           ],
           "tasks": {
-            "S9db742-2-1": {"title": "CreateVolume + プリセット適用", "description": "VolumeOpts.Preset → zfs プロパティに展開", "status": "pending"},
-            "S9db742-2-2": {"title": "Snapshot CRUD + Rollback", "description": "CreateSnapshot/ListSnapshots/Rollback の実装と UI", "status": "pending"},
-            "S9db742-2-3": {"title": "Quota 設定", "description": "SetQuota の実装と UI フィールド", "status": "pending"}
+            "S9db742-2-1": {
+              "title": "CreateVolume + プリセット適用",
+              "description": "VolumeOpts.Preset → zfs プロパティに展開",
+              "status": "pending"
+            },
+            "S9db742-2-2": {
+              "title": "Snapshot CRUD + Rollback",
+              "description": "CreateSnapshot/ListSnapshots/Rollback の実装と UI",
+              "status": "pending"
+            },
+            "S9db742-2-3": {
+              "title": "Quota 設定",
+              "description": "SetQuota の実装と UI フィールド",
+              "status": "pending"
+            }
           }
         },
         "S9db742-3": {
@@ -369,8 +513,16 @@
             }
           ],
           "tasks": {
-            "S9db742-3-1": {"title": "ImportPool 実装", "description": "ImportOpts (Force/ReadOnly/AltRoot) の zpool import への変換", "status": "pending"},
-            "S9db742-3-2": {"title": "config.json apply 経由の import", "description": "mode: import / auto_share / share_map に対応", "status": "pending"}
+            "S9db742-3-1": {
+              "title": "ImportPool 実装",
+              "description": "ImportOpts (Force/ReadOnly/AltRoot) の zpool import への変換",
+              "status": "pending"
+            },
+            "S9db742-3-2": {
+              "title": "config.json apply 経由の import",
+              "description": "mode: import / auto_share / share_map に対応",
+              "status": "pending"
+            }
           }
         }
       }
@@ -400,11 +552,31 @@
             }
           ],
           "tasks": {
-            "Sd64f38-1-1": {"title": "ShareEngine interface と SQLite store", "description": "shares テーブル + access テーブル", "status": "pending"},
-            "Sd64f38-1-2": {"title": "smb.conf テンプレート", "description": "design.md §5.3 のパフォーマンスデフォルトを含むテンプレート", "status": "pending"},
-            "Sd64f38-1-3": {"title": "/etc/exports テンプレート", "description": "NFS 4.2 デフォルト", "status": "pending"},
-            "Sd64f38-1-4": {"title": "smbd / nfsd reload 抽象化", "description": "CmdExecutor 経由で systemctl reload", "status": "pending"},
-            "Sd64f38-1-5": {"title": "共有パス重複/入れ子バリデーション", "description": "登録時に検出して warning 表示", "status": "pending"}
+            "Sd64f38-1-1": {
+              "title": "ShareEngine interface と SQLite store",
+              "description": "shares テーブル + access テーブル",
+              "status": "pending"
+            },
+            "Sd64f38-1-2": {
+              "title": "smb.conf テンプレート",
+              "description": "design.md §5.3 のパフォーマンスデフォルトを含むテンプレート",
+              "status": "pending"
+            },
+            "Sd64f38-1-3": {
+              "title": "/etc/exports テンプレート",
+              "description": "NFS 4.2 デフォルト",
+              "status": "pending"
+            },
+            "Sd64f38-1-4": {
+              "title": "smbd / nfsd reload 抽象化",
+              "description": "CmdExecutor 経由で systemctl reload",
+              "status": "pending"
+            },
+            "Sd64f38-1-5": {
+              "title": "共有パス重複/入れ子バリデーション",
+              "description": "登録時に検出して warning 表示",
+              "status": "pending"
+            }
           }
         },
         "Sd64f38-2": {
@@ -420,8 +592,16 @@
             }
           ],
           "tasks": {
-            "Sd64f38-2-1": {"title": "用途 → dataset プリセットマッピング", "description": "media→media, docs→general, など", "status": "pending"},
-            "Sd64f38-2-2": {"title": "share 作成フォーム", "description": "share_picker UX に近い 1 ステップ完結", "status": "pending"}
+            "Sd64f38-2-1": {
+              "title": "用途 → dataset プリセットマッピング",
+              "description": "media→media, docs→general, など",
+              "status": "pending"
+            },
+            "Sd64f38-2-2": {
+              "title": "share 作成フォーム",
+              "description": "share_picker UX に近い 1 ステップ完結",
+              "status": "pending"
+            }
           }
         }
       }
@@ -451,8 +631,16 @@
             }
           ],
           "tasks": {
-            "S1bccf5-1-1": {"title": "Manifest 型と YAML タグ", "description": "containers / shares / storage / setup / settings / routing / auth / health / backup / configs", "status": "pending"},
-            "S1bccf5-1-2": {"title": "バリデータ", "description": "テーブルドリブンで成功/失敗ケースを網羅", "status": "pending"}
+            "S1bccf5-1-1": {
+              "title": "Manifest 型と YAML タグ",
+              "description": "containers / shares / storage / setup / settings / routing / auth / health / backup / configs",
+              "status": "pending"
+            },
+            "S1bccf5-1-2": {
+              "title": "バリデータ",
+              "description": "テーブルドリブンで成功/失敗ケースを網羅",
+              "status": "pending"
+            }
           }
         },
         "S1bccf5-2": {
@@ -474,10 +662,26 @@
             }
           ],
           "tasks": {
-            "S1bccf5-2-1": {"title": "RegistryClient interface", "description": "FetchRegistry / FetchManifest", "status": "pending"},
-            "S1bccf5-2-2": {"title": "cosign keyless ライブラリ統合", "description": "sigstore-go を採用、verify-blob 相当", "status": "pending"},
-            "S1bccf5-2-3": {"title": "ハッシュ + 署名の二重チェック", "description": "片方失敗で即停止", "status": "pending"},
-            "S1bccf5-2-4": {"title": "app_registries 設定", "description": "config.json で official 以外を追加可能、明示的 trust 設定", "status": "pending"}
+            "S1bccf5-2-1": {
+              "title": "RegistryClient interface",
+              "description": "FetchRegistry / FetchManifest",
+              "status": "pending"
+            },
+            "S1bccf5-2-2": {
+              "title": "cosign keyless ライブラリ統合",
+              "description": "sigstore-go を採用、verify-blob 相当",
+              "status": "pending"
+            },
+            "S1bccf5-2-3": {
+              "title": "ハッシュ + 署名の二重チェック",
+              "description": "片方失敗で即停止",
+              "status": "pending"
+            },
+            "S1bccf5-2-4": {
+              "title": "app_registries 設定",
+              "description": "config.json で official 以外を追加可能、明示的 trust 設定",
+              "status": "pending"
+            }
           }
         },
         "S1bccf5-3": {
@@ -499,9 +703,21 @@
             }
           ],
           "tasks": {
-            "S1bccf5-3-1": {"title": "Dataset プランナー", "description": "pool_hint + フォールバックロジック", "status": "pending"},
-            "S1bccf5-3-2": {"title": "ポートアロケータ", "description": "SQLite に予約レコード", "status": "pending"},
-            "S1bccf5-3-3": {"title": "内部 secrets ストア", "description": "config.json export 時は env 参照のみ、平文を含めない", "status": "pending"}
+            "S1bccf5-3-1": {
+              "title": "Dataset プランナー",
+              "description": "pool_hint + フォールバックロジック",
+              "status": "pending"
+            },
+            "S1bccf5-3-2": {
+              "title": "ポートアロケータ",
+              "description": "SQLite に予約レコード",
+              "status": "pending"
+            },
+            "S1bccf5-3-3": {
+              "title": "内部 secrets ストア",
+              "description": "config.json export 時は env 参照のみ、平文を含めない",
+              "status": "pending"
+            }
           }
         }
       }
@@ -531,10 +747,26 @@
             }
           ],
           "tasks": {
-            "S65b510-1-1": {"title": "Docker SDK 統合", "description": "docker/docker クライアント + compose-spec パーサ", "status": "pending"},
-            "S65b510-1-2": {"title": "compose YAML テンプレート", "description": "manifest → compose 変換、bind mount / network / env を反映", "status": "pending"},
-            "S65b510-1-3": {"title": "configs テンプレート展開", "description": "Go template + .KuraOS namespace", "status": "pending"},
-            "S65b510-1-4": {"title": "ヘルスチェック待ちと UI 進捗", "description": "SSE で進捗をストリーム", "status": "pending"}
+            "S65b510-1-1": {
+              "title": "Docker SDK 統合",
+              "description": "docker/docker クライアント + compose-spec パーサ",
+              "status": "pending"
+            },
+            "S65b510-1-2": {
+              "title": "compose YAML テンプレート",
+              "description": "manifest → compose 変換、bind mount / network / env を反映",
+              "status": "pending"
+            },
+            "S65b510-1-3": {
+              "title": "configs テンプレート展開",
+              "description": "Go template + .KuraOS namespace",
+              "status": "pending"
+            },
+            "S65b510-1-4": {
+              "title": "ヘルスチェック待ちと UI 進捗",
+              "description": "SSE で進捗をストリーム",
+              "status": "pending"
+            }
           }
         },
         "S65b510-2": {
@@ -550,8 +782,16 @@
             }
           ],
           "tasks": {
-            "S65b510-2-1": {"title": "ルーティング動的更新", "description": "アプリ install/uninstall に追従", "status": "pending"},
-            "S65b510-2-2": {"title": "strip_prefix / base_path_env 対応", "description": "path 方式の 2 種類", "status": "pending"}
+            "S65b510-2-1": {
+              "title": "ルーティング動的更新",
+              "description": "アプリ install/uninstall に追従",
+              "status": "pending"
+            },
+            "S65b510-2-2": {
+              "title": "strip_prefix / base_path_env 対応",
+              "description": "path 方式の 2 種類",
+              "status": "pending"
+            }
           }
         },
         "S65b510-3": {
@@ -573,9 +813,21 @@
             }
           ],
           "tasks": {
-            "S65b510-3-1": {"title": "Update フロー", "description": "snapshot → pull → up → healthcheck → ロールバック分岐", "status": "pending"},
-            "S65b510-3-2": {"title": "Uninstall フロー", "description": "container 削除 / dataset は残す", "status": "pending"},
-            "S65b510-3-3": {"title": "アプリストア UI", "description": "カテゴリ表示・1〜2 ステップのインストールフォーム", "status": "pending"}
+            "S65b510-3-1": {
+              "title": "Update フロー",
+              "description": "snapshot → pull → up → healthcheck → ロールバック分岐",
+              "status": "pending"
+            },
+            "S65b510-3-2": {
+              "title": "Uninstall フロー",
+              "description": "container 削除 / dataset は残す",
+              "status": "pending"
+            },
+            "S65b510-3-3": {
+              "title": "アプリストア UI",
+              "description": "カテゴリ表示・1〜2 ステップのインストールフォーム",
+              "status": "pending"
+            }
           }
         }
       }
@@ -605,8 +857,16 @@
             }
           ],
           "tasks": {
-            "S822961-1-1": {"title": "zitadel/oidc Storage 実装", "description": "AuthRequest / Client / Token / UserInfo の SQLite 永続化", "status": "pending"},
-            "S822961-1-2": {"title": "op の組み込みと Gateway 連携", "description": "/oidc/* を OP にバインド", "status": "pending"}
+            "S822961-1-1": {
+              "title": "zitadel/oidc Storage 実装",
+              "description": "AuthRequest / Client / Token / UserInfo の SQLite 永続化",
+              "status": "pending"
+            },
+            "S822961-1-2": {
+              "title": "op の組み込みと Gateway 連携",
+              "description": "/oidc/* を OP にバインド",
+              "status": "pending"
+            }
           }
         },
         "S822961-2": {
@@ -628,8 +888,16 @@
             }
           ],
           "tasks": {
-            "S822961-2-1": {"title": "OIDC client 動的登録", "description": "auth.mode=oidc 時の client 作成 + secret 注入", "status": "pending"},
-            "S822961-2-2": {"title": "forward_auth ミドルウェア", "description": "header_user 設定で X-Forwarded-User を付与", "status": "pending"}
+            "S822961-2-1": {
+              "title": "OIDC client 動的登録",
+              "description": "auth.mode=oidc 時の client 作成 + secret 注入",
+              "status": "pending"
+            },
+            "S822961-2-2": {
+              "title": "forward_auth ミドルウェア",
+              "description": "header_user 設定で X-Forwarded-User を付与",
+              "status": "pending"
+            }
           }
         },
         "S822961-3": {
@@ -651,8 +919,16 @@
             }
           ],
           "tasks": {
-            "S822961-3-1": {"title": "engine/auth/federation", "description": "Google OIDC RP として動作", "status": "pending"},
-            "S822961-3-2": {"title": "AuthMethod 紐付け UI", "description": "Users 画面で external IdP 紐付けのトグル", "status": "pending"}
+            "S822961-3-1": {
+              "title": "engine/auth/federation",
+              "description": "Google OIDC RP として動作",
+              "status": "pending"
+            },
+            "S822961-3-2": {
+              "title": "AuthMethod 紐付け UI",
+              "description": "Users 画面で external IdP 紐付けのトグル",
+              "status": "pending"
+            }
           }
         }
       }
@@ -682,10 +958,26 @@
             }
           ],
           "tasks": {
-            "S8a756d-1-1": {"title": "Ring Buffer 実装", "description": "16 バイト/エントリの固定サイズファイル", "status": "pending"},
-            "S8a756d-1-2": {"title": "5 分 / 1 時間集約タスク", "description": "別 goroutine で集約", "status": "pending"},
-            "S8a756d-1-3": {"title": "/metrics 出力", "description": "OpenMetrics 形式", "status": "pending"},
-            "S8a756d-1-4": {"title": "Dashboard ウィジェット", "description": "プール容量 / CPU / メモリ", "status": "pending"}
+            "S8a756d-1-1": {
+              "title": "Ring Buffer 実装",
+              "description": "16 バイト/エントリの固定サイズファイル",
+              "status": "pending"
+            },
+            "S8a756d-1-2": {
+              "title": "5 分 / 1 時間集約タスク",
+              "description": "別 goroutine で集約",
+              "status": "pending"
+            },
+            "S8a756d-1-3": {
+              "title": "/metrics 出力",
+              "description": "OpenMetrics 形式",
+              "status": "pending"
+            },
+            "S8a756d-1-4": {
+              "title": "Dashboard ウィジェット",
+              "description": "プール容量 / CPU / メモリ",
+              "status": "pending"
+            }
           }
         },
         "S8a756d-2": {
@@ -701,9 +993,21 @@
             }
           ],
           "tasks": {
-            "S8a756d-2-1": {"title": "AlertEvaluator", "description": "metric ワイルドカード対応 (pool.*.used_percent)", "status": "pending"},
-            "S8a756d-2-2": {"title": "EventBus", "description": "Go channel ベース、subscriber 登録", "status": "pending"},
-            "S8a756d-2-3": {"title": "event_log テーブル", "description": "全イベントを永続化", "status": "pending"}
+            "S8a756d-2-1": {
+              "title": "AlertEvaluator",
+              "description": "metric ワイルドカード対応 (pool.*.used_percent)",
+              "status": "pending"
+            },
+            "S8a756d-2-2": {
+              "title": "EventBus",
+              "description": "Go channel ベース、subscriber 登録",
+              "status": "pending"
+            },
+            "S8a756d-2-3": {
+              "title": "event_log テーブル",
+              "description": "全イベントを永続化",
+              "status": "pending"
+            }
           }
         },
         "S8a756d-3": {
@@ -725,9 +1029,21 @@
             }
           ],
           "tasks": {
-            "S8a756d-3-1": {"title": "Channel interface と 5 種実装", "description": "ntfy / webhook / smtp / line_notify / gotify", "status": "pending"},
-            "S8a756d-3-2": {"title": "テスト送信機能", "description": "UI ボタン + 即時送信", "status": "pending"},
-            "S8a756d-3-3": {"title": "イベントログビューア", "description": "event_log のフィルタ UI", "status": "pending"}
+            "S8a756d-3-1": {
+              "title": "Channel interface と 5 種実装",
+              "description": "ntfy / webhook / smtp / line_notify / gotify",
+              "status": "pending"
+            },
+            "S8a756d-3-2": {
+              "title": "テスト送信機能",
+              "description": "UI ボタン + 即時送信",
+              "status": "pending"
+            },
+            "S8a756d-3-3": {
+              "title": "イベントログビューア",
+              "description": "event_log のフィルタ UI",
+              "status": "pending"
+            }
           }
         }
       }
@@ -751,8 +1067,16 @@
             }
           ],
           "tasks": {
-            "Se1e7a6-1-1": {"title": "cron 風スケジューラ", "description": "robfig/cron v3 を採用", "status": "pending"},
-            "Se1e7a6-1-2": {"title": "retention ロジック", "description": "hourly/daily/monthly の保持数で削除", "status": "pending"}
+            "Se1e7a6-1-1": {
+              "title": "cron 風スケジューラ",
+              "description": "robfig/cron v3 を採用",
+              "status": "pending"
+            },
+            "Se1e7a6-1-2": {
+              "title": "retention ロジック",
+              "description": "hourly/daily/monthly の保持数で削除",
+              "status": "pending"
+            }
           }
         },
         "Se1e7a6-2": {
@@ -774,10 +1098,26 @@
             }
           ],
           "tasks": {
-            "Se1e7a6-2-1": {"title": "BackupBackend interface", "description": "Send / Restore / List", "status": "pending"},
-            "Se1e7a6-2-2": {"title": "zfs_send 実装", "description": "ssh + zfs send | zfs receive のラッパー", "status": "pending"},
-            "Se1e7a6-2-3": {"title": "restic 実装", "description": "restic CLI ラッパー", "status": "pending"},
-            "Se1e7a6-2-4": {"title": "rclone 実装", "description": "rclone CLI ラッパー", "status": "pending"}
+            "Se1e7a6-2-1": {
+              "title": "BackupBackend interface",
+              "description": "Send / Restore / List",
+              "status": "pending"
+            },
+            "Se1e7a6-2-2": {
+              "title": "zfs_send 実装",
+              "description": "ssh + zfs send | zfs receive のラッパー",
+              "status": "pending"
+            },
+            "Se1e7a6-2-3": {
+              "title": "restic 実装",
+              "description": "restic CLI ラッパー",
+              "status": "pending"
+            },
+            "Se1e7a6-2-4": {
+              "title": "rclone 実装",
+              "description": "rclone CLI ラッパー",
+              "status": "pending"
+            }
           }
         },
         "Se1e7a6-3": {
@@ -799,9 +1139,21 @@
             }
           ],
           "tasks": {
-            "Se1e7a6-3-1": {"title": "graceful stop シーケンス", "description": "アプリの停止順序とタイムアウト", "status": "pending"},
-            "Se1e7a6-3-2": {"title": "対象 dataset 列挙", "description": "rootfs + backup:true の dataset", "status": "pending"},
-            "Se1e7a6-3-3": {"title": "復旧手順を README に記載", "description": "design.md §17.2 の手順をコピー", "status": "pending"}
+            "Se1e7a6-3-1": {
+              "title": "graceful stop シーケンス",
+              "description": "アプリの停止順序とタイムアウト",
+              "status": "pending"
+            },
+            "Se1e7a6-3-2": {
+              "title": "対象 dataset 列挙",
+              "description": "rootfs + backup:true の dataset",
+              "status": "pending"
+            },
+            "Se1e7a6-3-3": {
+              "title": "復旧手順を README に記載",
+              "description": "design.md §17.2 の手順をコピー",
+              "status": "pending"
+            }
           }
         }
       }
@@ -837,9 +1189,21 @@
             }
           ],
           "tasks": {
-            "Sf92666-1-1": {"title": "self_signed CA 生成と保管", "description": "CA + leaf cert、ブラウザインストール案内", "status": "pending"},
-            "Sf92666-1-2": {"title": "engine/network/acme/ レジストリと Cloudflare 実装", "description": "design.md §15.2 のモジュール構造に準拠", "status": "pending"},
-            "Sf92666-1-3": {"title": "lego ラッパー", "description": "DNSProvider の NewLegoProvider 経由で challenge.Provider を取得", "status": "pending"}
+            "Sf92666-1-1": {
+              "title": "self_signed CA 生成と保管",
+              "description": "CA + leaf cert、ブラウザインストール案内",
+              "status": "pending"
+            },
+            "Sf92666-1-2": {
+              "title": "engine/network/acme/ レジストリと Cloudflare 実装",
+              "description": "design.md §15.2 のモジュール構造に準拠",
+              "status": "pending"
+            },
+            "Sf92666-1-3": {
+              "title": "lego ラッパー",
+              "description": "DNSProvider の NewLegoProvider 経由で challenge.Provider を取得",
+              "status": "pending"
+            }
           }
         },
         "Sf92666-2": {
@@ -855,8 +1219,16 @@
             }
           ],
           "tasks": {
-            "Sf92666-2-1": {"title": "engine/network", "description": "netplan 設定ファイル生成", "status": "pending"},
-            "Sf92666-2-2": {"title": "Network UI", "description": "現在の状態 + 編集フォーム", "status": "pending"}
+            "Sf92666-2-1": {
+              "title": "engine/network",
+              "description": "netplan 設定ファイル生成",
+              "status": "pending"
+            },
+            "Sf92666-2-2": {
+              "title": "Network UI",
+              "description": "現在の状態 + 編集フォーム",
+              "status": "pending"
+            }
           }
         },
         "Sf92666-3": {
@@ -878,10 +1250,26 @@
             }
           ],
           "tasks": {
-            "Sf92666-3-1": {"title": "JSONL ストア + ローテーション", "description": "日次ローテ + retention", "status": "pending"},
-            "Sf92666-3-2": {"title": "Docker ログ ingester", "description": "goroutine で全コンテナを tail", "status": "pending"},
-            "Sf92666-3-3": {"title": "journald ingester", "description": "systemd-journal-gatewayd 経由 or sd_journal", "status": "pending"},
-            "Sf92666-3-4": {"title": "SSE ライブビューア", "description": "filter 適用後ストリーム", "status": "pending"}
+            "Sf92666-3-1": {
+              "title": "JSONL ストア + ローテーション",
+              "description": "日次ローテ + retention",
+              "status": "pending"
+            },
+            "Sf92666-3-2": {
+              "title": "Docker ログ ingester",
+              "description": "goroutine で全コンテナを tail",
+              "status": "pending"
+            },
+            "Sf92666-3-3": {
+              "title": "journald ingester",
+              "description": "systemd-journal-gatewayd 経由 or sd_journal",
+              "status": "pending"
+            },
+            "Sf92666-3-4": {
+              "title": "SSE ライブビューア",
+              "description": "filter 適用後ストリーム",
+              "status": "pending"
+            }
           }
         },
         "Sf92666-4": {
@@ -903,9 +1291,21 @@
             }
           ],
           "tasks": {
-            "Sf92666-4-1": {"title": "GitHub Releases から検出", "description": "auto_check / auto_apply 設定の反映", "status": "pending"},
-            "Sf92666-4-2": {"title": "署名検証 + アトミック置換", "description": "kura.new → kura のリネーム", "status": "pending"},
-            "Sf92666-4-3": {"title": "セルフチェックとロールバック", "description": "起動 5 秒で /healthz 200 を確認", "status": "pending"}
+            "Sf92666-4-1": {
+              "title": "GitHub Releases から検出",
+              "description": "auto_check / auto_apply 設定の反映",
+              "status": "pending"
+            },
+            "Sf92666-4-2": {
+              "title": "署名検証 + アトミック置換",
+              "description": "kura.new → kura のリネーム",
+              "status": "pending"
+            },
+            "Sf92666-4-3": {
+              "title": "セルフチェックとロールバック",
+              "description": "起動 5 秒で /healthz 200 を確認",
+              "status": "pending"
+            }
           }
         }
       }
@@ -941,10 +1341,26 @@
             }
           ],
           "tasks": {
-            "S0eedaa-1-1": {"title": "endpoints 実装", "description": "全 8 エンドポイント (design.md §6.4)", "status": "pending"},
-            "S0eedaa-1-2": {"title": "X-Kura-Token HMAC 検証", "description": "Gateway 発行のトークンを検証", "status": "pending"},
-            "S0eedaa-1-3": {"title": "アプリスコープ評価", "description": "scopes 構造に基づく allow/deny", "status": "pending"},
-            "S0eedaa-1-4": {"title": "Range / streaming サポート", "description": "io.Copy + sendfile が効く実装", "status": "pending"}
+            "S0eedaa-1-1": {
+              "title": "endpoints 実装",
+              "description": "全 8 エンドポイント (design.md §6.4)",
+              "status": "pending"
+            },
+            "S0eedaa-1-2": {
+              "title": "X-Kura-Token HMAC 検証",
+              "description": "Gateway 発行のトークンを検証",
+              "status": "pending"
+            },
+            "S0eedaa-1-3": {
+              "title": "アプリスコープ評価",
+              "description": "scopes 構造に基づく allow/deny",
+              "status": "pending"
+            },
+            "S0eedaa-1-4": {
+              "title": "Range / streaming サポート",
+              "description": "io.Copy + sendfile が効く実装",
+              "status": "pending"
+            }
           }
         },
         "S0eedaa-2": {
@@ -966,8 +1382,16 @@
             }
           ],
           "tasks": {
-            "S0eedaa-2-1": {"title": "Files UI", "description": "htmx でリスト + 操作", "status": "pending"},
-            "S0eedaa-2-2": {"title": "アップロード進捗", "description": "fetch + Progress イベント", "status": "pending"}
+            "S0eedaa-2-1": {
+              "title": "Files UI",
+              "description": "htmx でリスト + 操作",
+              "status": "pending"
+            },
+            "S0eedaa-2-2": {
+              "title": "アップロード進捗",
+              "description": "fetch + Progress イベント",
+              "status": "pending"
+            }
           }
         }
       }
@@ -997,8 +1421,16 @@
             }
           ],
           "tasks": {
-            "S99702c-1-1": {"title": "/ui ポータル UI", "description": "ランチャー風", "status": "pending"},
-            "S99702c-1-2": {"title": "可視性フィルタ", "description": "visibility.users / groups の評価", "status": "pending"}
+            "S99702c-1-1": {
+              "title": "/ui ポータル UI",
+              "description": "ランチャー風",
+              "status": "pending"
+            },
+            "S99702c-1-2": {
+              "title": "可視性フィルタ",
+              "description": "visibility.users / groups の評価",
+              "status": "pending"
+            }
           }
         },
         "S99702c-2": {
@@ -1020,9 +1452,21 @@
             }
           ],
           "tasks": {
-            "S99702c-2-1": {"title": "推奨構成エンジン", "description": "ディスク数/種類 → topology + special vdev の判定", "status": "pending"},
-            "S99702c-2-2": {"title": "ウィザード UI Step2-Step5", "description": "S1e7eeb の Step1 を拡張", "status": "pending"},
-            "S99702c-2-3": {"title": "kura init CLI", "description": "config.json をストリームから流し込み", "status": "pending"}
+            "S99702c-2-1": {
+              "title": "推奨構成エンジン",
+              "description": "ディスク数/種類 → topology + special vdev の判定",
+              "status": "pending"
+            },
+            "S99702c-2-2": {
+              "title": "ウィザード UI Step2-Step5",
+              "description": "S1e7eeb の Step1 を拡張",
+              "status": "pending"
+            },
+            "S99702c-2-3": {
+              "title": "kura init CLI",
+              "description": "config.json をストリームから流し込み",
+              "status": "pending"
+            }
           }
         },
         "S99702c-3": {
@@ -1050,28 +1494,105 @@
             }
           ],
           "tasks": {
-            "S99702c-3-1": {"title": "言語選択 UI", "description": "Settings の Language タブ", "status": "pending"},
-            "S99702c-3-2": {"title": "config export-import の e2e 動作確認", "description": "全 Engine が apply に追従しているか最終確認", "status": "pending"},
-            "S99702c-3-3": {"title": "README / docs/RELEASE_NOTES.md", "description": "Phase 1 の総括", "status": "pending"}
+            "S99702c-3-1": {
+              "title": "言語選択 UI",
+              "description": "Settings の Language タブ",
+              "status": "pending"
+            },
+            "S99702c-3-2": {
+              "title": "config export-import の e2e 動作確認",
+              "description": "全 Engine が apply に追従しているか最終確認",
+              "status": "pending"
+            },
+            "S99702c-3-3": {
+              "title": "README / docs/RELEASE_NOTES.md",
+              "description": "Phase 1 の総括",
+              "status": "pending"
+            }
           }
         }
       }
     }
   },
   "dependencies": {
-    "S464e47": {"depends_on": ["S0ff37f"], "reason": "UI シェルと config パッケージは Go モジュール / SQLite ストア / i18n の土台に依存"},
-    "S1e7eeb": {"depends_on": ["S464e47"], "reason": "ログイン UI は UI シェルが必要、admin 作成ウィザードは config import の枠組みを利用"},
-    "Se3b190": {"depends_on": ["S1e7eeb"], "reason": "管理 UI の Storage 画面は admin ロールのログインを前提にする"},
-    "S9db742": {"depends_on": ["Se3b190"], "reason": "書き込み系は読み取り系のパーサと CmdExecutor を再利用"},
-    "Sd64f38": {"depends_on": ["S9db742"], "reason": "Share は Volume が存在することを前提"},
-    "S1bccf5": {"depends_on": ["Sd64f38"], "reason": "アプリ install は Share への bind mount と dataset プールが利用可能であることを前提"},
-    "S65b510": {"depends_on": ["S1bccf5"], "reason": "compose 生成と install/update/uninstall フローはマニフェスト + dataset / port allocator に依存"},
-    "S822961": {"depends_on": ["S65b510"], "reason": "OIDC client 自動登録と forward_auth はアプリの install フローに組み込まれる"},
-    "S8a756d": {"depends_on": ["S822961"], "reason": "監視は OS / ストレージ / アプリの全コンポーネントが立ち上がってから収集対象を持つ"},
-    "Se1e7a6": {"depends_on": ["S8a756d"], "reason": "バックアップは Event Bus にイベントを流し、通知チャネルを再利用する"},
-    "Sf92666": {"depends_on": ["Se1e7a6"], "reason": "TLS / Network / Logging / kura 自身の更新は基盤完成後に追加するクロスカット機能"},
-    "S0eedaa": {"depends_on": ["Sf92666"], "reason": "File API はアプリ + 認証 + Share + ロギングが揃った後に最も価値が出る"},
-    "S99702c": {"depends_on": ["S0eedaa"], "reason": "完全なウィザードと総仕上げは全 Engine 揃い後に実施"}
+    "S464e47": {
+      "depends_on": [
+        "S0ff37f"
+      ],
+      "reason": "UI シェルと config パッケージは Go モジュール / SQLite ストア / i18n の土台に依存"
+    },
+    "S1e7eeb": {
+      "depends_on": [
+        "S464e47"
+      ],
+      "reason": "ログイン UI は UI シェルが必要、admin 作成ウィザードは config import の枠組みを利用"
+    },
+    "Se3b190": {
+      "depends_on": [
+        "S1e7eeb"
+      ],
+      "reason": "管理 UI の Storage 画面は admin ロールのログインを前提にする"
+    },
+    "S9db742": {
+      "depends_on": [
+        "Se3b190"
+      ],
+      "reason": "書き込み系は読み取り系のパーサと CmdExecutor を再利用"
+    },
+    "Sd64f38": {
+      "depends_on": [
+        "S9db742"
+      ],
+      "reason": "Share は Volume が存在することを前提"
+    },
+    "S1bccf5": {
+      "depends_on": [
+        "Sd64f38"
+      ],
+      "reason": "アプリ install は Share への bind mount と dataset プールが利用可能であることを前提"
+    },
+    "S65b510": {
+      "depends_on": [
+        "S1bccf5"
+      ],
+      "reason": "compose 生成と install/update/uninstall フローはマニフェスト + dataset / port allocator に依存"
+    },
+    "S822961": {
+      "depends_on": [
+        "S65b510"
+      ],
+      "reason": "OIDC client 自動登録と forward_auth はアプリの install フローに組み込まれる"
+    },
+    "S8a756d": {
+      "depends_on": [
+        "S822961"
+      ],
+      "reason": "監視は OS / ストレージ / アプリの全コンポーネントが立ち上がってから収集対象を持つ"
+    },
+    "Se1e7a6": {
+      "depends_on": [
+        "S8a756d"
+      ],
+      "reason": "バックアップは Event Bus にイベントを流し、通知チャネルを再利用する"
+    },
+    "Sf92666": {
+      "depends_on": [
+        "Se1e7a6"
+      ],
+      "reason": "TLS / Network / Logging / kura 自身の更新は基盤完成後に追加するクロスカット機能"
+    },
+    "S0eedaa": {
+      "depends_on": [
+        "Sf92666"
+      ],
+      "reason": "File API はアプリ + 認証 + Share + ロギングが揃った後に最も価値が出る"
+    },
+    "S99702c": {
+      "depends_on": [
+        "S0eedaa"
+      ],
+      "reason": "完全なウィザードと総仕上げは全 Engine 揃い後に実施"
+    }
   },
   "backlog": [
     {

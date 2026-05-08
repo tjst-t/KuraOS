@@ -1,0 +1,42 @@
+{
+  "sprint": "S0ff37f",
+  "run_at": "2026-05-08T00:00:00Z",
+  "server_command": "./bin/kura (KURA_PORT injected via portman, KURA_STATE_DB to tmpdir)",
+  "summary": {
+    "total": 3,
+    "pass": 3,
+    "fail": 0,
+    "skip": 0
+  },
+  "tests": [
+    {
+      "name": "[AC-S0ff37f-1-1] make build produces bin/kura",
+      "file": "tests/acceptance/bootstrap.sh",
+      "status": "pass",
+      "duration_ms": null,
+      "error": null
+    },
+    {
+      "name": "[AC-S0ff37f-1-2] /healthz returns 200 with status/version/started_at",
+      "file": "tests/acceptance/bootstrap.sh",
+      "status": "pass",
+      "duration_ms": null,
+      "error": null
+    },
+    {
+      "name": "[AC-S0ff37f-2-1] state.db created with schema_version + kv tables",
+      "file": "tests/acceptance/store.sh",
+      "status": "pass",
+      "duration_ms": null,
+      "error": null
+    }
+  ],
+  "go_unit_tests": {
+    "summary": "PASS",
+    "packages": [
+      "github.com/kuraos-org/kura/i18n",
+      "github.com/kuraos-org/kura/internal/gateway",
+      "github.com/kuraos-org/kura/internal/store"
+    ]
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "system.startup": "kura を起動しています (port {0})",
+  "system.healthy": "正常稼働中",
+  "system.shutdown": "kura を停止しています"
+}

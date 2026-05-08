@@ -1,0 +1,43 @@
+{
+  "sprint": "S0ff37f",
+  "matrix": {
+    "S0ff37f-1": [
+      {
+        "criterion": "AC-S0ff37f-1-1",
+        "description": "make build で bin/kura が生成される",
+        "test_file": "tests/acceptance/bootstrap.sh",
+        "test_name": "[AC-S0ff37f-1-1] make build produces bin/kura",
+        "status": "pass",
+        "error": null
+      },
+      {
+        "criterion": "AC-S0ff37f-1-2",
+        "description": "make serve で portman が割当てたポートで kura が起動し、/healthz に 200 を返す",
+        "test_file": "tests/acceptance/bootstrap.sh",
+        "test_name": "[AC-S0ff37f-1-2] /healthz returns 200 with status/version/started_at",
+        "status": "pass",
+        "error": null
+      }
+    ],
+    "S0ff37f-2": [
+      {
+        "criterion": "AC-S0ff37f-2-1",
+        "description": "kura 起動時に state.db が無ければ作成され、空のテーブル群が用意される",
+        "test_file": "tests/acceptance/store.sh",
+        "test_name": "[AC-S0ff37f-2-1] state.db created with schema_version + kv tables",
+        "status": "pass",
+        "error": null
+      }
+    ],
+    "S0ff37f-3": [
+      {
+        "criterion": "AC-S0ff37f-3-1",
+        "description": "i18n/locales/ja.json が embed.FS で同梱され、起動時にロード成功する",
+        "test_file": "i18n/translator_test.go",
+        "test_name": "TestNew_LoadsDefaultLocale + TestT_RendersKnownMessages [AC-S0ff37f-3-1]",
+        "status": "pass",
+        "error": null
+      }
+    ]
+  }
+}
