@@ -3,14 +3,18 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S0ff37f",
+    "current_sprint": "Se3b190",
     "total": 14,
-    "done": 0,
+    "done": 3,
     "in_progress": 0,
-    "remaining": 14,
-    "percentage": 0,
-    "completed_sprints": 3,
-    "updated_at": "2026-05-08T01:08:00Z"
+    "remaining": 11,
+    "percentage": 21,
+    "completed_sprints": [
+      "S0ff37f",
+      "S464e47",
+      "S1e7eeb"
+    ],
+    "updated_at": "2026-05-08T01:11:00Z"
   },
   "execution_order": [
     "S0ff37f",

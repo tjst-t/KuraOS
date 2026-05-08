@@ -55,8 +55,9 @@ serve: build
 	  exit 1; \
 	fi
 	@. $(PORTMAN_ENV) && \
-	  echo "==> Starting kura on port $$KURA_PORT (log: $(LOG_FILE))" && \
-	  KURA_PORT=$$KURA_PORT nohup $(BIN) > $(LOG_FILE) 2>&1 & \
+	  : $${KURA_STATE_DB:=/tmp/kuraos-dev-state.db} && \
+	  echo "==> Starting kura on port $$KURA_PORT (state: $$KURA_STATE_DB, log: $(LOG_FILE))" && \
+	  KURA_PORT=$$KURA_PORT KURA_STATE_DB=$$KURA_STATE_DB nohup $(BIN) > $(LOG_FILE) 2>&1 & \
 	  echo $$! > $(PID_FILE) && \
 	  echo "    PID: $$(cat $(PID_FILE))"
 
