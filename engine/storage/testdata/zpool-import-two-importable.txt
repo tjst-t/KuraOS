@@ -1,0 +1,24 @@
+   pool: archive
+     id: 14882371020481034512
+  state: ONLINE
+ action: The pool can be imported using its name or numeric identifier.
+ config:
+
+	archive                         ONLINE
+	  raidz1-0                      ONLINE
+	    /dev/disk/by-id/sdx         ONLINE
+	    /dev/disk/by-id/sdy         ONLINE
+	    /dev/disk/by-id/sdz         ONLINE
+
+   pool: photos
+     id: 9241733812057894112
+  state: DEGRADED
+status: One or more devices contains corrupted data.
+ action: The pool can be imported despite missing or damaged devices.  The
+	fault tolerance of the pool may be compromised if imported.
+ config:
+
+	photos                         DEGRADED
+	  mirror-0                     DEGRADED
+	    /dev/disk/by-id/sdm        ONLINE
+	    14882371020481034589      UNAVAIL

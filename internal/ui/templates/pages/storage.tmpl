@@ -1,0 +1,173 @@
+{{- /*
+storage.tmpl — admin /ui/admin/storage page. Visual SSOT is
+prototype/claude_design/Storage.html: PoolCard grid + import banner + disks
+table. Volume / snapshot / scrub tabs from the prototype are deferred to
+subsequent sprints — this sprint covers only the read-only views shipped
+with engine/storage's ListPools / ListDisks / ListImportable.
+
+Data shape: PageData.Extra is a StorageView. All strings are pre-translated
+in storage.go so the template stays free of CLI-output tokens.
+*/ -}}
+{{ define "content" }}
+{{ $v := .Extra }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.storage.title" }}</h1>
+    <p class="page-sub">{{ $v.Subtitle }}</p>
+  </div>
+  <div class="row gap-sm" style="display:flex;gap:8px;">
+    <button type="button" class="btn" disabled aria-disabled="true" title="{{ T "page.storage.new_pool_deferred" }}">
+      {{ T "page.storage.new_pool" }}
+    </button>
+  </div>
+</div>
+
+{{ if $v.ImportError }}
+<div class="banner crit" data-testid="storage-error" style="margin-bottom:20px">
+  <div style="flex:1">{{ $v.ImportError }}</div>
+</div>
+{{ end }}
+
+{{ if $v.Importer.Visible }}
+<div class="banner" data-testid="storage-import-banner" style="margin-bottom:20px">
+  <div style="flex:1">
+    <div style="font-weight:550">{{ $v.Importer.BannerText }}</div>
+    <div style="font-size:11px;color:var(--text-3);margin-top:2px">{{ $v.Importer.Deferred }}</div>
+  </div>
+  <button type="button" class="btn btn-sm" disabled aria-disabled="true">{{ T "page.storage.import_inspect" }}</button>
+</div>
+{{ end }}
+
+{{ if $v.HasPools }}
+<section data-testid="storage-pools" style="margin-bottom:24px">
+  <div class="grid grid-2">
+    {{ range $v.Pools }}
+    <div class="card" data-testid="storage-pool-card" data-pool="{{ .Name }}">
+      <div class="card-head">
+        <div class="row center" style="display:flex;gap:12px;align-items:center">
+          <div>
+            <h3 class="card-title">{{ .Name }}</h3>
+            <p class="card-sub mono">{{ .Topology }}</p>
+          </div>
+        </div>
+        <span class="badge {{ .HealthClass }}" data-health="{{ .HealthBadge }}"><span class="badge-dot"></span>{{ .HealthBadge }}</span>
+      </div>
+      <div class="card-body">
+        <div class="row between center" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+          <span class="stat-value">{{ .UsedDisplay }}<span class="unit"> / {{ .SizeDisplay }}</span></span>
+          <span class="muted mono" style="font-size:11px">{{ .CapPercent }}%</span>
+        </div>
+        <div class="bar {{ .BarClass }}"><span style="width:{{ .CapPercent }}%"></span></div>
+        <div class="row between" style="display:flex;justify-content:space-between;margin-top:8px;font-size:12px;color:var(--text-3)">
+          <span>{{ .UsedSentence }}</span>
+          <span>{{ .FragSentence }}</span>
+        </div>
+
+        {{ if .Vdevs }}
+        <div class="vdev-tree" data-testid="storage-pool-topology" style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px">
+          {{ range .Vdevs }}
+          <div class="vdev-row" style="font-size:12px;line-height:1.5">
+            <span class="mono" style="color:var(--text-2)">{{ .TypeLabel }}{{ if .Layout }} ({{ .Layout }}){{ end }}</span>
+            {{ if .HealthBadge }}<span class="badge {{ .HealthClass }}" style="margin-left:8px"><span class="badge-dot"></span>{{ .HealthBadge }}</span>{{ end }}
+            {{ if .Children }}
+            <ul style="margin:4px 0 6px 18px;padding:0;list-style:none">
+              {{ range .Children }}
+              <li class="row center" style="display:flex;gap:8px;align-items:center;font-size:11px;margin:1px 0">
+                <span class="mono" style="color:var(--text-3)">{{ .Path }}</span>
+                {{ if .HealthBadge }}<span class="badge {{ .HealthClass }}"><span class="badge-dot"></span>{{ .HealthBadge }}</span>{{ end }}
+              </li>
+              {{ end }}
+            </ul>
+            {{ end }}
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+      </div>
+      <div class="card-foot">
+        <span>{{ T "page.storage.pool.data_intact" }}</span>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+</section>
+{{ else }}
+<div class="card" data-testid="storage-empty">
+  <div class="card-body">
+    <p class="muted" style="margin:0">{{ T "page.storage.empty" }}</p>
+  </div>
+</div>
+{{ end }}
+
+{{ if $v.HasDisks }}
+<section data-testid="storage-disks" style="margin-top:24px">
+  <div class="card">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.disks_heading" }}</h3>
+    </div>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ T "page.storage.disks.col.device" }}</th>
+          <th>{{ T "page.storage.disks.col.model" }}</th>
+          <th>{{ T "page.storage.disks.col.pool" }}</th>
+          <th class="td-num">{{ T "page.storage.disks.col.size" }}</th>
+          <th class="td-num">{{ T "page.storage.disks.col.temp" }}</th>
+          <th class="td-num">{{ T "page.storage.disks.col.hours" }}</th>
+          <th>{{ T "page.storage.disks.col.smart" }}</th>
+          <th>{{ T "page.storage.disks.col.usage" }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $v.Disks }}
+        <tr data-testid="storage-disk-row" data-path="{{ .Path }}">
+          <td><span class="mono">{{ .Path }}</span></td>
+          <td>
+            <div style="font-size:13px">{{ .Model }}</div>
+            {{ if .Serial }}<div class="mono" style="font-size:11px;color:var(--text-3)">S/N {{ .Serial }}</div>{{ end }}
+          </td>
+          <td>{{ if .Pool }}<span class="badge">{{ .Pool }}</span>{{ else }}<span class="muted">—</span>{{ end }}</td>
+          <td class="td-num">{{ .SizeDisplay }}</td>
+          <td class="td-num">{{ .TempDisplay }}</td>
+          <td class="td-num">{{ .HoursLabel }}</td>
+          <td><span class="badge {{ .SMARTClass }}" data-smart="{{ .SMARTBadge }}"><span class="badge-dot"></span>{{ .SMARTBadge }}</span></td>
+          <td><span class="badge {{ .UsageClass }}">{{ .UsageLabel }}</span></td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{ end }}
+
+{{ if $v.HasImports }}
+<section data-testid="storage-import" style="margin-top:24px">
+  <div class="card">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.storage.import_heading" }}</h3>
+      <p class="card-sub">{{ T "page.storage.import_deferred" }}</p>
+    </div>
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ T "page.storage.import.col.name" }}</th>
+          <th>{{ T "page.storage.import.col.guid" }}</th>
+          <th>{{ T "page.storage.import.col.state" }}</th>
+          <th>{{ T "page.storage.import.col.topology" }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range $v.Imports }}
+        <tr data-testid="storage-import-row" data-pool="{{ .Name }}">
+          <td><span class="mono">{{ .Name }}</span></td>
+          <td><span class="mono" style="font-size:11px">{{ .GUID }}</span></td>
+          <td><span class="badge {{ .StateClass }}"><span class="badge-dot"></span>{{ .StateBadge }}</span></td>
+          <td class="mono" style="font-size:12px">{{ .Topology }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</section>
+{{ end }}
+{{ end }}

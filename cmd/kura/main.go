@@ -12,8 +12,10 @@ import (
 	"time"
 
 	"github.com/kuraos-org/kura/engine/auth/session"
+	"github.com/kuraos-org/kura/engine/storage"
 	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
+	"github.com/kuraos-org/kura/internal/cmdexec"
 	"github.com/kuraos-org/kura/internal/gateway"
 	"github.com/kuraos-org/kura/internal/store"
 	"github.com/kuraos-org/kura/internal/ui"
@@ -79,6 +81,13 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("init ui: %w", err)
 	}
+
+	// Storage engine wires the production CmdExecutor that shells out to
+	// zpool / zfs / lsblk / smartctl. On a dev box without ZFS the engine's
+	// methods will return errors which the UI surfaces as a translated
+	// banner rather than crashing.
+	storageEngine := storage.NewCLI(cmdexec.NewReal())
+	uiRenderer.SetStorageHandler(uiRenderer.StorageHandler(ui.StorageDeps{Engine: storageEngine}))
 
 	users := user.NewStore(st.DB(), nil)
 	sessions := session.NewStore(st.DB())

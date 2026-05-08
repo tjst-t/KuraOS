@@ -1,0 +1,16 @@
+{
+  "smartctl": {"version": [7, 3], "exit_status": 0},
+  "device": {"name": "/dev/sdd", "type": "sat"},
+  "model_name": "TOSHIBA HDWG480",
+  "serial_number": "X1U2A1KK",
+  "smart_status": {"passed": true},
+  "temperature": {"current": 42},
+  "power_on_time": {"hours": 9240},
+  "ata_smart_attributes": {
+    "table": [
+      {"id": 5,   "name": "Reallocated_Sector_Ct", "raw": {"value": 12}},
+      {"id": 197, "name": "Current_Pending_Sector", "raw": {"value": 4}},
+      {"id": 199, "name": "UDMA_CRC_Error_Count", "raw": {"value": 0}}
+    ]
+  }
+}

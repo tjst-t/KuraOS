@@ -1,0 +1,46 @@
+{
+   "blockdevices": [
+      {
+         "name": "sda", "kname": "sda", "path": "/dev/sda", "type": "disk",
+         "size": 8001563222016, "rota": true, "model": "WDC WD80EFZZ-68BTXN0", "serial": "VLH8WMTL",
+         "tran": "sata", "rev": "0A83",
+         "mountpoint": null,
+         "children": [
+            {"name": "sda1","type":"part","size":8001562173440,"model":null,"mountpoint":null,"fstype":"zfs_member"},
+            {"name": "sda9","type":"part","size":8388608,"model":null,"mountpoint":null,"fstype":"zfs_member"}
+         ]
+      },
+      {
+         "name": "sdb", "kname": "sdb", "path": "/dev/sdb", "type": "disk",
+         "size": 8001563222016, "rota": true, "model": "WDC WD80EFZZ-68BTXN0", "serial": "VLHA8K1L",
+         "tran": "sata", "rev": "0A83", "mountpoint": null,
+         "children": [
+            {"name": "sdb1","type":"part","size":8001562173440,"fstype":"zfs_member"},
+            {"name": "sdb9","type":"part","size":8388608,"fstype":"zfs_member"}
+         ]
+      },
+      {
+         "name": "sdz", "kname": "sdz", "path": "/dev/sdz", "type": "disk",
+         "size": 4001000000000, "rota": true, "model": "TOSHIBA HDWG440", "serial": "X1ZYFREE",
+         "tran": "sata", "mountpoint": null
+      },
+      {
+         "name": "nvme0n1","kname":"nvme0n1","path":"/dev/nvme0n1","type":"disk",
+         "size": 1024209543168, "rota": false, "model": "Samsung SSD 980 1TB", "serial": "S6BENG0R",
+         "tran": "nvme", "mountpoint": null,
+         "children": [
+            {"name":"nvme0n1p1","type":"part","fstype":"zfs_member"},
+            {"name":"nvme0n1p9","type":"part","fstype":"zfs_member"}
+         ]
+      },
+      {
+         "name": "sdsys","kname":"sdsys","path":"/dev/sdsys","type":"disk",
+         "size": 240000000000, "rota": false, "model": "INTEL SSDSC2BB240G7", "serial": "BTYM712301AB",
+         "tran":"sata","mountpoint":null,
+         "children":[
+            {"name":"sdsys1","type":"part","mountpoint":"/boot/efi","fstype":"vfat"},
+            {"name":"sdsys2","type":"part","mountpoint":"/","fstype":"ext4"}
+         ]
+      }
+   ]
+}
