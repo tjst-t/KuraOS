@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/kuraos-org/kura/engine/app"
 	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
 )
@@ -33,6 +34,12 @@ type Deps struct {
 	// — same behaviour as before this sprint added auth.
 	Sessions SessionResolver
 	Users    UserLookup
+
+	// AppRoutes is the dynamic registry engine/app updates on
+	// install/uninstall. When non-nil, /apps/<name>/* and /api/app-routes
+	// are mounted. Tests / minimal binaries leave it nil to skip those
+	// surfaces.
+	AppRoutes *app.MemoryRouteRegistry
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
@@ -99,6 +106,12 @@ func New(d Deps) http.Handler {
 			root = auth.requireAdminExists(front)
 		}
 		mux.Handle("/", root)
+	}
+
+	if d.AppRoutes != nil {
+		appHandler := NewAppRouteHandler(d.AppRoutes)
+		mux.Handle("/apps/", appHandler)
+		mux.Handle("/api/app-routes", AppRouteListHandler(d.AppRoutes))
 	}
 	return mux
 }

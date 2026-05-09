@@ -11,6 +11,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/kuraos-org/kura/engine/app"
 	"github.com/kuraos-org/kura/engine/auth/session"
 	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
@@ -168,6 +169,33 @@ func run() error {
 		SecureCookies: secureCookies,
 	})
 
+	// engine/app wiring (S65b510). Falls back to FakeDockerClient on dev
+	// boxes where /var/run/docker.sock isn't reachable; production VMs use
+	// the real HTTPDockerClient against the docker daemon.
+	dockerClient := buildDockerClient(ctx)
+	verifier := app.NewLocalVerifier()
+	registryClient := app.NewHTTPRegistryClient(verifier, &http.Client{Timeout: 30 * time.Second})
+	planner := app.NewDatasetPlanner(st.DB(), &app.StaticPoolLister{Pools: discoverPools(ctx, storageEngine)})
+	planner.FallbackPool = "tank"
+	ports := app.NewPortAllocator(st.DB())
+	secrets := app.NewSecretStore(sysEng)
+	storageAdapter := &app.StorageAdapter{Engine: storageDatasetAdapter{engine: storageEngine}}
+	routeRegistry := app.NewMemoryRouteRegistry()
+	lifecycle := app.NewLifecycle(registryClient, planner, ports, secrets, dockerClient, storageAdapter, routeRegistry, st.DB())
+	if root := os.Getenv("KURA_APPS_CONFIG_ROOT"); root != "" {
+		lifecycle.ConfigRoot = root
+	}
+	if err := bootstrapAppRegistries(ctx, st.DB(), lifecycle); err != nil {
+		log.Printf("apps: bootstrap registries (non-fatal): %v", err)
+	}
+	appsDeps := ui.AppsDeps{
+		Lifecycle:       lifecycle,
+		Registry:        registryClient,
+		Sources:         loadAppSources(ctx, st.DB()),
+		SharePathLister: sharePathListerFromEngine(shareEngine),
+	}
+	uiRenderer.SetAppsHandler(appsDeps)
+
 	startedAt := time.Now().UTC()
 	handler := gateway.New(gateway.Deps{
 		Translator:   tr,
@@ -178,6 +206,7 @@ func run() error {
 		SetupHandler: setupH,
 		Sessions:     sessions,
 		Users:        users,
+		AppRoutes:    routeRegistry,
 	})
 
 	srv := &http.Server{

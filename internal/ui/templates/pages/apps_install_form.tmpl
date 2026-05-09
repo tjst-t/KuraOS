@@ -1,0 +1,49 @@
+{{- /*
+apps_install_form.tmpl — htmx fragment for the install dialog.
+Returned by /ui/admin/apps/install/form.
+*/ -}}
+<div class="modal" data-testid="apps-install-modal" style="display:block">
+  <form class="card" hx-post="/ui/admin/apps/install/start"
+        hx-target="#apps-modal-target" hx-swap="innerHTML">
+    <input type="hidden" name="app" value="{{ .AppName }}">
+    <input type="hidden" name="registry" value="{{ .Registry }}">
+    <input type="hidden" name="version" value="{{ .Version }}">
+    <div class="card-head"><h3 class="card-title">{{ .Title }}</h3></div>
+    <div class="card-body">
+      {{ if .Required }}
+      <h4 style="margin-top:0">{{ .SetupHdr }}</h4>
+      {{ range .Required }}
+      <div class="field" style="margin-bottom:12px">
+        <label>{{ .Label }}</label>
+        {{ if eq .Type "share_picker" }}
+        <select class="select" name="setup.{{ .Key }}" required data-testid="apps-setup-{{ .Key }}">
+          {{ range .Options }}
+          <option value="{{ .Value }}">{{ .Label }}</option>
+          {{ end }}
+        </select>
+        {{ else if eq .Type "select" }}
+        <select class="select" name="setup.{{ .Key }}" data-testid="apps-setup-{{ .Key }}">
+          {{ range .Options }}
+          <option value="{{ .Value }}" {{ if eq $.Default .Value }}selected{{ end }}>{{ .Label }}</option>
+          {{ end }}
+        </select>
+        {{ else if eq .Type "toggle" }}
+        <input type="checkbox" name="setup.{{ .Key }}" data-testid="apps-setup-{{ .Key }}">
+        {{ else }}
+        <input class="input" name="setup.{{ .Key }}" value="{{ .Default }}" data-testid="apps-setup-{{ .Key }}">
+        {{ end }}
+      </div>
+      {{ end }}
+      {{ end }}
+    </div>
+    <div class="card-foot" style="justify-content:flex-end;gap:8px">
+      <button type="button" class="btn"
+              hx-on:click="document.getElementById('apps-modal-target').innerHTML=''">
+        {{ .CancelText }}
+      </button>
+      <button type="submit" class="btn btn-primary" data-testid="apps-install-submit">
+        {{ .SubmitText }}
+      </button>
+    </div>
+  </form>
+</div>

@@ -69,6 +69,10 @@ func (h *systemHandle) Close() {
 func openSystemEngine(ctx context.Context) (*systemHandle, error) {
 	dbPath := os.Getenv("KURA_STATE_DB")
 	if dbPath == "" {
+		// Match the daemon's default search order: env var first, then the
+		// canonical /var/lib/kura/state.db. CLI invocations on dev VMs that
+		// run the daemon with KURA_STATE_DB pointed elsewhere must export
+		// the same env var so the CLI sees the same rows.
 		dbPath = "/var/lib/kura/state.db"
 	}
 	st, err := store.Open(ctx, dbPath)

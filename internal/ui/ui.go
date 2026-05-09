@@ -58,6 +58,13 @@ type Renderer struct {
 	sharesHandler       http.Handler
 	sharesDeleteHandler http.Handler
 	sharesUpdateHandler http.Handler
+
+	// Apps handlers (added in S65b510). Wired via SetAppsHandler.
+	appsListHandler         http.Handler
+	appsInstallFormHandler  http.Handler
+	appsInstallStartHandler http.Handler
+	appsStreamHandler       http.Handler
+	appsUninstallHandler    http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -301,7 +308,23 @@ func (r *Renderer) Routes() http.Handler {
 	}
 	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
-	mux.HandleFunc("/ui/admin/apps", r.handlePlaceholder("apps", i18n.MsgNavApps))
+	if r.appsListHandler != nil {
+		mux.Handle("/ui/admin/apps", r.appsListHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/apps", r.handlePlaceholder("apps", i18n.MsgNavApps))
+	}
+	if r.appsInstallFormHandler != nil {
+		mux.Handle("/ui/admin/apps/install/form", r.appsInstallFormHandler)
+	}
+	if r.appsInstallStartHandler != nil {
+		mux.Handle("/ui/admin/apps/install/start", r.appsInstallStartHandler)
+	}
+	if r.appsStreamHandler != nil {
+		mux.Handle("/ui/admin/apps/stream", r.appsStreamHandler)
+	}
+	if r.appsUninstallHandler != nil {
+		mux.Handle("/ui/admin/apps/uninstall", r.appsUninstallHandler)
+	}
 	mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
 
 	// /ui — user-portal landing. The portal proper is built out in a later

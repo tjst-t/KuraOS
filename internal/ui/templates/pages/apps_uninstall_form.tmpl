@@ -1,0 +1,26 @@
+{{- /*
+apps_uninstall_form.tmpl — uninstall confirm dialog (htmx fragment).
+*/ -}}
+<div class="modal" data-testid="apps-uninstall-modal" style="display:block">
+  <form class="card" hx-post="/ui/admin/apps/uninstall?app_id={{ .AppID }}"
+        hx-target="#apps-modal-target" hx-swap="innerHTML">
+    <div class="card-head"><h3 class="card-title">{{ .Title }}</h3></div>
+    <div class="card-body">
+      <p class="muted">{{ .Warn }}</p>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+        <input type="checkbox" name="delete_data" data-testid="apps-uninstall-delete-data">
+        <span>{{ .DeleteData }}</span>
+      </label>
+      <p class="muted" style="font-size:12px;margin:6px 0 0 24px">{{ .DeleteHint }}</p>
+    </div>
+    <div class="card-foot" style="justify-content:flex-end;gap:8px">
+      <button type="button" class="btn"
+              hx-on:click="document.getElementById('apps-modal-target').innerHTML=''">
+        {{ .Cancel }}
+      </button>
+      <button type="submit" class="btn btn-primary" data-testid="apps-uninstall-submit">
+        {{ .Submit }}
+      </button>
+    </div>
+  </form>
+</div>

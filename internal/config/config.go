@@ -176,6 +176,18 @@ type NetworkConfig struct{}
 type AppsConfig struct {
 	Registries []AppRegistryEntry `json:"registries,omitempty"`
 	Installed  []AppInstanceEntry `json:"installed,omitempty"`
+	// PortRange optionally constrains the host-side port allocator. Empty
+	// fields fall back to the IANA dynamic range 49152-65535. Operators
+	// expose this so they can reserve a band for non-KuraOS services.
+	PortRange *PortRangeConfig `json:"port_range,omitempty"`
+}
+
+// PortRangeConfig is the operator-tunable port band used by the App engine's
+// PortAllocator. Min is inclusive; Max is inclusive. v1 ignores values
+// outside the IANA dynamic range.
+type PortRangeConfig struct {
+	Min int `json:"min"`
+	Max int `json:"max"`
 }
 
 // AppRegistryEntry mirrors design.md §7.9 app_registries[] block.
