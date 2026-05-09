@@ -1,0 +1,115 @@
+{{- /*
+apps.tmpl — admin /ui/admin/apps page. Visual SSOT: prototype/claude_design/Apps.html.
+
+Two tabs (Installed / Store), category pill filter, card grid. The install
+flow opens the install form via htmx; the form posts to /install/start which
+returns an SSE-bound progress card.
+
+PageData.Extra is an ui.AppsView.
+*/ -}}
+{{ define "content" }}
+{{ $v := .Extra }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.apps.title" }}</h1>
+    <p class="page-sub">{{ $v.Subtitle }}</p>
+  </div>
+</div>
+
+<div class="tabs" data-testid="apps-tabs" style="margin-bottom:16px;display:flex;gap:8px;border-bottom:1px solid var(--border)">
+  <a href="/ui/admin/apps?tab=installed"
+     data-testid="apps-tab-installed"
+     class="tab" {{ if eq $v.Tab "installed" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer">
+    {{ T "page.apps.tab.installed" }}
+  </a>
+  <a href="/ui/admin/apps?tab=store"
+     data-testid="apps-tab-store"
+     class="tab" {{ if eq $v.Tab "store" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer">
+    {{ T "page.apps.tab.store" }}
+  </a>
+</div>
+
+<div class="row gap-sm" style="margin-bottom:16px;display:flex;gap:8px;flex-wrap:wrap" data-testid="apps-categories">
+  {{ range $v.Categories }}
+  <a href="?tab={{ $v.Tab }}&category={{ . }}"
+     class="btn btn-sm"
+     style="text-decoration:none"
+     {{ if eq $v.ActiveCategory . }}data-active="true"{{ end }}>
+    {{ . }}
+  </a>
+  {{ end }}
+</div>
+
+{{ if eq $v.Tab "installed" }}
+  {{ if not $v.Installed }}
+  <div class="card" data-testid="apps-empty-installed">
+    <div class="card-body" style="padding:48px 24px;text-align:center">
+      <p class="muted" style="margin:0">{{ $v.EmptyInstalled }}</p>
+    </div>
+  </div>
+  {{ else }}
+  <div class="grid" data-testid="apps-installed-grid"
+       style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    {{ range $v.Installed }}
+    <div class="card app-card" data-testid="apps-installed-card" data-app-id="{{ .AppID }}" data-app-name="{{ .Name }}">
+      <div class="card-body">
+        <div class="row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <div class="app-icon" style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;font-weight:600">{{ slice .Name 0 1 }}</div>
+          <div style="flex:1;min-width:0">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <strong>{{ .Name }}</strong>
+              <span class="badge {{ .StateClass }}" data-testid="apps-state" data-state="{{ .StateID }}">
+                <span class="badge-dot"></span>{{ .StateLabel }}
+              </span>
+            </div>
+            <div class="mono muted" style="font-size:11px">{{ .Version }}</div>
+          </div>
+        </div>
+        <p class="muted" style="margin:0 0 12px 0;font-size:12px">{{ .Description }}</p>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <a class="btn btn-sm" href="{{ .OpenURL }}" data-testid="apps-open-btn">{{ T "page.apps.btn.open" }}</a>
+          <a class="btn btn-sm" href="{{ .UninstallURL }}" data-testid="apps-uninstall-btn">{{ T "page.apps.btn.uninstall" }}</a>
+        </div>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+{{ else }}
+  {{ if not $v.Store }}
+  <div class="card" data-testid="apps-empty-store">
+    <div class="card-body" style="padding:48px 24px;text-align:center">
+      <p class="muted" style="margin:0">{{ $v.EmptyStore }}</p>
+    </div>
+  </div>
+  {{ else }}
+  <div class="grid" data-testid="apps-store-grid"
+       style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px">
+    {{ range $v.Store }}
+    <div class="card app-card" data-testid="apps-store-card" data-app-name="{{ .Name }}" data-registry="{{ .Registry }}">
+      <div class="card-body">
+        <div class="row" style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+          <div class="app-icon" style="width:44px;height:44px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);display:grid;place-items:center;font-weight:600">{{ slice .Name 0 1 }}</div>
+          <div style="flex:1;min-width:0">
+            <strong>{{ .Name }}</strong>
+            <div class="mono muted" style="font-size:11px">{{ .Registry }} · {{ .Version }}</div>
+          </div>
+        </div>
+        <p class="muted" style="margin:0 0 12px 0;font-size:12px">{{ .Description }}</p>
+        <button class="btn btn-sm btn-primary" data-testid="apps-install-btn"
+                hx-get="/ui/admin/apps/install/form?app={{ .Name }}&registry={{ .Registry }}"
+                hx-target="#apps-modal-target"
+                hx-swap="innerHTML">
+          {{ T "page.apps.btn.install" }}
+        </button>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+  {{ end }}
+{{ end }}
+
+<div id="apps-modal-target" data-testid="apps-modal-target"></div>
+{{ end }}

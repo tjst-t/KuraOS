@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S65b510",
+    "current_sprint": "S822961",
     "total": 15,
-    "done": 8,
+    "done": 9,
     "in_progress": 0,
-    "remaining": 7,
-    "percentage": 53,
+    "remaining": 6,
+    "percentage": 60,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -17,9 +17,10 @@
       "S9db742",
       "Sd64f38",
       "Ssys001",
-      "S1bccf5"
+      "S1bccf5",
+      "S65b510"
     ],
-    "updated_at": "2026-05-09T05:20:00Z"
+    "updated_at": "2026-05-09T06:05:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -759,109 +760,109 @@
     },
     "S65b510": {
       "title": "アプリのインストール / 更新 / 削除 と アプリストア UI",
-      "status": "pending",
+      "status": "done",
       "description": "Docker compose 動的生成、install/update/uninstall フロー、Gateway へのルーティング登録 (path/strip_prefix/port/subdomain)、configs テンプレート展開、アプリストア UI、ヘルスチェック。視覚仕様は prototype/claude_design/Apps.html (Installed / Store トグル、カテゴリフィルタ、カードグリッド、install モーダル)。",
       "milestone": false,
       "stories": {
         "S65b510-1": {
           "title": "Docker compose 動的生成と install フロー",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、アプリをワンクリックでインストールしヘルスチェック通過後に『利用可能』表示されるようにしたい。なぜなら、Docker Compose を手動編集する手間を省きたいから。",
           "acceptance_criteria": [
             {
               "id": "AC-S65b510-1-1",
               "description": "アプリストアの『インストール』を押し share_picker を選ぶだけで、compose YAML 生成 → docker compose up → ヘルスチェック通過まで自動進行する",
-              "test": "[AC-S65b510-1-1] in tests/e2e/app-install.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S65b510-1-1] in tests/e2e/app-install.e2e.spec.ts + engine/app/lifecycle_test.go TestLifecycleInstallEndToEnd",
+              "status": "pass"
             },
             {
               "id": "AC-S65b510-1-2",
               "description": "ヘルスチェック失敗時はインストールが ロールバックされ、原因がログに残る",
-              "test": "[AC-S65b510-1-2] in tests/e2e/app-install.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S65b510-1-2] in tests/e2e/app-install.e2e.spec.ts + engine/app/lifecycle_test.go TestLifecycleInstallRollback",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S65b510-1-1": {
               "title": "Docker SDK 統合",
               "description": "docker/docker クライアント + compose-spec パーサ",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-1-2": {
               "title": "compose YAML テンプレート",
               "description": "manifest → compose 変換、bind mount / network / env を反映",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-1-3": {
               "title": "configs テンプレート展開",
               "description": "Go template + .KuraOS namespace",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-1-4": {
               "title": "ヘルスチェック待ちと UI 進捗",
               "description": "SSE で進捗をストリーム",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S65b510-2": {
           "title": "Gateway ルーティング登録 (path/strip_prefix/port/subdomain)",
-          "status": "pending",
+          "status": "done",
           "user_story": "ユーザーとして、ポータルからアプリをクリックするだけでアプリにアクセスできるようにしたい。なぜなら、ポート番号や FQDN を覚えるのは家族向け体験を壊すから。",
           "acceptance_criteria": [
             {
               "id": "AC-S65b510-2-1",
               "description": "manifest の routing.mode (path / port / subdomain) が Gateway に動的反映され、対応する URL でアプリへ到達できる",
-              "test": "[AC-S65b510-2-1] in tests/e2e/app-routing.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S65b510-2-1] in tests/e2e/app-routing.e2e.spec.ts + internal/gateway/app_routes_test.go",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S65b510-2-1": {
               "title": "ルーティング動的更新",
               "description": "アプリ install/uninstall に追従",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-2-2": {
               "title": "strip_prefix / base_path_env 対応",
               "description": "path 方式の 2 種類",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S65b510-3": {
           "title": "Update / Uninstall とアプリストア UI",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、アプリ更新時に backup.datasets のスナップショットが自動作成され、失敗時に旧バージョンへ自動ロールバックされるようにしたい。なぜなら、更新でデータが壊れるリスクを減らしたいから。",
           "acceptance_criteria": [
             {
               "id": "AC-S65b510-3-1",
               "description": "update 時に backup:true の dataset のスナップショットが作成され、ヘルスチェック失敗時に自動ロールバックされる",
-              "test": "[AC-S65b510-3-1] in tests/e2e/app-update.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S65b510-3-1] in tests/e2e/app-update.e2e.spec.ts + engine/app/lifecycle_test.go TestLifecycleUpdateSnapshotsBackupDatasets",
+              "status": "pass"
             },
             {
               "id": "AC-S65b510-3-2",
               "description": "uninstall は deleteData=false がデフォルトで、再インストール時にデータが復元される",
-              "test": "[AC-S65b510-3-2] in tests/e2e/app-uninstall.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S65b510-3-2] in tests/e2e/app-uninstall.e2e.spec.ts + engine/app/lifecycle_test.go TestLifecycleUninstallKeepsData",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S65b510-3-1": {
               "title": "Update フロー",
               "description": "snapshot → pull → up → healthcheck → ロールバック分岐",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-3-2": {
               "title": "Uninstall フロー",
               "description": "container 削除 / dataset は残す",
-              "status": "pending"
+              "status": "done"
             },
             "S65b510-3-3": {
               "title": "アプリストア UI",
               "description": "カテゴリ表示・1〜2 ステップのインストールフォーム",
-              "status": "pending"
+              "status": "done"
             }
           }
         }
@@ -1861,6 +1862,54 @@
         "smb-conf-include",
         "share-fs-perms"
       ]
+    },
+    {
+      "title": "sigstore-go production wiring (TUF root + Fulcio + Rekor)",
+      "description": "S65b510 ships LocalVerifier (operator-managed ed25519 keys) as the v1 production verifier. Replace with full sigstore-go pipeline once the official cosign-signed app registry exists and a stable TUF root snapshot can be embedded.",
+      "added_in": "S65b510",
+      "reason": "plan-3 decision: LocalVerifier unblocks v1 install, sigstore-go full integration deferred to v1.x",
+      "status": "pending",
+      "target": "v1.x"
+    },
+    {
+      "title": "CLI/daemon shared-state route registry",
+      "description": "Currently the in-memory route registry lives in the daemon process; CLI install/uninstall update SQLite but cannot push the new route into the daemon's registry without a restart. Add either: (a) a /api/app-routes/reload endpoint the CLI calls after install, or (b) a SQLite-backed route table the daemon polls. Bootstrap-on-restart works correctly today.",
+      "added_in": "S65b510",
+      "reason": "VM verification surfaced the gap",
+      "status": "pending",
+      "target": "v1"
+    },
+    {
+      "title": "engine/storage Destroy methods + safety dialog",
+      "description": "engine/storage deliberately omits DestroyVolume from its Engine surface (priority #5 — destructive ops need confirm UI). When app uninstall+deleteData is requested, app_lifecycle currently returns an error instructing the operator to run zfs destroy manually. Wire DestroyVolume + a typed-name confirm UI to remove that error path.",
+      "added_in": "S65b510",
+      "reason": "surfaced during impl",
+      "status": "pending",
+      "target": "v1"
+    },
+    {
+      "title": "setup wizard registry add UX (carry-over from S1bccf5)",
+      "description": "app_registries[] add still requires CLI 'kura app registry add'. Integrate into the setup wizard final step so first-install operators can add the official registry with one click.",
+      "added_in": "S65b510",
+      "reason": "S1bccf5 申し送り; S65b510 left CLI-only",
+      "status": "pending",
+      "target": "S99702c"
+    },
+    {
+      "title": "PortAllocator range overrides honoured at runtime",
+      "description": "AppsConfig.PortRange schema added in S65b510; the daemon does not yet read it back into PortAllocator.Range at startup. Wire config.json apply -> PortAllocator.Range update.",
+      "added_in": "S65b510",
+      "reason": "schema landed but loader not wired",
+      "status": "pending",
+      "target": "v1"
+    },
+    {
+      "title": "Reconcile loop for installed apps",
+      "description": "On daemon startup we rebuild gateway routes from app_installs but do not (re)start containers if they are missing. Add a reconcile pass that ensures every running-state app has its container set up + healthy, mirroring engine/system.Reconcile for users/groups.",
+      "added_in": "S65b510",
+      "reason": "surfaced during impl",
+      "status": "pending",
+      "target": "v1"
     }
   ]
 }

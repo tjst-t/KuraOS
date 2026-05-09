@@ -22,7 +22,7 @@ import (
 // S65b510.
 func appCmd(args []string) error {
 	if len(args) == 0 {
-		return fmt.Errorf("kura app: subcommand required (lint | fetch | dataset-plan | reserve-port)")
+		return fmt.Errorf("kura app: subcommand required (lint | fetch | dataset-plan | reserve-port | install | update | uninstall | list | registry | sign | keygen)")
 	}
 	switch args[0] {
 	case "lint":
@@ -33,6 +33,20 @@ func appCmd(args []string) error {
 		return appDatasetPlan(args[1:], os.Stdout)
 	case "reserve-port":
 		return appReservePort(args[1:], os.Stdout)
+	case "install":
+		return appInstall(args[1:], os.Stdout)
+	case "update":
+		return appUpdate(args[1:], os.Stdout)
+	case "uninstall":
+		return appUninstall(args[1:], os.Stdout)
+	case "list":
+		return appList(args[1:], os.Stdout)
+	case "registry":
+		return appRegistry(args[1:], os.Stdout)
+	case "keygen":
+		return appKeygen(args[1:], os.Stdout)
+	case "sign":
+		return appSign(args[1:], os.Stdout)
 	default:
 		return fmt.Errorf("kura app: unknown subcommand %q", args[0])
 	}

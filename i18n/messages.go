@@ -345,6 +345,67 @@ const (
 	MsgSharesErrCreateFailed      MessageID = "page.shares.err.create_failed"
 )
 
+// Apps page (added in S65b510).
+const (
+	MsgAppsTitle    MessageID = "page.apps.title"
+	MsgAppsSubtitle MessageID = "page.apps.subtitle"
+
+	MsgAppsTabInstalled MessageID = "page.apps.tab.installed"
+	MsgAppsTabStore     MessageID = "page.apps.tab.store"
+	MsgAppsCategoryAll  MessageID = "page.apps.category.all"
+
+	MsgAppsBtnInstall   MessageID = "page.apps.btn.install"
+	MsgAppsBtnUpdate    MessageID = "page.apps.btn.update"
+	MsgAppsBtnUninstall MessageID = "page.apps.btn.uninstall"
+	MsgAppsBtnOpen      MessageID = "page.apps.btn.open"
+	MsgAppsBtnCancel    MessageID = "page.apps.btn.cancel"
+
+	MsgAppsStateRunning      MessageID = "page.apps.state.running"
+	MsgAppsStateStopped      MessageID = "page.apps.state.stopped"
+	MsgAppsStateInstalling   MessageID = "page.apps.state.installing"
+	MsgAppsStateFailed       MessageID = "page.apps.state.failed"
+	MsgAppsStateUninstalling MessageID = "page.apps.state.uninstalling"
+
+	MsgAppsInstallTitle    MessageID = "page.apps.install.title"
+	MsgAppsInstallSubmit   MessageID = "page.apps.install.submit"
+	MsgAppsInstallSetupHdr MessageID = "page.apps.install.setup_heading"
+	MsgAppsInstallProgress MessageID = "page.apps.install.progress"
+	MsgAppsInstallSuccess  MessageID = "page.apps.install.success"
+	MsgAppsInstallFailed   MessageID = "page.apps.install.failed"
+
+	MsgAppsUninstallTitle      MessageID = "page.apps.uninstall.title"
+	MsgAppsUninstallWarn       MessageID = "page.apps.uninstall.warn"
+	MsgAppsUninstallSubmit     MessageID = "page.apps.uninstall.submit"
+	MsgAppsUninstallDeleteData MessageID = "page.apps.uninstall.delete_data"
+	MsgAppsUninstallDeleteHint MessageID = "page.apps.uninstall.delete_hint"
+
+	MsgAppsEmptyInstalled MessageID = "page.apps.empty.installed"
+	MsgAppsEmptyStore     MessageID = "page.apps.empty.store"
+
+	MsgAppsErrDocker          MessageID = "page.apps.err.docker"
+	MsgAppsErrRegistry        MessageID = "page.apps.err.registry"
+	MsgAppsErrSignature       MessageID = "page.apps.err.signature"
+	MsgAppsErrHealthcheck     MessageID = "page.apps.err.healthcheck"
+	MsgAppsErrAlreadyInstalled MessageID = "page.apps.err.already_installed"
+
+	MsgAppsStageStart           MessageID = "page.apps.stage.start"
+	MsgAppsStagePullImages      MessageID = "page.apps.stage.pull_images"
+	MsgAppsStageProvisionData   MessageID = "page.apps.stage.provision_data"
+	MsgAppsStageReservePorts    MessageID = "page.apps.stage.reserve_ports"
+	MsgAppsStageStoreSecrets    MessageID = "page.apps.stage.store_secrets"
+	MsgAppsStageRenderConfigs   MessageID = "page.apps.stage.render_configs"
+	MsgAppsStageStartContainers MessageID = "page.apps.stage.start_containers"
+	MsgAppsStageHealthcheck     MessageID = "page.apps.stage.healthcheck"
+	MsgAppsStageRegisterRoute   MessageID = "page.apps.stage.register_route"
+	MsgAppsStageDone            MessageID = "page.apps.stage.done"
+	MsgAppsStageRollback        MessageID = "page.apps.stage.rollback"
+	MsgAppsStageError           MessageID = "page.apps.stage.error"
+	MsgAppsStageSnapshot        MessageID = "page.apps.stage.snapshot"
+	MsgAppsStagePullUpdate      MessageID = "page.apps.stage.pull_update"
+	MsgAppsStageStop            MessageID = "page.apps.stage.stop"
+	MsgAppsStageRemove          MessageID = "page.apps.stage.remove"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"
