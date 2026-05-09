@@ -41,11 +41,34 @@ Go (単一バイナリ・モジュラーモノリス) / htmx + Tailwind CSS / SQ
 ZFS / SMB / Docker / systemd / lego ACME など実 OS 機能を伴うテストは Ubuntu 検証 VM で実行する:
 
 - **Host**: `192.168.1.42` (LAN 内)
-- **SSH**: `ssh ubuntu@192.168.1.42`
+- **SSH**: `ssh ubuntu@192.168.1.42` (sudo パスワード無し)
 - **用途**: Engine 層の実環境テスト (ZFS pool 作成、smbd reload、docker compose 起動、apt upgrade, snapshot rollback など)
 - **ローカル CI**: `go test ./...` は CmdExecutor / DockerClient / DNSProvider などのモックで完結する単体テストのみを対象とし、実 OS が必要なテストは VM 側で実行する
 
-VM 上での反復テストは `rsync ./ ubuntu@192.168.1.42:/home/ubuntu/kuraos/ && ssh ubuntu@192.168.1.42 'cd kuraos && make build && sudo ./bin/kura ...'` のようなパターンを基本とする。本番 NAS データを VM に持ち込まない。
+### 動作確認は必ず VM にデプロイして行う
+
+- ローカルの `go test` / `make build` 通過は最低条件、それだけで「動作確認済み」と報告しない
+- 「動作確認」「デモ」「実機検証」を伴うタスクは VM 192.168.1.42 にバイナリをデプロイして実機で再現すること
+- **VM 上の既存 `kura` プロセスは無断で kill して新バイナリに差し替えて良い** (dev VM・共有データ無し前提)。事前確認不要、ただし state DB ファイル `/home/ubuntu/kuraos/state.db` は消さない (admin / 設定が消える)
+- 本番 NAS データを VM に持ち込まない
+
+### Deploy recipe
+
+VM には Go / make が入っていない。ローカルでビルドしてバイナリだけ送る:
+
+```
+CGO_ENABLED=0 go build -o bin/kura ./cmd/kura
+rsync -az bin/kura ubuntu@192.168.1.42:/home/ubuntu/kuraos/kura.new
+ssh ubuntu@192.168.1.42 'sudo pkill -x kura; sleep 2; \
+  sudo mv /home/ubuntu/kuraos/kura.new /home/ubuntu/kuraos/kura && \
+  sudo chmod +x /home/ubuntu/kuraos/kura && \
+  cd /home/ubuntu/kuraos && \
+  sudo nohup env KURA_PORT=8204 KURA_STATE_DB=/home/ubuntu/kuraos/state.db \
+    /home/ubuntu/kuraos/kura > /home/ubuntu/kuraos/kura.log 2>&1 </dev/null & \
+  disown'
+```
+
+確認は `curl -s http://192.168.1.42:8204/healthz` の `started_at` が直近のデプロイ時刻と一致すること。
 
 ## References
 
