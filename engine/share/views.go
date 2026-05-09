@@ -71,10 +71,23 @@ func buildNFSView(s Share) nfs.ShareView {
 	}
 }
 
+// EmptyACLSentinel is rendered as `valid users` when the ACL is empty.
+// Without it, Samba treats `valid users` as unset → any authenticated user
+// can access the share — fail-open semantics that contradict the UI's
+// implicit contract ("ACL is the access list; empty = no one"). `nobody`
+// is the conventional unprivileged Linux account and is never a valid
+// KuraOS / tdbsam user, so this sentinel cleanly denies everyone.
+const EmptyACLSentinel = "nobody"
+
 // flattenACL reduces the ACL slice into the four smb.conf principal lists.
 //   - valid users / invalid users uses Samba's `@group` syntax for groups.
 //   - write list grants rw regardless of `read only = yes` global.
 //   - read list grants r when `read only = no`.
+//
+// When the ACL has no rw / r entries, valid users defaults to the sentinel
+// (see EmptyACLSentinel above). The deny-by-default branch — operator
+// must explicitly add at least one principal to grant access. The UI
+// surfaces this with a warning when saving an empty ACL.
 //
 // Deterministic — entries are sorted by kind+name so rendered configs are
 // stable byte-for-byte (golden tests rely on this).
@@ -100,6 +113,9 @@ func flattenACL(s Share) (valid, write, read, invalid string) {
 			validList = append(validList, token)
 			readList = append(readList, token)
 		}
+	}
+	if len(validList) == 0 {
+		validList = []string{EmptyACLSentinel}
 	}
 	return joinPrincipals(validList), joinPrincipals(writeList), joinPrincipals(readList), joinPrincipals(invalidList)
 }

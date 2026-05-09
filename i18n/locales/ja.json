@@ -312,7 +312,7 @@
   "page.shares.form.protocol": "プロトコル",
   "page.shares.form.preset": "用途プリセット",
   "page.shares.form.access": "デフォルトアクセス",
-  "page.shares.form.acl": "アクセス権 (任意)",
+  "page.shares.form.acl": "アクセス権",
   "page.shares.form.acl_hint": "user:NAME:rw / group:NAME:r をカンマ区切りで指定",
   "page.shares.form.description": "説明 (任意)",
   "page.shares.form.submit": "共有を作成",
@@ -468,7 +468,7 @@
   "page.shares.acl.picker.remove": "削除",
   "page.shares.acl.picker.kind.user": "ユーザー",
   "page.shares.acl.picker.kind.group": "グループ",
-  "page.shares.acl.picker.empty": "まだ ACL がありません。「+ ユーザー / グループを追加」で行を追加してください。",
+  "page.shares.acl.picker.empty": "アクセス権の設定がありません。このままだと誰もアクセスできません。「+ ユーザー / グループを追加」で自分自身を必ず追加してください。",
   "page.shares.acl.mode.rw": "読み書き (rw)",
   "page.shares.acl.mode.r": "読み取り (r)"
 }

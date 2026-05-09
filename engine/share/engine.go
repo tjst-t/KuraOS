@@ -304,6 +304,19 @@ func (m *Manager) Apply(ctx context.Context) error {
 		_ = hasSMB // hasSMB observed for future "skip reload when no SMB shares" optimization (v1.x)
 		return fmt.Errorf("%w: smbd: %v", ErrReloadFailed, err)
 	}
+
+	// Force-close existing connections to every share. smbd reload
+	// rewrites the config but keeps live SMB sessions open — so a user
+	// removed from the ACL still has authority on their existing
+	// connection until they disconnect. close-share kicks them so the
+	// next request re-authenticates against the new ACL. Soft-fail when
+	// smbcontrol is unavailable (test envs).
+	for _, s := range shares {
+		if s.Disabled || !s.Protocol.HasSMB() {
+			continue
+		}
+		_, _, _ = m.exec.Run(ctx, "smbcontrol", "smbd", "close-share", s.Name)
+	}
 	if _, _, err := m.exec.Run(ctx, m.exportfsBin, "-ra"); err != nil {
 		_ = hasNFS
 		return fmt.Errorf("%w: exportfs -ra: %v", ErrReloadFailed, err)
