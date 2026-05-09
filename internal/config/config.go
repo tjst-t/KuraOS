@@ -166,7 +166,53 @@ type UserEntry struct {
 	CredentialState string `json:"credential_state"`
 }
 type NetworkConfig struct{}
-type AppsConfig struct{}
+
+// AppsConfig is the declarative shape of "apps" in config.json. v1
+// declares the trusted app registries (design.md §7.9) and the list of
+// installed app instances. Per DESIGN_PRINCIPLES priority #1, internal
+// app secrets (DB password, OIDC client secret) NEVER appear here — they
+// live in the credential vault and config.json carries only the
+// CredentialState placeholder.
+type AppsConfig struct {
+	Registries []AppRegistryEntry `json:"registries,omitempty"`
+	Installed  []AppInstanceEntry `json:"installed,omitempty"`
+}
+
+// AppRegistryEntry mirrors design.md §7.9 app_registries[] block.
+// Identity_regex and issuer feed the cosign keyless verifier; trust.type
+// must be "cosign_keyless" for v1 (any other value is rejected at load).
+type AppRegistryEntry struct {
+	Name  string                `json:"name"`
+	URL   string                `json:"url"`
+	Trust AppRegistryTrustEntry `json:"trust"`
+}
+
+// AppRegistryTrustEntry is the trust block of one registry.
+type AppRegistryTrustEntry struct {
+	Type          string `json:"type"`
+	IdentityRegex string `json:"identity_regex"`
+	Issuer        string `json:"issuer,omitempty"`
+}
+
+// AppInstanceEntry is one row of installed apps. Settings carry only
+// non-secret values; secrets are flagged with credential_state placeholder
+// (priority #1) so a stolen config.json cannot reproduce login.
+type AppInstanceEntry struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Version       string            `json:"version"`
+	Registry      string            `json:"registry"`
+	SettingsState []AppSettingState `json:"settings_state,omitempty"`
+}
+
+// AppSettingState is one entry of an instance's settings block. For
+// non-secret settings, Value carries the actual value. For secret
+// settings, Value is empty and CredentialState is "set" or "unset".
+type AppSettingState struct {
+	Key             string `json:"key"`
+	Value           string `json:"value,omitempty"`
+	CredentialState string `json:"credential_state,omitempty"`
+}
 type AuthConfig struct{}
 type BackupConfig struct{}
 type NotificationsConfig struct{}

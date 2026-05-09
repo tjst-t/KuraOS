@@ -1,0 +1,85 @@
+apiVersion: v1
+name: immich
+version: "1.111.0"
+type: legacy
+display_name:
+  ja: "Immich"
+  en: "Immich"
+description:
+  ja: "セルフホスト型の写真・動画管理"
+  en: "Self-hosted photo & video management"
+homepage: https://immich.app
+
+containers:
+  server:
+    image: ghcr.io/immich-app/immich-server:v1.111.0
+    ports:
+      - "3001:3001"
+    env:
+      DB_URL: "postgres://immich:${db_password}@db:5432/immich"
+    depends_on: [db, redis]
+  db:
+    image: postgres:16
+    volumes:
+      - type: dataset
+        name: db
+        mountpoint: /var/lib/postgresql/data
+  redis:
+    image: redis:7
+
+shares:
+  - name: photos
+    access: readwrite
+    mountpoint: /usr/src/app/upload
+    container: server
+
+storage:
+  datasets:
+    - name: db
+      pool_hint: ssd
+      backup: true
+      quota: 5G
+    - name: cache
+      pool_hint: ssd
+      backup: false
+      quota: 20G
+
+setup:
+  required:
+    - key: photo_share
+      type: share_picker
+      label:
+        ja: "写真の保存先"
+        en: "Photo storage location"
+  optional: []
+
+settings:
+  - key: db_password
+    type: secret
+    required: true
+  - key: upload_limit
+    type: string
+    default: "10G"
+
+resources:
+  storage: 10G
+  memory: 2G
+
+routing:
+  mode: path
+  base_path_env: IMMICH_BASE_URL
+  strip_prefix: true
+  container: server
+
+auth:
+  mode: forward_auth
+  header_user: X-Forwarded-User
+
+health:
+  endpoint: /api/server/ping
+  container: server
+  interval: 30s
+
+backup:
+  datasets: [db]
+  strategy: daily

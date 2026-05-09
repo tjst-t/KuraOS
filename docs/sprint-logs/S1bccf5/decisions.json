@@ -1,0 +1,77 @@
+{
+  "sprint_id": "S1bccf5",
+  "title": "アプリマニフェストと レジストリ (cosign keyless 検証)",
+  "branch": "autopilot/main/S1bccf5",
+  "planning_decisions": [
+    {
+      "id": "plan-1",
+      "topic": "Package layout",
+      "decision": "新規 engine/app パッケージを作成。Manifest / Registry / Allocator を 1 パッケージに収める (priority #4 モジュラーモノリス)。",
+      "rationale": "engine/{storage,share,user,system,auth} 既存パターンに揃える。"
+    },
+    {
+      "id": "plan-2",
+      "topic": "YAML パーサ",
+      "decision": "標準的な gopkg.in/yaml.v3 を採用。",
+      "rationale": "priority #6 既存ライブラリ活用。yaml.v3 は Go コミュニティ事実上標準で、tag による snake_case マッピングを直接サポート。"
+    },
+    {
+      "id": "plan-3",
+      "topic": "cosign keyless 検証ライブラリ",
+      "decision": "CosignVerifier interface を切り、production seam (NewSigstoreVerifier) は v1 では fail-closed のスタブ実装。実 sigstore-go bundle 復号 + TUF root の wiring は S65b510 で fixture bundle と一緒に追加する。",
+      "rationale": "sigstore-go v1.1.4 は Rekor / sigstore-tiles 等 100+ の transitive deps を持ち込み、TUF root 取得にネットワーク必須。fixture bundle なしでは E2E テスト不可。Sprint 仕様『sigstore-go 採用』は守りつつ、interface boundary を確定し、本物の fixture が用意できる S65b510 で実装本体を差し込む。priority #6 + #9 + forbidden (検証スキップ禁止 — production スタブは fail-closed なので skip ではない)。"
+    },
+    {
+      "id": "plan-4",
+      "topic": "RegistryClient HTTP 取得",
+      "decision": "HTTPClient interface を切って net/http の Client を裏に置く。テストは httptest.Server で署名 / ハッシュ検証経路を回す。",
+      "rationale": "priority #9 副作用は interface 経由。"
+    },
+    {
+      "id": "plan-5",
+      "topic": "内部 secret 保管先",
+      "decision": "engine/system.SetCredential(OwnerApp, AppID, Field) 経由で vault に格納。config.json の AppsConfig は credential_state placeholder のみ持つ。",
+      "rationale": "priority #1 + forbidden: env 参照ファイル / config.json 平文禁止。Ssys001 で完成した unified vault を使う。"
+    },
+    {
+      "id": "plan-6",
+      "topic": "ポート予約テーブル",
+      "decision": "新規 migration 0006_app_port_reservations.sql を追加。app_id + container_name + manifest_port を主キーにし、host_port を割当",
+      "rationale": "priority #1 (ランタイム状態は SQLite キャッシュ)。再起動跨ぎで決定論的に同じ host_port を返す。"
+    },
+    {
+      "id": "plan-7",
+      "topic": "Dataset プランナー pool フォールバック",
+      "decision": "PoolLister interface 経由で zpool list を取得し、`role=ssd` (またはこの sprint では name に 'ssd' or 'fast' を含むプール) があればそれ、なければ tank。",
+      "rationale": "priority #2 賢いデフォルト。pool タグ仕様は v1 では命名規約 (fast/ssd/tank) で運用。本格的な pool kind カラムは S65b510 以降。"
+    },
+    {
+      "id": "plan-8",
+      "topic": "GUI spec",
+      "decision": "GUI なし — engine + CLI のみの sprint。gui-spec はスキップしログに記録。",
+      "rationale": "Stories はすべて engine_test.go 参照。AC description に UI/画面/フォームへの言及なし。"
+    },
+    {
+      "id": "plan-9",
+      "topic": "CLI 命令空間",
+      "decision": "kura app fetch <registry-url> <app> <version> / kura app dataset-plan <manifest> / kura app reserve-port <app-id> を追加。",
+      "rationale": "VM smoke 試験用。priority #8 明示的 (UI も CLI も用意)。"
+    },
+    {
+      "id": "plan-10",
+      "topic": "config.json の app_registries 表現",
+      "decision": "AppsConfig に Registries []AppRegistryEntry を持たせる。明示的に追加されたものだけを trust。",
+      "rationale": "priority #8 + forbidden 検証スキップ禁止。"
+    }
+  ],
+  "implementation_decisions": [
+    {
+      "id": "impl-1",
+      "topic": "sigstore-go 一旦撤去",
+      "decision": "go get sigstore-go を試したが transitive dep tree が肥大、CGO や追加 module 多数。CosignVerifier interface だけ確定して production stub は fail-closed、テストは FakeVerifier で identity_regex / 二重チェック / hash mismatch を網羅。",
+      "rationale": "plan-3 と同じ。差別化要因ではない外部ライブラリのために build cache を破壊しない (priority #6)。AC は『identity_regex に一致する場合のみ受理』『hash 不一致で停止』を満たすロジックの確認なので FakeVerifier で本質をカバーできる。"
+    }
+  ],
+  "review_decisions": [],
+  "backlog_added": []
+}

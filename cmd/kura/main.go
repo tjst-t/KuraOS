@@ -52,6 +52,8 @@ func dispatch(args []string) error {
 		return userCmd(args[1:])
 	case "share":
 		return shareCmd(args[1:])
+	case "app":
+		return appCmd(args[1:])
 	case "backup":
 		return backupCmd(args[1:])
 	case "restore":
@@ -60,7 +62,7 @@ func dispatch(args []string) error {
 		fmt.Println(Version)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try: config | storage | system | user | share | backup | restore | version)", args[0])
+		return fmt.Errorf("unknown command %q (try: config | storage | system | user | share | app | backup | restore | version)", args[0])
 	}
 }
 

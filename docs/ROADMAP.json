@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S1bccf5",
+    "current_sprint": "S65b510",
     "total": 15,
-    "done": 7,
+    "done": 8,
     "in_progress": 0,
-    "remaining": 8,
-    "percentage": 46,
+    "remaining": 7,
+    "percentage": 53,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -16,9 +16,10 @@
       "Se3b190",
       "S9db742",
       "Sd64f38",
-      "Ssys001"
+      "Ssys001",
+      "S1bccf5"
     ],
-    "updated_at": "2026-05-09T04:18:00Z"
+    "updated_at": "2026-05-09T05:20:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -642,115 +643,115 @@
     },
     "S1bccf5": {
       "title": "アプリマニフェストと レジストリ (cosign keyless 検証)",
-      "status": "pending",
+      "status": "done",
       "description": "アプリマニフェスト (YAML) のスキーマ定義とパーサ、GitHub Releases ベースの RegistryClient、registry.json と manifest.yaml の cosign keyless 署名検証 + ハッシュ二重チェック。アプリ用 dataset の自動作成 (pool_hint)、ポート/内部パスワードの自動生成。",
       "milestone": false,
       "stories": {
         "S1bccf5-1": {
           "title": "マニフェスト構造とバリデーション",
-          "status": "pending",
+          "status": "done",
           "user_story": "アプリ作者として、design.md §7.2 の YAML スキーマでマニフェストを書けば KuraOS にロードできるようにしたい。なぜなら、新しいアプリを追加する時に毎回コードを書きたくないから。",
           "acceptance_criteria": [
             {
               "id": "AC-S1bccf5-1-1",
               "description": "サンプル immich マニフェスト YAML がパースされ、setup.required / containers / shares / storage / routing / auth 等が構造体に取り込まれる",
               "test": "[AC-S1bccf5-1-1] in engine/app/manifest_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1bccf5-1-2",
               "description": "必須フィールドの欠落・unknown ドライバ型・互換しない routing.mode の組合せはバリデーションエラーとなる",
               "test": "[AC-S1bccf5-1-2] in engine/app/manifest_test.go",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1bccf5-1-1": {
               "title": "Manifest 型と YAML タグ",
               "description": "containers / shares / storage / setup / settings / routing / auth / health / backup / configs",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-1-2": {
               "title": "バリデータ",
               "description": "テーブルドリブンで成功/失敗ケースを網羅",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S1bccf5-2": {
           "title": "RegistryClient と cosign keyless 検証",
-          "status": "pending",
+          "status": "done",
           "user_story": "KuraOS ユーザーとして、official レジストリから安全にマニフェストを取得したい。なぜなら、改ざんされたマニフェストでマシンが乗っ取られたら困るから。",
           "acceptance_criteria": [
             {
               "id": "AC-S1bccf5-2-1",
               "description": "registry.json と manifest.yaml が、cosign keyless で identity_regex に一致する場合のみ受理される",
               "test": "[AC-S1bccf5-2-1] in engine/app/registry_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1bccf5-2-2",
               "description": "manifest_sha256 がレジストリ記載値と不一致の場合、明確なエラーで停止する",
               "test": "[AC-S1bccf5-2-2] in engine/app/registry_test.go",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1bccf5-2-1": {
               "title": "RegistryClient interface",
               "description": "FetchRegistry / FetchManifest",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-2-2": {
               "title": "cosign keyless ライブラリ統合",
               "description": "sigstore-go を採用、verify-blob 相当",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-2-3": {
               "title": "ハッシュ + 署名の二重チェック",
               "description": "片方失敗で即停止",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-2-4": {
               "title": "app_registries 設定",
               "description": "config.json で official 以外を追加可能、明示的 trust 設定",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S1bccf5-3": {
           "title": "アプリ用 dataset / ポート / 内部パスワード自動割当",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、アプリインストール時にデータセット / ポート / DB パスワードを意識せずに済むようにしたい。なぜなら、これらをユーザーに考えさせると複雑さが漏れ出すから。",
           "acceptance_criteria": [
             {
               "id": "AC-S1bccf5-3-1",
               "description": "pool_hint:ssd の dataset は SSD プールがあれば fast/apps 配下、無ければ tank/apps 配下に作成される",
               "test": "[AC-S1bccf5-3-1] in engine/app/dataset_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S1bccf5-3-2",
               "description": "ポート割当と内部パスワード生成は決定論的に追跡可能で、再起動を跨いで保持される",
               "test": "[AC-S1bccf5-3-2] in engine/app/allocator_test.go",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S1bccf5-3-1": {
               "title": "Dataset プランナー",
               "description": "pool_hint + フォールバックロジック",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-3-2": {
               "title": "ポートアロケータ",
               "description": "SQLite に予約レコード",
-              "status": "pending"
+              "status": "done"
             },
             "S1bccf5-3-3": {
               "title": "内部 secrets ストア",
               "description": "config.json export 時は env 参照のみ、平文を含めない",
-              "status": "pending"
+              "status": "done"
             }
           }
         }
