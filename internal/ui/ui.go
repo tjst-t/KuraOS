@@ -65,6 +65,9 @@ type Renderer struct {
 	appsInstallStartHandler http.Handler
 	appsStreamHandler       http.Handler
 	appsUninstallHandler    http.Handler
+
+	// Users handler (added in S822961). Wired via SetUsersHandler.
+	usersHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -306,7 +309,11 @@ func (r *Renderer) Routes() http.Handler {
 	if r.sharesUpdateHandler != nil {
 		mux.Handle("/ui/admin/shares/update", r.sharesUpdateHandler)
 	}
-	mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
+	if r.usersHandler != nil {
+		mux.Handle("/ui/admin/users", r.usersHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
+	}
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
 	if r.appsListHandler != nil {
 		mux.Handle("/ui/admin/apps", r.appsListHandler)

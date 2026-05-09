@@ -24,6 +24,12 @@ import (
 // it owns the ordering rules (validate -> reserve -> materialize -> start ->
 // healthcheck -> commit) and the rollback rules (anything reserved before a
 // failure is freed before the error returns).
+//
+// OIDC field added in S822961 — when the manifest declares auth.mode=oidc,
+// AppLifecycle.Install hands an OIDCAppClient to OIDC.RegisterAppClient
+// and exposes the returned client_id/secret/issuer in the configs template
+// data (.Secrets.OIDC*). Nil OIDC is tolerated for legacy or test wiring;
+// auth.mode=oidc apps simply skip the registration step.
 type AppLifecycle struct {
 	Registry RegistryClient
 	Planner  *DatasetPlanner
@@ -32,6 +38,7 @@ type AppLifecycle struct {
 	Docker   DockerClient
 	Storage  DatasetWriter
 	Routes   RouteRegistry
+	OIDC     OIDCRegistrar
 	DB       *sql.DB
 
 	// HealthTimeout caps how long Install waits for a container's health
@@ -79,7 +86,44 @@ type RouteRegistry interface {
 	ListAppRoutes() []AppRoute
 }
 
+// OIDCRegistrar is the slice of engine/auth/oidc AppLifecycle needs to
+// auto-register a client_id when manifest.auth.mode == "oidc". The
+// adapter cmd/kura wires also persists the secret to the credential
+// vault so engine/app does not need to import engine/system.
+type OIDCRegistrar interface {
+	// RegisterAppClient creates (or refreshes) a confidential client for
+	// the app and returns the credentials the manifest configs templates
+	// need (.Secrets.OIDC*). Idempotent on the (appID, name) pair: a
+	// re-install reuses the same client_id while rotating the secret.
+	RegisterAppClient(ctx context.Context, req OIDCAppClient) (OIDCAppClientCreds, error)
+	// UnregisterAppClient drops the client and its vault entry.
+	UnregisterAppClient(ctx context.Context, appID string) error
+}
+
+// OIDCAppClient is what AppLifecycle hands the registrar.
+type OIDCAppClient struct {
+	AppID        string
+	AppName      string
+	RedirectURIs []string
+}
+
+// OIDCAppClientCreds is the freshly minted client + secret + issuer URL
+// returned to AppLifecycle so it can populate the manifest configs
+// template data.
+type OIDCAppClientCreds struct {
+	ClientID     string
+	ClientSecret string
+	Issuer       string
+	RedirectURI  string
+}
+
 // AppRoute is the routing manifest -> gateway adapter shape.
+//
+// AuthMode + HeaderUser were added in S822961 so the gateway can pick
+// between forward_auth header injection (legacy apps), OIDC pass-through
+// (native apps), and no-auth (rare). Existing routes constructed before
+// the field arrived default to AuthModeNone with no header, behaving
+// identically to pre-sprint behaviour.
 type AppRoute struct {
 	AppID       string
 	AppName     string
@@ -89,6 +133,8 @@ type AppRoute struct {
 	StripPrefix bool
 	BasePathEnv string
 	Container   string
+	AuthMode    AuthMode
+	HeaderUser  string
 }
 
 // ProgressEvent is one SSE message the install/update/uninstall stream emits.
@@ -106,19 +152,20 @@ type ProgressEvent struct {
 // Recognised stage tokens. The UI maps these to MessageIDs; new stages need
 // a matching i18n entry.
 const (
-	StageStart           = "start"
-	StagePullImages      = "pull_images"
-	StageReservePorts    = "reserve_ports"
-	StageProvisionData   = "provision_data"
-	StageRenderConfigs   = "render_configs"
-	StageStoreSecrets    = "store_secrets"
-	StageStartContainers = "start_containers"
-	StageHealthcheck     = "healthcheck"
-	StageRegisterRoute   = "register_route"
-	StagePersist         = "persist"
-	StageRollback        = "rollback"
-	StageDone            = "done"
-	StageError           = "error"
+	StageStart              = "start"
+	StagePullImages         = "pull_images"
+	StageReservePorts       = "reserve_ports"
+	StageProvisionData      = "provision_data"
+	StageRenderConfigs      = "render_configs"
+	StageStoreSecrets       = "store_secrets"
+	StageRegisterOIDCClient = "register_oidc_client"
+	StageStartContainers    = "start_containers"
+	StageHealthcheck        = "healthcheck"
+	StageRegisterRoute      = "register_route"
+	StagePersist            = "persist"
+	StageRollback           = "rollback"
+	StageDone               = "done"
+	StageError              = "error"
 
 	StageSnapshot   = "snapshot"
 	StagePullUpdate = "pull_update"
@@ -237,6 +284,7 @@ type installState struct {
 	StartedConts  []string // container names
 	WrittenConfig []string // file paths
 	RouteRegd     bool
+	OIDCRegd      bool
 }
 
 // Install runs the full install pipeline:
@@ -363,6 +411,32 @@ func (l *AppLifecycle) Install(ctx context.Context, req InstallRequest) (string,
 		} else if s.Default != "" {
 			secrets[s.Key] = s.Default
 		}
+	}
+
+	// 3.5 OIDC client auto-registration. Only when manifest.auth.mode=oidc
+	// and an OIDCRegistrar is wired. The returned creds are exposed in
+	// configs template data as .Secrets.OIDCClientID / OIDCClientSecret /
+	// OIDCIssuer / OIDCRedirectURI so the manifest's app config template
+	// can write them into the container's config file at install time.
+	if manifest.Auth.Mode == AuthModeOIDC && l.OIDC != nil {
+		l.emit(ProgressEvent{AppID: appID, Stage: StageRegisterOIDCClient, OK: true,
+			Detail: "registering OIDC client"})
+		redirects := defaultRedirectURIs(manifest)
+		creds, err := l.OIDC.RegisterAppClient(ctx, OIDCAppClient{
+			AppID:        appID,
+			AppName:      manifest.Name,
+			RedirectURIs: redirects,
+		})
+		if err != nil {
+			return appID, l.fail(state, "register oidc client", err)
+		}
+		state.OIDCRegd = true
+		secrets["OIDCClientID"] = creds.ClientID
+		secrets["OIDCClientSecret"] = creds.ClientSecret
+		secrets["OIDCIssuer"] = creds.Issuer
+		secrets["OIDCRedirectURI"] = creds.RedirectURI
+		l.emit(ProgressEvent{AppID: appID, Stage: StageRegisterOIDCClient, OK: true,
+			Detail: "client " + creds.ClientID + " registered"})
 	}
 
 	// 4. Share paths from setup.required (share_picker fields).
@@ -512,6 +586,10 @@ func (l *AppLifecycle) rollbackInstall(ctx context.Context, state *installState)
 	// Route.
 	if state.RouteRegd && l.Routes != nil {
 		_ = l.Routes.UnregisterAppRoute(state.AppID)
+	}
+	// OIDC client.
+	if state.OIDCRegd && l.OIDC != nil {
+		_ = l.OIDC.UnregisterAppClient(ctx, state.AppID)
 	}
 	// Configs / transcripts.
 	for _, p := range state.WrittenConfig {
@@ -855,6 +933,8 @@ func buildRoute(appID string, m *Manifest, ports map[PortKey]int) AppRoute {
 		BasePathEnv: m.Routing.BasePathEnv,
 		Container:   m.Routing.Container,
 		Subdomain:   m.Routing.Subdomain,
+		AuthMode:    m.Auth.Mode,
+		HeaderUser:  m.Auth.HeaderUser,
 	}
 	// Resolve target host port: prefer routing.port, else first port of the
 	// nominated container.
@@ -960,6 +1040,14 @@ func parseSize(s string) int64 {
 		return 0
 	}
 	return v * mul
+}
+
+// defaultRedirectURIs returns the redirect_uri set the gateway exposes
+// for an app's OIDC code flow. v1 ships one URL per app (the path-mode
+// callback at /apps/<name>/oidc/callback) — apps that need additional
+// URIs (extra subdomains, etc.) can ship a manifest setting in v1.x.
+func defaultRedirectURIs(m *Manifest) []string {
+	return []string{"/apps/" + m.Name + "/oidc/callback"}
 }
 
 // parseDuration is a permissive wrapper for time.ParseDuration that returns

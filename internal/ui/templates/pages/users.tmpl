@@ -1,0 +1,183 @@
+{{- /*
+users.tmpl — admin /ui/admin/users page (S822961). Visual SSOT:
+prototype/claude_design/Users.html. The 4 tabs (users / groups / auth /
+oidc) are implemented as plain anchor links rather than client-side
+state so a non-JS browser still navigates between them. The Auth tab is
+the entry point for AC-S822961-3-1 (Google linking).
+
+PageData.Extra is *ui.UsersView.
+*/ -}}
+{{ define "content" }}
+{{ $v := .Extra }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.users.title" }}</h1>
+    <p class="page-sub">{{ T "page.users.subtitle" }}</p>
+  </div>
+</div>
+
+<div class="tabs" data-testid="users-tabs"
+     style="margin-bottom:16px;display:flex;gap:8px;border-bottom:1px solid var(--border)">
+  <a href="?tab=users"  data-testid="users-tab-users"
+     class="tab" {{ if eq $v.Tab "users" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer;text-decoration:none">
+    {{ T "page.users.tab.users" }} <span class="muted mono">({{ len $v.Users }})</span>
+  </a>
+  <a href="?tab=groups" data-testid="users-tab-groups"
+     class="tab" {{ if eq $v.Tab "groups" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer;text-decoration:none">
+    {{ T "page.users.tab.groups" }} <span class="muted mono">({{ len $v.Groups }})</span>
+  </a>
+  <a href="?tab=auth"   data-testid="users-tab-auth"
+     class="tab" {{ if eq $v.Tab "auth" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer;text-decoration:none">
+    {{ T "page.users.tab.auth" }}
+  </a>
+  <a href="?tab=oidc"   data-testid="users-tab-oidc"
+     class="tab" {{ if eq $v.Tab "oidc" }}data-active="true"{{ end }}
+     style="padding:10px 14px;border:0;background:transparent;cursor:pointer;text-decoration:none">
+    {{ T "page.users.tab.oidc" }}
+  </a>
+</div>
+
+{{ if eq $v.Tab "users" }}
+<div class="card" data-testid="users-table-card">
+  <table class="tbl" data-testid="users-table">
+    <thead><tr>
+      <th>{{ T "page.users.col.user" }}</th>
+      <th>{{ T "page.users.col.role" }}</th>
+      <th>{{ T "page.users.col.methods" }}</th>
+      <th>{{ T "page.users.col.groups" }}</th>
+      <th>{{ T "page.users.col.last" }}</th>
+      <th>{{ T "page.users.col.actions" }}</th>
+    </tr></thead>
+    <tbody>
+      {{ range $v.Users }}
+      <tr data-testid="users-row" data-user-id="{{ .UserID }}">
+        <td>
+          <span class="row center" style="display:flex;align-items:center;gap:10px">
+            <span class="avatar" style="width:24px;height:24px;font-size:10px;border-radius:6px;background:var(--surface-2);display:inline-grid;place-items:center;font-weight:600">{{ .Initials }}</span>
+            <span style="font-weight:500">{{ .Username }}</span>
+          </span>
+        </td>
+        <td><span class="badge {{ if .IsAdmin }}info{{ end }}">{{ .Role }}</span></td>
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            {{ range .Methods }}<span class="badge mono" data-method="{{ . }}">{{ . }}</span>{{ end }}
+          </div>
+        </td>
+        <td class="mono">{{ if .Groups }}{{ range $i, $g := .Groups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}{{ else }}—{{ end }}</td>
+        <td class="muted">{{ if .LastLogin }}{{ .LastLogin }}{{ else }}—{{ end }}</td>
+        <td>
+          <a class="btn btn-sm" data-testid="users-link-google-btn"
+             href="/federation/google/link?return_to=/ui/admin/users">{{ T "page.users.auth.link_google_btn" }}</a>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ end }}
+
+{{ if eq $v.Tab "groups" }}
+<div class="card">
+  {{ if not $v.Groups }}
+  <div class="card-body" style="padding:24px;text-align:center">
+    <p class="muted" style="margin:0">{{ T "page.users.groups.empty" }}</p>
+  </div>
+  {{ else }}
+  <table class="tbl">
+    <thead><tr><th>グループ</th><th>メンバー</th><th>説明</th></tr></thead>
+    <tbody>
+      {{ range $v.Groups }}
+      <tr><td class="td-mono">{{ .Name }}</td><td>{{ .Members }}</td><td>{{ .Description }}</td></tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if eq $v.Tab "auth" }}
+<div class="grid grid-2" style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+  <div class="card" data-testid="provider-local">
+    <div class="card-head" style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <h3 class="card-title" style="margin:0">{{ T "page.users.auth.local" }}</h3>
+      <span class="badge info">{{ T "page.users.auth.enabled" }}</span>
+    </div>
+    <div class="card-body">
+      <p class="muted" style="margin:0;font-size:13px">{{ T "page.users.auth.local.desc" }}</p>
+    </div>
+  </div>
+
+  {{ range $v.Providers }}
+  <div class="card" data-testid="provider-{{ .Name }}">
+    <div class="card-head" style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <h3 class="card-title" style="margin:0">{{ .Name }}</h3>
+      <span class="badge {{ if .Enabled }}info{{ end }}">
+        {{ if .Enabled }}{{ T "page.users.auth.enabled" }}{{ else }}{{ T "page.users.auth.disabled" }}{{ end }}
+      </span>
+    </div>
+    <div class="card-body col">
+      <div class="field">
+        <label>{{ T "page.users.auth.client_id_label" }}</label>
+        <input class="input mono" value="{{ .ClientID }}" disabled />
+      </div>
+      <div class="field">
+        <label>{{ T "page.users.auth.secret_label" }}</label>
+        <input class="input mono" type="password" value="placeholder" disabled />
+        <div class="field-hint">{{ T "page.users.auth.secret_placeholder" }}</div>
+      </div>
+      <div class="row between center" style="display:flex;justify-content:space-between;align-items:center">
+        <label style="font-size:13px">{{ T "page.users.auth.auto_provision" }}</label>
+        <span class="badge mono">{{ if .AutoProvision }}on{{ else }}off{{ end }}</span>
+      </div>
+    </div>
+  </div>
+  {{ end }}
+
+  {{ if not $v.Providers }}
+  <div class="card" data-testid="provider-google">
+    <div class="card-head" style="display:flex;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border)">
+      <h3 class="card-title" style="margin:0">{{ T "page.users.auth.google" }}</h3>
+      <span class="badge">{{ T "page.users.auth.disabled" }}</span>
+    </div>
+    <div class="card-body">
+      <p class="muted" style="margin:0;font-size:13px">{{ T "page.users.auth.google.desc" }}</p>
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if eq $v.Tab "oidc" }}
+<div class="card" data-testid="oidc-clients-card">
+  {{ if not $v.OIDCClients }}
+  <div class="card-body" style="padding:24px;text-align:center">
+    <p class="muted" style="margin:0">{{ T "page.users.oidc.empty" }}</p>
+  </div>
+  {{ else }}
+  <table class="tbl" data-testid="oidc-clients-table">
+    <thead><tr>
+      <th>{{ T "page.users.oidc.col.client" }}</th>
+      <th>{{ T "page.users.oidc.col.issuer" }}</th>
+      <th>{{ T "page.users.oidc.col.redirect" }}</th>
+      <th>{{ T "page.users.oidc.col.created" }}</th>
+    </tr></thead>
+    <tbody>
+      {{ range $v.OIDCClients }}
+      <tr data-testid="oidc-row">
+        <td class="td-mono">{{ .ClientID }}</td>
+        <td><span class="badge">{{ $v.Issuer }}</span></td>
+        <td class="td-mono">
+          {{ range $i, $u := .RedirectURIs }}{{ if $i }}<br>{{ end }}{{ $u }}{{ end }}
+        </td>
+        <td class="muted">{{ .CreatedAt.Format "2006-01-02" }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+{{ end }}
+{{ end }}

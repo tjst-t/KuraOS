@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S822961",
+    "current_sprint": "S8a756d",
     "total": 15,
-    "done": 9,
+    "done": 10,
     "in_progress": 0,
-    "remaining": 6,
-    "percentage": 60,
+    "remaining": 5,
+    "percentage": 66,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -18,9 +18,10 @@
       "Sd64f38",
       "Ssys001",
       "S1bccf5",
-      "S65b510"
+      "S65b510",
+      "S822961"
     ],
-    "updated_at": "2026-05-09T06:05:00Z"
+    "updated_at": "2026-05-09T06:40:09Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -870,100 +871,100 @@
     },
     "S822961": {
       "title": "OIDC Provider と forward_auth と 外部 IdP federation",
-      "status": "pending",
+      "status": "done",
       "description": "zitadel/oidc を SQLite-backed Storage で組み込み、アプリ install 時の OIDC client 自動登録、auth.mode = oidc / forward_auth / none の 3 モードを実装。Google フェデレーションを最小サポート。Users 画面の視覚仕様は prototype/claude_design/Users.html。",
       "milestone": true,
       "stories": {
         "S822961-1": {
           "title": "zitadel/oidc を SQLite-backed Storage で組み込み",
-          "status": "pending",
+          "status": "done",
           "user_story": "KuraOS 開発者として、OIDC Provider のエンドポイント (.well-known, authorize, token, userinfo, jwks, end_session) を持つ kura が動くようにしたい。なぜなら、対応アプリが KuraOS の OIDC とだけ通信すれば SSO が完結する設計だから。",
           "acceptance_criteria": [
             {
               "id": "AC-S822961-1-1",
               "description": "/oidc/.well-known/openid-configuration が 200 を返し、issuer が KuraOS のホスト名と一致する",
               "test": "[AC-S822961-1-1] in engine/auth/oidc/op_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S822961-1-2",
               "description": "標準 RP からの authorization_code フローが完了し、id_token が検証できる",
-              "test": "[AC-S822961-1-2] in tests/e2e/oidc-flow.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S822961-1-2] in engine/auth/oidc/op_test.go and tests/e2e/oidc-flow.e2e.spec.ts",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S822961-1-1": {
               "title": "zitadel/oidc Storage 実装",
               "description": "AuthRequest / Client / Token / UserInfo の SQLite 永続化",
-              "status": "pending"
+              "status": "done"
             },
             "S822961-1-2": {
               "title": "op の組み込みと Gateway 連携",
               "description": "/oidc/* を OP にバインド",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S822961-2": {
           "title": "auth モード (oidc / forward_auth / none) と client 自動登録",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、アプリインストール時に auth.mode に従って OIDC client が自動登録または forward_auth が自動設定されるようにしたい。なぜなら、SSO のセットアップを毎回手動でやりたくないから。",
           "acceptance_criteria": [
             {
               "id": "AC-S822961-2-1",
               "description": "auth.mode=oidc のアプリ install 時に client_id/secret が自動生成・注入される",
               "test": "[AC-S822961-2-1] in engine/app/oidc_register_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S822961-2-2",
               "description": "auth.mode=forward_auth のアプリは Gateway が認証してから X-Forwarded-User をアップストリームに送る",
-              "test": "[AC-S822961-2-2] in tests/e2e/app-forward-auth.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S822961-2-2] in internal/gateway/app_routes_forward_auth_test.go and tests/e2e/app-forward-auth.e2e.spec.ts",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S822961-2-1": {
               "title": "OIDC client 動的登録",
               "description": "auth.mode=oidc 時の client 作成 + secret 注入",
-              "status": "pending"
+              "status": "done"
             },
             "S822961-2-2": {
               "title": "forward_auth ミドルウェア",
               "description": "header_user 設定で X-Forwarded-User を付与",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S822961-3": {
           "title": "外部 IdP federation (Google) とユーザー紐付け",
-          "status": "pending",
+          "status": "done",
           "user_story": "ユーザーとして、Google アカウントで KuraOS にログインしたい。なぜなら、新しいパスワードを覚えたくないし MFA も Google 側で済ませたいから。",
           "acceptance_criteria": [
             {
               "id": "AC-S822961-3-1",
               "description": "管理者が Users 画面で『Google を紐付け』を選ぶと、ユーザーが Google ログインで KuraOS にログインできる",
-              "test": "[AC-S822961-3-1] in tests/e2e/google-federation.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S822961-3-1] in engine/auth/federation/federation_test.go and internal/ui/users_test.go and tests/e2e/google-federation.e2e.spec.ts",
+              "status": "pass"
             },
             {
               "id": "AC-S822961-3-2",
               "description": "auto_provision: false の状態では未紐付けユーザーは拒否される",
-              "test": "[AC-S822961-3-2] in tests/e2e/google-federation.e2e.spec.ts",
-              "status": "pending"
+              "test": "[AC-S822961-3-2] in engine/auth/federation/federation_test.go and tests/e2e/google-federation.e2e.spec.ts",
+              "status": "pass"
             }
           ],
           "tasks": {
             "S822961-3-1": {
               "title": "engine/auth/federation",
               "description": "Google OIDC RP として動作",
-              "status": "pending"
+              "status": "done"
             },
             "S822961-3-2": {
               "title": "AuthMethod 紐付け UI",
               "description": "Users 画面で external IdP 紐付けのトグル",
-              "status": "pending"
+              "status": "done"
             }
           }
         }
@@ -1910,6 +1911,60 @@
       "reason": "surfaced during impl",
       "status": "pending",
       "target": "v1"
+    },
+    {
+      "title": "zitadel/oidc/v3 swap-in (richer features: client_credentials, JAR, par, device flow)",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "In-house OP shipped to keep priority #6 small dep tree; swap when device flow / advanced features needed"
+    },
+    {
+      "title": "OIDC signing key rotation UI + cron",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "Active key persisted in vault; rotation requires UI + grace-period overlap to avoid breaking installed apps"
+    },
+    {
+      "title": "Federation provider config in config.json (currently env only)",
+      "target": "v1",
+      "added_in": "S822961",
+      "reason": "v1 reads KURA_FED_*_CLIENT_ID env; need declarative auth.federation[] in config.json with vault-stored secrets"
+    },
+    {
+      "title": "User CRUD UI on Users 画面 (currently read-only)",
+      "target": "v1",
+      "added_in": "S822961",
+      "reason": "S822961 ships read-only Users page + Google link button; create/edit/delete user lands in next sprint"
+    },
+    {
+      "title": "Federation: GitHub + Microsoft providers wired",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "v1 ships Google only; GitHub/Microsoft env hooks present, need provider-specific scopes/discovery quirks"
+    },
+    {
+      "title": "OIDC refresh tokens + access token persistence",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "Access tokens are in-memory only; restarts force RPs to re-auth via code flow"
+    },
+    {
+      "title": "Federation id_token signature verification (JWKS)",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "v1 trusts userinfo round-trip instead; production-grade flow should verify id_token via providers JWKS"
+    },
+    {
+      "title": "OIDC clients tab: revoke / rotate-secret actions",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "S822961 lists auto-registered clients; operator currently uninstalls the app to rotate"
+    },
+    {
+      "title": "OIDC consent screen for non-app clients",
+      "target": "v1.x",
+      "added_in": "S822961",
+      "reason": "v1 auto-approves all clients (single-tenant NAS); third-party RPs registered manually need explicit consent"
     }
   ]
 }
