@@ -14,6 +14,7 @@ import (
 	"github.com/kuraos-org/kura/engine/auth/session"
 	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
+	"github.com/kuraos-org/kura/engine/system"
 	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
 	"github.com/kuraos-org/kura/internal/cmdexec"
@@ -45,11 +46,21 @@ func dispatch(args []string) error {
 		return configCmd(args[1:])
 	case "storage":
 		return storageCmd(args[1:])
+	case "system":
+		return systemCmd(args[1:])
+	case "user":
+		return userCmd(args[1:])
+	case "share":
+		return shareCmd(args[1:])
+	case "backup":
+		return backupCmd(args[1:])
+	case "restore":
+		return restoreCmd(args[1:])
 	case "version", "--version", "-v":
 		fmt.Println(Version)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try: config | storage | version)", args[0])
+		return fmt.Errorf("unknown command %q (try: config | storage | system | user | share | backup | restore | version)", args[0])
 	}
 }
 
@@ -113,9 +124,36 @@ func run() error {
 	)
 	uiRenderer.SetSharesUpdateHandler(uiRenderer.SharesUpdateHandler(sharesDeps))
 
-	users := user.NewStore(st.DB(), nil)
+	hasher := user.NewHasher()
+	users := user.NewStore(st.DB(), hasher)
 	sessions := session.NewStore(st.DB())
 	secureCookies := os.Getenv("KURA_SECURE_COOKIES") == "1"
+
+	// engine/system owns Linux NSS, Samba tdbsam, share path ownership, and
+	// the credential vault. Reconcile is invoked at startup; per-event
+	// projection (SetUserPassword, ApplyShareOwnership) is wired below.
+	sysRoot := os.Getenv("KURA_SYSTEM_ROOT")
+	if sysRoot == "" {
+		sysRoot = "/"
+	}
+	sysEng, err := system.New(system.Options{
+		DB:               st.DB(),
+		FS:               system.NewRealFS(sysRoot),
+		Exec:             cmdexec.NewReal(),
+		Hasher:           system.NewHasherAdapter(hasher),
+		Users:            system.NewUserStoreAdapter(users),
+		OnPasswordChange: system.LegacyAuthMethodMirror(st.DB()),
+	})
+	if err != nil {
+		return fmt.Errorf("init system engine: %w", err)
+	}
+	shareEngine.SetOwnershipApplier(system.NewShareOwnershipAdapter(sysEng))
+
+	// Soft-fail on a dev box without /etc/passwd write permission. Production
+	// VM has root; dev box logs the failure and continues.
+	if recErr := sysEng.Reconcile(ctx); recErr != nil {
+		log.Printf("system: startup reconcile failed (non-fatal): %v", recErr)
+	}
 
 	authH := uiRenderer.AuthHandler(ui.AuthDeps{
 		Users:         users,

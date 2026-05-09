@@ -107,6 +107,69 @@ func (s *Store) GetByUsername(ctx context.Context, username string) (User, error
 	return scanUser(row)
 }
 
+// List returns every persisted user, ordered by username for stable
+// rendering. Used by engine/system.Reconcile to project the canonical
+// user set into /etc/passwd.
+func (s *Store) List(ctx context.Context) ([]User, error) {
+	rows, err := s.db.QueryContext(ctx, `
+		SELECT id, username, display_name, role, disabled, created_at, updated_at
+		FROM users ORDER BY username
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("user: list: %w", err)
+	}
+	defer rows.Close()
+	var out []User
+	for rows.Next() {
+		var u User
+		var role string
+		var disabled int
+		var created, updated string
+		if err := rows.Scan(&u.ID, &u.Username, &u.DisplayName, &role, &disabled, &created, &updated); err != nil {
+			return nil, fmt.Errorf("user: scan: %w", err)
+		}
+		u.Role = Role(role)
+		u.Disabled = disabled != 0
+		if t, perr := time.Parse(time.RFC3339Nano, created); perr == nil {
+			u.CreatedAt = t
+		}
+		if t, perr := time.Parse(time.RFC3339Nano, updated); perr == nil {
+			u.UpdatedAt = t
+		}
+		out = append(out, u)
+	}
+	return out, rows.Err()
+}
+
+// SetPassword overwrites the existing password row for the user. Used by
+// `kura user set-password` and by future password-change UI. The argon2id
+// verifier is updated in auth_methods; the corresponding NT-hash mirror
+// is the responsibility of engine/system (via OnPasswordChange or a
+// direct SetUserPassword call by the CLI).
+func (s *Store) SetPassword(ctx context.Context, userID, password string) error {
+	if password == "" {
+		return errors.New("user: password is empty")
+	}
+	encoded, err := s.hasher.Hash(password)
+	if err != nil {
+		return fmt.Errorf("user: hash password: %w", err)
+	}
+	now := s.now().UTC().Format(time.RFC3339Nano)
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE auth_methods
+		SET secret = ?, updated_at = ?
+		WHERE user_id = ? AND method = 'password'
+	`, encoded, now, userID)
+	if err != nil {
+		return fmt.Errorf("user: update password: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CountByRole reports how many users currently hold role. The setup wizard
 // uses CountByRole(ctx, RoleAdmin) to decide whether the bootstrap form
 // should be reachable.

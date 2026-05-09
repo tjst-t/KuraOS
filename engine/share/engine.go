@@ -35,6 +35,11 @@ type Manager struct {
 	// requested path lives under a known ZFS volume. Engines without a
 	// storage hook can leave it nil; Create then accepts any well-formed path.
 	checker VolumeChecker
+
+	// ownership, when non-nil, is invoked by Create/Update after Apply to
+	// chown/chmod the share path so KuraOS users can write to it. nil
+	// means tests / dev-box runs without engine/system wired up.
+	ownership OwnershipApplier
 }
 
 // VolumeChecker is the seam against engine/storage. The interface is local
@@ -48,6 +53,14 @@ type VolumeChecker interface {
 	PathBelongsToVolume(ctx context.Context, p string) (bool, error)
 }
 
+// OwnershipApplier is the seam against engine/system. Implementations chown
+// + chmod the share's filesystem path so KuraOS users can write to it.
+// The interface is local to engine/share to avoid importing engine/system
+// (priority #10: cross-engine boundaries via narrow interfaces).
+type OwnershipApplier interface {
+	ApplyOwnership(ctx context.Context, share Share) error
+}
+
 // Options configures NewManager. Empty fields fall back to production
 // defaults; tests routinely override SMBConfPath / ExportsPath to a temp dir.
 type Options struct {
@@ -57,6 +70,7 @@ type Options struct {
 	TestparmBin  string
 	ExportfsBin  string
 	Checker      VolumeChecker
+	Ownership    OwnershipApplier
 }
 
 // NewManager constructs a Manager. The Executor must be non-nil; pass
@@ -86,7 +100,35 @@ func NewManager(store *Store, exec cmdexec.Executor, opts Options) *Manager {
 		testparmBin:  opts.TestparmBin,
 		exportfsBin:  opts.ExportfsBin,
 		checker:      opts.Checker,
+		ownership:    opts.Ownership,
 	}
+}
+
+// SetOwnershipApplier swaps the ownership hook after construction. Used by
+// cmd/kura wiring so engine/system (which itself depends on a created
+// store) can be injected after NewManager has run.
+func (m *Manager) SetOwnershipApplier(o OwnershipApplier) { m.ownership = o }
+
+// ReconcilePerms re-runs ApplyOwnership for every share. Called by
+// `kura share reconcile-perms` and at startup reconciliation. A nil
+// applier is treated as a no-op.
+func (m *Manager) ReconcilePerms(ctx context.Context) error {
+	if m.ownership == nil {
+		return nil
+	}
+	shares, err := m.store.List(ctx)
+	if err != nil {
+		return err
+	}
+	for _, s := range shares {
+		if s.Disabled {
+			continue
+		}
+		if err := m.ownership.ApplyOwnership(ctx, s); err != nil {
+			return fmt.Errorf("share: apply ownership %q: %w", s.Name, err)
+		}
+	}
+	return nil
 }
 
 // List returns every share, sorted by name.
@@ -145,6 +187,13 @@ func (m *Manager) Create(ctx context.Context, in CreateInput) (Share, error) {
 		_ = m.store.Delete(ctx, created.ID)
 		return Share{}, err
 	}
+	// Engine/system chown/chmod: failure is logged but does not roll back
+	// the share creation. Operator can fix the path manually or re-run
+	// `kura share reconcile-perms`. Hard-failing here would orphan the
+	// share row that smbd already sees.
+	if m.ownership != nil {
+		_ = m.ownership.ApplyOwnership(ctx, created)
+	}
 	return created, nil
 }
 
@@ -183,6 +232,9 @@ func (m *Manager) Update(ctx context.Context, id string, in UpdateInput) (Share,
 		// outlive a successful row mutation.
 		_, _ = m.store.Update(ctx, id, prev)
 		return Share{}, err
+	}
+	if m.ownership != nil {
+		_ = m.ownership.ApplyOwnership(ctx, saved)
 	}
 	return saved, nil
 }

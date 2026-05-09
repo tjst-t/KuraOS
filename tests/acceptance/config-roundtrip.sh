@@ -83,6 +83,51 @@ else
     fail "[AC-S464e47-2-2] apply --dry-run exited non-zero"
 fi
 
+# ---------------------------------------------------------------------------
+# [AC-Ssys001-2-2] TestUsersExportContainsOnlyPlaceholder — when a config
+# is hand-authored to include a users section, every entry MUST carry only
+# `credential_state` and never argon2id verifier / NT-hash / raw secret.
+# ---------------------------------------------------------------------------
+USERS_FILE="$(mktemp)"
+cat >"$USERS_FILE" <<'JSON'
+{
+  "schema_version": 1,
+  "users": {
+    "users": [
+      {"username": "alice", "role": "admin", "credential_state": "set"},
+      {"username": "bob",   "role": "user",  "credential_state": "set"}
+    ]
+  }
+}
+JSON
+
+if ! ./bin/kura config apply --dry-run "$USERS_FILE" >"$APPLY_OUT" 2>/tmp/kuraos-acceptance-users-apply.log; then
+    cat /tmp/kuraos-acceptance-users-apply.log >&2
+    fail "[AC-Ssys001-2-2] apply --dry-run rejected a users section that holds only placeholders"
+else
+    pass "[AC-Ssys001-2-2] apply --dry-run accepts users section with credential_state placeholders"
+fi
+
+# Same file with an embedded credential MUST be rejected (DisallowUnknownFields)
+LEAK_FILE="$(mktemp)"
+cat >"$LEAK_FILE" <<'JSON'
+{
+  "schema_version": 1,
+  "users": {
+    "users": [
+      {"username": "alice", "role": "admin", "credential_state": "set", "argon2id": "$argon2id$leak"}
+    ]
+  }
+}
+JSON
+
+if ./bin/kura config apply --dry-run "$LEAK_FILE" >/dev/null 2>/tmp/kuraos-acceptance-leak-apply.log; then
+    fail "[AC-Ssys001-2-2] apply --dry-run accepted a config with an embedded argon2id field"
+else
+    pass "[AC-Ssys001-2-2] apply --dry-run rejects embedded credential fields (vault is the only secret store)"
+fi
+rm -f "$USERS_FILE" "$LEAK_FILE"
+
 echo
 echo "config-roundtrip.sh: $PASS passed, $FAIL failed"
 exit "$FAIL"

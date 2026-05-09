@@ -13,6 +13,7 @@ import (
 
 	"github.com/kuraos-org/kura/engine/auth/session"
 	"github.com/kuraos-org/kura/engine/share"
+	"github.com/kuraos-org/kura/engine/system"
 	"github.com/kuraos-org/kura/engine/user"
 	"github.com/kuraos-org/kura/i18n"
 	"github.com/kuraos-org/kura/internal/cmdexec"
@@ -321,3 +322,110 @@ func mustReadFile(t *testing.T, path string) string {
 	}
 	return string(b)
 }
+
+// [AC-Ssys001-4-1] Share creation triggers engine/system to chown/chmod
+// the share's dataset path and record the applied state in
+// share_perm_state. The setgid bit (mode 2775) is observable via stat.
+func TestAcceptance_Share_DatasetOwnership(t *testing.T) {
+	dir := t.TempDir()
+	dbPath := filepath.Join(dir, "state.db")
+	st, err := store.Open(context.Background(), dbPath)
+	if err != nil {
+		t.Fatalf("store.Open: %v", err)
+	}
+	t.Cleanup(func() { _ = st.Close() })
+
+	rootfs := filepath.Join(dir, "rootfs")
+	sharePath := filepath.Join(rootfs, "tank/photos")
+	if err := os.MkdirAll(sharePath, 0o755); err != nil {
+		t.Fatalf("mkdir sharePath: %v", err)
+	}
+
+	hasher := user.NewHasher()
+	users := user.NewStore(st.DB(), hasher)
+	if _, err := users.CreateLocalUser(context.Background(), "alice", "Alice", "longenoughpw", user.RoleUser); err != nil {
+		t.Fatalf("seed alice: %v", err)
+	}
+
+	sysEng, err := system.New(system.Options{
+		DB:     st.DB(),
+		FS:     system.NewRealFS(rootfs),
+		Exec:   newSilentExec(),
+		Hasher: system.NewHasherAdapter(hasher),
+		Users:  system.NewUserStoreAdapter(users),
+	})
+	if err != nil {
+		t.Fatalf("system.New: %v", err)
+	}
+	owner := system.NewShareOwnershipAdapter(sysEng)
+
+	smbConfPath := filepath.Join(dir, "kura.conf")
+	expPath := filepath.Join(dir, "kura.exports")
+	fake := cmdexec.NewFake()
+	fake.RegisterStdout("testparm", []string{"-s", "--suppress-prompt", smbConfPath}, nil)
+	fake.RegisterStdout("systemctl", []string{"reload", "smbd"}, nil)
+	fake.RegisterStdout("systemctl", []string{"reload", "nfs-server"}, nil)
+	fake.RegisterStdout("exportfs", []string{"-ra"}, nil)
+	mgr := share.NewManager(share.NewStore(st.DB()), fake, share.Options{
+		SMBConfPath: smbConfPath,
+		ExportsPath: expPath,
+		Ownership:   owner,
+	})
+
+	created, err := mgr.Create(context.Background(), share.CreateInput{
+		Name:       "photos",
+		Path:       "/tank/photos",
+		Protocol:   share.ProtocolSMB,
+		Preset:     share.PresetGeneral,
+		AccessMode: share.AccessReadWrite,
+		ACL: []share.ACLEntry{
+			{Kind: share.PrincipalUser, Name: "alice", Mode: share.ACLModeReadWrite},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	// share_perm_state row exists for the new share.
+	var got struct {
+		path string
+		uid  int
+		gid  int
+		mode int
+	}
+	if err := st.DB().QueryRowContext(context.Background(),
+		`SELECT path, owner_uid, owner_gid, mode FROM share_perm_state WHERE share_id = ?`,
+		created.ID,
+	).Scan(&got.path, &got.uid, &got.gid, &got.mode); err != nil {
+		t.Fatalf("share_perm_state row missing: %v", err)
+	}
+	if got.path != "/tank/photos" {
+		t.Fatalf("recorded path %q", got.path)
+	}
+	if got.gid < system.GIDMin || got.gid > system.GIDMax {
+		t.Fatalf("recorded gid %d outside KuraOS range", got.gid)
+	}
+
+	// Setgid bit applied to the actual directory (mode 02775).
+	stat, err := os.Stat(sharePath)
+	if err != nil {
+		t.Fatalf("stat: %v", err)
+	}
+	if stat.Mode()&os.ModeSetgid == 0 {
+		t.Fatalf("setgid bit missing on %s (mode=%v)", sharePath, stat.Mode())
+	}
+	if stat.Mode().Perm() != 0o775 {
+		t.Fatalf("perm bits %#o on %s, want 0775", stat.Mode().Perm(), sharePath)
+	}
+}
+
+// newSilentExec is the test-side cmdexec that swallows pdbedit / chown
+// invocations engine/system makes. share_flow_test exercises pdbedit only
+// indirectly so a permissive exec keeps the test focused.
+type silentExec struct{}
+
+func (silentExec) Run(_ context.Context, _ string, _ ...string) ([]byte, []byte, error) {
+	return nil, nil, nil
+}
+
+func newSilentExec() silentExec { return silentExec{} }
