@@ -40,6 +40,15 @@ type Deps struct {
 	// are mounted. Tests / minimal binaries leave it nil to skip those
 	// surfaces.
 	AppRoutes *app.MemoryRouteRegistry
+
+	// OIDCHandler serves the in-house OpenID Provider at /oidc/* (added
+	// in S822961). Wired when an OIDC OP is constructed at startup;
+	// minimal/test setups can leave it nil.
+	OIDCHandler http.Handler
+
+	// FederationHandler serves external IdP RP callbacks (e.g. Google) at
+	// /federation/<provider>/(start|callback). Wired alongside OIDC.
+	FederationHandler http.Handler
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
@@ -109,9 +118,23 @@ func New(d Deps) http.Handler {
 	}
 
 	if d.AppRoutes != nil {
-		appHandler := NewAppRouteHandler(d.AppRoutes)
+		var appHandler *AppRouteHandler
+		if hasAuth {
+			appHandler = NewAppRouteHandlerWithAuth(d.AppRoutes, d.Sessions, d.Users)
+		} else {
+			appHandler = NewAppRouteHandler(d.AppRoutes)
+		}
 		mux.Handle("/apps/", appHandler)
 		mux.Handle("/api/app-routes", AppRouteListHandler(d.AppRoutes))
+	}
+
+	// /oidc/* — KuraOS OpenID Provider (S822961). Mounted only when wired.
+	if d.OIDCHandler != nil {
+		mux.Handle("/oidc/", d.OIDCHandler)
+	}
+	// /federation/* — external IdP (Google) callback URLs.
+	if d.FederationHandler != nil {
+		mux.Handle("/federation/", d.FederationHandler)
 	}
 	return mux
 }

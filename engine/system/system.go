@@ -94,11 +94,13 @@ type ProjectedGroup struct {
 type CredentialKind string
 
 const (
-	CredentialArgon2id         CredentialKind = "argon2id"
-	CredentialNTHash           CredentialKind = "nt_hash"
-	CredentialOIDCClientSecret CredentialKind = "oidc_client_secret"
-	CredentialAppDBPassword    CredentialKind = "app_db_password"
-	CredentialTLSKey           CredentialKind = "tls_key"
+	CredentialArgon2id              CredentialKind = "argon2id"
+	CredentialNTHash                CredentialKind = "nt_hash"
+	CredentialOIDCClientSecret      CredentialKind = "oidc_client_secret"
+	CredentialOIDCSigningKey        CredentialKind = "oidc_signing_key"
+	CredentialFederationClientSec   CredentialKind = "federation_client_secret"
+	CredentialAppDBPassword         CredentialKind = "app_db_password"
+	CredentialTLSKey                CredentialKind = "tls_key"
 )
 
 // CredentialOwnerKind partitions the vault rows by the kind of entity that

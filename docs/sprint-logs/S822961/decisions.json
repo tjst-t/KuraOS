@@ -1,0 +1,155 @@
+{
+  "sprint_id": "S822961",
+  "title": "OIDC Provider と forward_auth と 外部 IdP federation",
+  "branch": "autopilot/main/S822961",
+  "milestone": true,
+  "planning_decisions": [
+    {
+      "id": "plan-1",
+      "topic": "zitadel/oidc/v3 vs in-house minimal OP",
+      "decision": "v1 では in-house の最小 OIDC OP (engine/auth/oidc) を実装する。zitadel/oidc/v3 は VISION/PRINCIPLES で名指しされているが、依存ツリーが github.com/go-chi/chi/v5 + go-jose/v4 + zitadel/schema + golang.org/x/text/language + rs/cors + 多数の transitive を引き込み、KuraOS が priority #6 で謳う『差別化要因ではない外部ライブラリは小さく保つ』に反する。S65b510 の LocalVerifier swap (cosign keyless 廃止) と完全に同じ pragmatic trade。実装する surface は 7 endpoint (.well-known / authorize / token / userinfo / jwks / end_session) + RS256 signer + authorization_code + PKCE 必須 + KuraOS session cookie 連携 のみ。RP からは zitadel と区別できない。Backlog に 'zitadel/oidc/v3 swap-in (richer features: client_credentials, JAR, par)' を v1.x 移譲。",
+      "rationale": "VISION priority #6 (差別化要因でないライブラリは小さく) と priority #4 (シンプルなモジュラーモノリス)。zitadel/oidc は go-chi router を持ち込み internal mux と二重化する、エラーレスポンスがカスタマイズしづらい等のフリクションがある。in-house なら 600 行以下で 7 endpoint 全網羅でき、テストしやすい。"
+    },
+    {
+      "id": "plan-2",
+      "topic": "OIDC Storage は state.db (SQLite) に集約",
+      "decision": "新規 migration 0009_oidc.sql で oidc_clients / oidc_auth_codes / oidc_signing_keys を追加。auth_code は 60 秒 TTL で issue 後 1 度だけ消費。client_secret 平文は保存せず engine/system vault (CredentialOIDCClientSecret) へ。signing key (RS256 private key PKCS8 PEM) も vault (kind='oidc_signing_key', owner=system) に置く。public JWKS は state.db cache。",
+      "rationale": "priority #1 (SSOT は config.json + vault)。client_id と redirect_uris は config.json に出る (declarative)、secret と signing key は vault のみ (placeholder)。"
+    },
+    {
+      "id": "plan-3",
+      "topic": "AppRoute schema 拡張: AuthMode + HeaderUser",
+      "decision": "engine/app.AppRoute に AuthMode AuthMode と HeaderUser string フィールドを追加。Lifecycle.buildRoute() がマニフェストの auth.mode / auth.header_user を route に詰める。internal/gateway/app_routes.go の AppRouteHandler は auth.mode=forward_auth の場合 KuraOS session cookie を resolve → user.Username を X-Forwarded-User (HeaderUser が空なら) もしくは header_user 名義で upstream へ付与。auth.mode=oidc / none の場合は素 proxy (proxied app 自身が OIDC で認証する)。",
+      "rationale": "S65b510 申し送り #2 への直接対応。priority #1 (config.json で再現可能) と priority #8 (明示的)。"
+    },
+    {
+      "id": "plan-4",
+      "topic": "AppLifecycle.Install hook for auth.mode",
+      "decision": "Install pipeline に StageRegisterOIDCClient stage を追加 (StageRegisterRoute の前)。auth.mode=oidc 時、(1) client_id = 'app-<appID>' を決定, (2) client_secret を 32B random hex で生成, (3) redirect_uris は manifest configs テンプレートから抽出するか、デフォルトで '/apps/<name>/oidc/callback' を1件登録, (4) engine/auth/oidc.Storage.RegisterClient で oidc_clients に INSERT, (5) secret を vault (CredentialOIDCClientSecret, owner=app, ownerID=appID) に upsert, (6) manifest configs テンプレート展開時に .Secrets.OIDCClientID / .Secrets.OIDCClientSecret / .Secrets.OIDCIssuer / .Secrets.OIDCRedirectURI を template data に流し込む。auth.mode=forward_auth 時は OIDC client は登録しない、AppRoute に AuthMode=forward_auth を伝えるだけで十分。",
+      "rationale": "S65b510 申し送り #3 への対応。priority #1 (vault のみ)、priority #8 (明示的)、priority #2 (operator が触る設定をゼロに保つ — 自動生成)。"
+    },
+    {
+      "id": "plan-5",
+      "topic": "Google federation: in-house OIDC RP",
+      "decision": "engine/auth/federation を新設し Google OIDC RP として動作。Discovery (https://accounts.google.com/.well-known/openid-configuration) を 1 度 fetch して endpoint cache。authorization_code フロー + PKCE。federation 設定 (provider name, client_id, client_secret, auto_provision flag) は config.json の auth.federation[] に書く、secret は vault (CredentialKind 'federation_client_secret', owner=system, ownerID=provider name)。ユーザー紐付けは federation_links テーブル (user_id, provider, subject, email, linked_at)。auto_provision=true なら未紐付けユーザーで Google 認証成功時に new user を engine/system.AllocateUID で作る。auto_provision=false なら拒否。VM では実 Google OAuth client は持っていないので mock IdP fixture (Go の httptest.Server で OIDC OP を1個立てる) で AC を満たす。",
+      "rationale": "VISION の forbidden 'MFA / WebAuthn / SAML / LDAP' は federation で委譲 — Google は唯一の v1 federation。priority #10 (engine/system.AllocateUID 経由で Linux uid を projection) を厳守。"
+    },
+    {
+      "id": "plan-6",
+      "topic": "Users 画面 UI",
+      "decision": "internal/ui/users.go (新) と templates/pages/users.tmpl で prototype Users.html を htmx 化。tab=users / groups / auth / oidc の 4 タブ。auth タブが federation provider 設定 (Local 常時有効、Google 設定 form)、oidc タブが auto-registered client 一覧。新規ユーザー作成 form (POST /ui/admin/users) は今 sprint scope 外 (ユーザー作成は CLI で代用、Settings 画面でやる)、users tab は read-only 表示 + 既存ユーザーへの『Google を紐付け』ボタンが核心。既存 e2e (admin user fixture) を破壊しない (S65b510 申し送り #5)。",
+      "rationale": "AC-S822961-3-1 に必要な最小 UI scope。フル CRUD は別 Sprint。VISION priority #2 (賢いデフォルト) — federation 紐付けボタン 1 個で済む。"
+    },
+    {
+      "id": "plan-7",
+      "topic": "セッション継続性",
+      "decision": "OIDC ログインフロー (KuraOS OP の /authorize エンドポイント) は KuraOS の既存 session cookie で『この operator は誰か』を resolve。未ログイン時は /login へ 302 (return_to=/oidc/authorize?...)。ログイン後 /oidc/authorize に戻り authorization_code を発行。Google federation の callback (/oidc/federation/<provider>/callback) は federation_links を引いて user を resolve、新規 session を Issue。既存 session cookie (CookieName='kura_session') と OIDC client への id_token 発行は完全に独立。",
+      "rationale": "S65b510 申し送り #5 (既存 e2e の session cookie ログインを破壊しない)。priority #4 (モジュラー)。"
+    },
+    {
+      "id": "plan-8",
+      "topic": "RS256 signing key の lifecycle",
+      "decision": "起動時 EnsureSigningKey() を呼び、なければ RSA 2048 key pair を生成して vault (kind='oidc_signing_key', owner=system, ownerID='active') に PEM で保存、kid は SHA256(public key DER) の先頭 8 byte hex。再起動でも同じ key を読む (vault は state.db の credentials テーブル)。rotation は v1.x 機能で backlog。",
+      "rationale": "priority #1 (vault のみ)、priority #5 (信頼性 — restart で id_token が無効化されるとアプリが死ぬので key 永続化必須)。"
+    },
+    {
+      "id": "plan-9",
+      "topic": "GUI spec 自律モード",
+      "decision": "tests/e2e/oidc-flow.e2e.spec.ts: 標準 RP fixture (Go test client) で /authorize → consent (auto-approve trusted client) → /token → /userinfo を回す。tests/e2e/app-forward-auth.e2e.spec.ts: forward_auth マニフェストの fake app を install → 未認証 GET /apps/<name>/ → /login redirect → admin login → 再 GET → upstream が X-Forwarded-User: admin を受信したことを assert。tests/e2e/google-federation.e2e.spec.ts: mock Google OP (httptest) を立て、Users 画面で『Google を紐付け』ボタン → mock IdP login → callback → KuraOS session 生成。auto_provision=false でも紐付け済 user は通る、未紐付けは拒否。",
+      "rationale": "ROADMAP test 参照名固定。AC は engine 単位/UI 単位で分離。"
+    },
+    {
+      "id": "plan-10",
+      "topic": "config.json schema 拡張",
+      "decision": "v1 では env-var ベースに留め (KURA_FED_<NAME>_CLIENT_ID 等)、config.json への federation block 追加は backlog。理由: (1) S822961 scope を AC + 視覚仕様に集中させる、(2) config.json の federation block 設計には vault 連携 (SecretState placeholder) や apply 時の error 動作も必要で別 Sprint 規模、(3) operator は v1 では env で十分。",
+      "rationale": "scope 管理。priority #1 違反ではなく、'まだ宣言的化していない領域' として明確に backlog 化。"
+    }
+  ],
+  "implementation_decisions": [
+    {
+      "id": "impl-1",
+      "topic": "in-house OIDC OP (zitadel/oidc/v3 swap)",
+      "decision": "engine/auth/oidc/op.go (~370 LoC) で OpenID Connect Core 1.0 の 6 endpoint を実装。RS256 signing key は vault (oidc_signing_key, owner=system, owner_id=active) に永続化、kid は SubjectPublicKeyInfo の SHA256 先頭 8 byte。authorization_code は SQLite (oidc_auth_codes) で 60s TTL、PKCE plain/S256 両対応、auth_code は consume_at で再利用防止。access_token は in-memory (1h TTL)。",
+      "rationale": "VISION/PRINCIPLES が zitadel/oidc/v3 を名指し指定だが、依存ツリーが go-chi + go-jose + zitadel/schema + 多数の transitive deps を引き込み priority #6 違反。S65b510 の LocalVerifier (cosign keyless) swap と完全パラレル。in-house なら OP の正しい contract (.well-known + JWKS + code/state + nonce + PKCE) を維持しつつ build cache を破壊しない。"
+    },
+    {
+      "id": "impl-2",
+      "topic": "AppRoute schema extension (S65b510 申し送り対応)",
+      "decision": "engine/app.AppRoute に AuthMode AuthMode + HeaderUser string を追加。internal/gateway.AppRouteHandler は AuthMode=forward_auth の場合のみ session resolve + X-Forwarded-User (or HeaderUser) 注入。client-supplied header は req.Header.Del で smuggling 防御。auth.mode=oidc / none は素 proxy。",
+      "rationale": "S65b510 申し送り #2 への直接対応。priority #5 (信頼性 — header smuggling 防御は test で reproduce)、priority #8 (明示的)。"
+    },
+    {
+      "id": "impl-3",
+      "topic": "AppLifecycle.Install hook (S65b510 申し送り対応)",
+      "decision": "engine/app.AppLifecycle に OIDCRegistrar interface (consumer-side) を追加。Install pipeline の StageRegisterOIDCClient stage で auth.mode=oidc 時に client_id (app-<appID>) + 32B hex secret を生成し、OIDC storage と vault に書き込み、.Secrets.OIDCClientID/OIDCClientSecret/OIDCIssuer/OIDCRedirectURI を configs テンプレート data に注入。rollback path も対応。",
+      "rationale": "S65b510 申し送り #3 への直接対応。priority #1 (vault のみ)、priority #2 (operator 操作ゼロで自動登録)。consumer-side interface 設計 (engine/app は engine/auth/oidc を import しない) で circular dep を回避。"
+    },
+    {
+      "id": "impl-4",
+      "topic": "Federation manager と mock IdP テスト",
+      "decision": "engine/auth/federation 新設。Provider discovery (.well-known fetch) + PKCE S256 + 10min state TTL + auto_provision flag。federation_links テーブル (provider, subject) -> user_id。auto_provision=false で未紐付け user は 403。auto_provision=true は UserProvisioner interface で engine/system.AllocateUID 経由 user 作成 (priority #10 厳守)。テストは httptest mock IdP fixture を立て、bound/unbound/auto_provision 3 ケース全網羅。",
+      "rationale": "VISION で Google federation のみ v1 列挙。priority #10 厳守 (engine/auth/federation は engine/system 経由でしか user を作らない)。実 Google OAuth2 client が無いので mock IdP fixture で AC を満たす — production 切替は env 一発。"
+    },
+    {
+      "id": "impl-5",
+      "topic": "RSA-2048 RS256 signing",
+      "decision": "x509.MarshalPKCS8PrivateKey + filippo.io/age 不使用 (vault は state.db のテーブル row、credentials.value に PEM 文字列で保存)。署名は crypto/rsa.SignPKCS1v15 + sha256。VerifyIDToken は test 専用 (production RP は go-jose 等を独自に持つ)。",
+      "rationale": "stdlib 完結、依存追加ゼロ。RSA-2048 は OIDC RP として最も互換性が高い (ECDSA は v1.x で追加検討)。"
+    },
+    {
+      "id": "impl-6",
+      "topic": "Users 画面の scope 限定 (read-only)",
+      "decision": "S822961 では Users 画面を read-only (一覧表示 + Google を紐付けボタン + auth provider toggle 表示 + OIDC client list) に絞る。CRUD (新規ユーザー作成 / パスワード変更 / グループ編集) は v1 backlog。理由: AC-3-1 が必要とする UI surface は『紐付けボタン』のみ、CRUD UI を含めると S822961 scope が倍に。",
+      "rationale": "scope 管理。AC-S822961-3-1 に必要な surface のみ実装。CRUD は次 Sprint で扱う方が、Users 画面に集中できる。"
+    },
+    {
+      "id": "impl-7",
+      "topic": "OIDC client secret は vault のみ",
+      "decision": "oidc_clients テーブルには redirect_uris / scopes 等 declarative metadata だけ。client_secret は engine/system.SetCredential(CredentialOIDCClientSecret, OwnerApp, client_id, secret) で vault のみ。OIDC OP の SecretLookup フィールドが /token 時に vault 引きしてくる。",
+      "rationale": "priority #1 (vault のみ — config.json export は placeholder)。priority #9 (副作用 interface 経由 — engine/auth/oidc は engine/system を直 import しない)。"
+    },
+    {
+      "id": "impl-8",
+      "topic": "session cookie 連携で既存 e2e 維持",
+      "decision": "OIDC OP の /authorize は KuraOS の既存 kura_session cookie を読み、未ログイン時は /login?return_to=... へ 302。ログイン後 /authorize に戻り認可コード発行。既存 e2e の session cookie ログイン経路は完全に無傷。",
+      "rationale": "S65b510 申し送り #5 に直接対応。priority #4 (モジュラー — OIDC は session の上に乗るレイヤ)。"
+    },
+    {
+      "id": "impl-9",
+      "topic": "VM 検証で観測した OIDC 動作",
+      "decision": "VM (192.168.1.42:8204) で /oidc/.well-known/openid-configuration が issuer=http://192.168.1.42:8204 を返し、JWKS が RS256 + RSA 2048bit kid を露出、/oidc/authorize?client_id=<unknown> が 400 unknown client を返すことを確認。/federation/google/start は env 未設定で 404 (graceful)。Users 画面は admin login 後に 4 タブ + Link Google ボタンが render。",
+      "rationale": "milestone sprint なので live verification 必須 (CLAUDE.md)。"
+    }
+  ],
+  "review_decisions": [
+    {
+      "id": "review-1",
+      "topic": "Test 構成",
+      "decision": "engine/auth/oidc/op_test.go (4 ケース、AC-1-1/1-2 cover)、engine/auth/federation/federation_test.go (4 ケース、AC-3-1/3-2 cover、mock IdP fixture)、engine/app/oidc_register_test.go (2 ケース、AC-2-1 cover + forward_auth path)、internal/gateway/app_routes_forward_auth_test.go (2 ケース、AC-2-2 cover + smuggling defence)、internal/ui/users_test.go (2 ケース、AC-3-1 surface)。tests/e2e/oidc-flow.e2e.spec.ts + app-forward-auth.e2e.spec.ts + google-federation.e2e.spec.ts (operator-visible surface 確認)。ac-surface-coverage は 26/86 全 pass。",
+      "rationale": "verification_rules: UI ACs は UI tests, engine ACs は engine tests, それぞれ tag で trace 可能。"
+    },
+    {
+      "id": "review-2",
+      "topic": "VM 検証",
+      "decision": "192.168.1.42:8204 で OIDC discovery / JWKS / unknown-client rejection / Users 画面 (4 タブ) を all 通過。federation は env 未設定 graceful 404。",
+      "rationale": "CLAUDE.md 'VM デプロイ動作確認' 必須要件 + milestone sprint なので念入り。"
+    },
+    {
+      "id": "review-3",
+      "topic": "Drift: VISION 名指しの zitadel/oidc/v3 を採用しなかった",
+      "decision": "in-house OIDC OP に swap。Backlog に v1.x 移譲。User reaffirm が milestone demo で必要。",
+      "rationale": "S65b510 の LocalVerifier swap と同じ priority #6 trade。User が VISION を厳守する判断なら次 milestone で zitadel に置き換え (in-house Storage interface 設計のおかげで差し替え cost は中)。"
+    }
+  ],
+  "backlog_added": [
+    {"title": "zitadel/oidc/v3 swap-in (richer features)", "target": "v1.x"},
+    {"title": "OIDC signing key rotation UI + cron", "target": "v1.x"},
+    {"title": "Federation provider config in config.json (currently env only)", "target": "v1"},
+    {"title": "User CRUD UI on Users 画面 (currently read-only)", "target": "v1"},
+    {"title": "Federation: GitHub + Microsoft providers wired", "target": "v1.x"},
+    {"title": "OIDC refresh tokens + access token persistence", "target": "v1.x"},
+    {"title": "Federation id_token signature verification (JWKS)", "target": "v1.x"},
+    {"title": "OIDC clients tab: revoke / rotate-secret actions", "target": "v1.x"},
+    {"title": "OIDC consent screen for non-app clients", "target": "v1.x"}
+  ]
+}

@@ -406,6 +406,45 @@ const (
 	MsgAppsStageRemove          MessageID = "page.apps.stage.remove"
 )
 
+// Users page (added in S822961). Visual SSOT: prototype/claude_design/Users.html.
+const (
+	MsgUsersTitle      MessageID = "page.users.title"
+	MsgUsersSubtitle   MessageID = "page.users.subtitle"
+	MsgUsersTabUsers   MessageID = "page.users.tab.users"
+	MsgUsersTabGroups  MessageID = "page.users.tab.groups"
+	MsgUsersTabAuth    MessageID = "page.users.tab.auth"
+	MsgUsersTabOIDC    MessageID = "page.users.tab.oidc"
+
+	MsgUsersColUser    MessageID = "page.users.col.user"
+	MsgUsersColRole    MessageID = "page.users.col.role"
+	MsgUsersColMethods MessageID = "page.users.col.methods"
+	MsgUsersColGroups  MessageID = "page.users.col.groups"
+	MsgUsersColLast    MessageID = "page.users.col.last"
+	MsgUsersColActions MessageID = "page.users.col.actions"
+
+	MsgUsersAuthLocal           MessageID = "page.users.auth.local"
+	MsgUsersAuthLocalDesc       MessageID = "page.users.auth.local.desc"
+	MsgUsersAuthGoogle          MessageID = "page.users.auth.google"
+	MsgUsersAuthGoogleDesc      MessageID = "page.users.auth.google.desc"
+	MsgUsersAuthAutoProvision   MessageID = "page.users.auth.auto_provision"
+	MsgUsersAuthLink            MessageID = "page.users.auth.link"
+	MsgUsersAuthUnlink          MessageID = "page.users.auth.unlink"
+	MsgUsersAuthLinkGoogleBtn   MessageID = "page.users.auth.link_google_btn"
+	MsgUsersAuthEnabled         MessageID = "page.users.auth.enabled"
+	MsgUsersAuthDisabled        MessageID = "page.users.auth.disabled"
+	MsgUsersAuthClientIDLabel   MessageID = "page.users.auth.client_id_label"
+	MsgUsersAuthSecretLabel     MessageID = "page.users.auth.secret_label"
+	MsgUsersAuthSecretPlaceholder MessageID = "page.users.auth.secret_placeholder"
+
+	MsgUsersOIDCColClient   MessageID = "page.users.oidc.col.client"
+	MsgUsersOIDCColIssuer   MessageID = "page.users.oidc.col.issuer"
+	MsgUsersOIDCColRedirect MessageID = "page.users.oidc.col.redirect"
+	MsgUsersOIDCColCreated  MessageID = "page.users.oidc.col.created"
+	MsgUsersOIDCEmpty       MessageID = "page.users.oidc.empty"
+
+	MsgUsersGroupsEmpty MessageID = "page.users.groups.empty"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/kuraos-org/kura/engine/app"
+	"github.com/kuraos-org/kura/engine/auth/oidc"
 	"github.com/kuraos-org/kura/engine/auth/session"
 	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
@@ -182,6 +183,30 @@ func run() error {
 	storageAdapter := &app.StorageAdapter{Engine: storageDatasetAdapter{engine: storageEngine}}
 	routeRegistry := app.NewMemoryRouteRegistry()
 	lifecycle := app.NewLifecycle(registryClient, planner, ports, secrets, dockerClient, storageAdapter, routeRegistry, st.DB())
+
+	// OIDC OP — built once after sysEng / sessions / users are ready so it
+	// can resolve operator sessions at /authorize and persist its signing
+	// key in the credential vault. Wiring is best-effort: if the OP can't
+	// be built (e.g. RSA generation fails), the daemon still serves the
+	// rest of its surface — apps with auth.mode=oidc just won't function.
+	oidcProvider := buildOIDCProvider(ctx, st.DB(), sysEng, sessions, users)
+	if oidcProvider != nil {
+		registrar := newAppOIDCRegistrar(oidcProvider, sysEng, gatewayPublicOrigin())
+		lifecycle.OIDC = registrar
+	}
+	// Federation provider — Google / future external IdPs. Optional in dev.
+	federationHandler := buildFederationHandler(ctx, st.DB(), sysEng, sessions)
+
+	// Wire the Users page (S822961). The view is read-only in v1: user
+	// CRUD lands in a later sprint. The crucial surface here is the
+	// "Google を紐付け" button (AC-S822961-3-1) and the OIDC clients
+	// list (auto-registered on app install).
+	uiRenderer.SetUsersHandler(ui.UsersDeps{
+		Users:       &usersListerAdapter{users: users},
+		Federations: &federationLookupAdapter{storage: oidc.NewStorage(st.DB())},
+		OIDCClients: oidcClientListAdapter(st.DB()),
+		Providers:   &providersListAdapter{db: st.DB()},
+	})
 	if root := os.Getenv("KURA_APPS_CONFIG_ROOT"); root != "" {
 		lifecycle.ConfigRoot = root
 	}
@@ -197,7 +222,7 @@ func run() error {
 	uiRenderer.SetAppsHandler(appsDeps)
 
 	startedAt := time.Now().UTC()
-	handler := gateway.New(gateway.Deps{
+	depsBuild := gateway.Deps{
 		Translator:   tr,
 		Version:      Version,
 		StartedAt:    startedAt,
@@ -207,7 +232,14 @@ func run() error {
 		Sessions:     sessions,
 		Users:        users,
 		AppRoutes:    routeRegistry,
-	})
+	}
+	if oidcProvider != nil {
+		depsBuild.OIDCHandler = oidcProvider.Routes()
+	}
+	if federationHandler != nil {
+		depsBuild.FederationHandler = federationHandler
+	}
+	handler := gateway.New(depsBuild)
 
 	srv := &http.Server{
 		Addr:              ":" + port,

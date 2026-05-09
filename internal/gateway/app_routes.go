@@ -23,17 +23,40 @@ import (
 // AppRouteHandler is the HTTP entry point for /apps/<name>/* (path mode).
 // Constructed via NewAppRouteHandler with the shared registry; the gateway
 // mounts it at /apps/.
+//
+// AuthBundle, when non-nil, is consulted on each request to apply the
+// AppRoute.AuthMode policy:
+//
+//   - AuthMode == "forward_auth": the route requires a live KuraOS session.
+//     Unauthenticated requests are 302'd to /login; authenticated ones get
+//     X-Forwarded-User: <username> (or the manifest-supplied header_user)
+//     forwarded to the upstream.
+//   - AuthMode == "oidc" / "none" / "" : pass-through; the upstream is
+//     expected to do its own auth (oidc apps use the KuraOS OP at /oidc/*).
 type AppRouteHandler struct {
 	Registry *app.MemoryRouteRegistry
 	// ProxyHost overrides the upstream host (default 127.0.0.1). Tests may
 	// point this at httptest.Server.URL's host when exercising end-to-end.
 	ProxyHost string
+	// Auth is consulted for forward_auth routes. nil disables the gating
+	// (useful for tests that don't need auth wired).
+	Auth *authBundle
 }
 
 // NewAppRouteHandler returns a handler that resolves /apps/<name>/... to the
 // app's host_port via the registry.
 func NewAppRouteHandler(reg *app.MemoryRouteRegistry) *AppRouteHandler {
 	return &AppRouteHandler{Registry: reg, ProxyHost: "127.0.0.1"}
+}
+
+// NewAppRouteHandlerWithAuth wires the auth bundle so forward_auth routes
+// can resolve the operator session and inject X-Forwarded-User.
+func NewAppRouteHandlerWithAuth(reg *app.MemoryRouteRegistry, sessions SessionResolver, users UserLookup) *AppRouteHandler {
+	return &AppRouteHandler{
+		Registry:  reg,
+		ProxyHost: "127.0.0.1",
+		Auth:      &authBundle{sessions: sessions, users: users},
+	}
 }
 
 // ServeHTTP looks up the app by the first /apps/<name>/ path segment.
@@ -58,9 +81,43 @@ func (h *AppRouteHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// AuthMode=forward_auth gating: the operator must have a live KuraOS
+	// session. We resolve the principal here (rather than deferring to a
+	// generic middleware) because the header injection needs the username
+	// and we have to decide before forwarding.
+	var forwardedUser string
+	if route.AuthMode == app.AuthModeForwardAuth && h.Auth != nil {
+		u, ok, err := h.Auth.resolvePrincipal(r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			loginURL := "/login?return_to=" + url.QueryEscape(r.URL.RequestURI())
+			http.Redirect(w, r, loginURL, http.StatusFound)
+			return
+		}
+		forwardedUser = u.Username
+	}
+
 	// Build proxy target URL.
 	target := &url.URL{Scheme: "http", Host: h.ProxyHost + ":" + intToStr(route.HostPort)}
 	proxy := httputil.NewSingleHostReverseProxy(target)
+	if route.AuthMode == app.AuthModeForwardAuth && forwardedUser != "" {
+		headerName := route.HeaderUser
+		if headerName == "" {
+			headerName = "X-Forwarded-User"
+		}
+		captured := forwardedUser
+		baseDirector := proxy.Director
+		proxy.Director = func(req *http.Request) {
+			baseDirector(req)
+			// Strip any client-supplied value first to defeat header
+			// smuggling — DESIGN_PRINCIPLES priority #5 (信頼性).
+			req.Header.Del(headerName)
+			req.Header.Set(headerName, captured)
+		}
+	}
 
 	// Adjust request path according to strip_prefix.
 	original := r.URL.Path
@@ -113,6 +170,8 @@ func routeToJSON(rt app.AppRoute) string {
 		`","host_port":` + intToStr(rt.HostPort) +
 		`,"strip_prefix":` + boolToStr(rt.StripPrefix) +
 		`,"subdomain":"` + jsonEscape(rt.Subdomain) +
+		`","auth_mode":"` + string(rt.AuthMode) +
+		`","header_user":"` + jsonEscape(rt.HeaderUser) +
 		`"}`
 }
 
