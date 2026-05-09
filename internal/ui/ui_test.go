@@ -59,6 +59,43 @@ func TestAdminPaths_ReturnHTML(t *testing.T) {
 	}
 }
 
+// Regression: htmx.min.js must actually be served. Without it every hx-get /
+// hx-post button on the admin UI is inert in a real browser, yet server-side
+// handlers pass their unit tests because they're hit directly via httptest.
+// This caught a production gap where dist/ shipped only kura.css + kura.js
+// and every htmx-driven flow (Share ACL row picker, Group members modal,
+// app install SSE progress) silently no-op'd.
+func TestStaticAssets_HTMXAndCSSReachable(t *testing.T) {
+	r := newTestRenderer(t)
+	srv := httptest.NewServer(r.Routes())
+	defer srv.Close()
+
+	cases := []struct {
+		name string
+		path string
+		mime string
+	}{
+		{"htmx", "/ui/static/htmx.min.js", "javascript"},
+		{"kura.js", "/ui/static/kura.js", "javascript"},
+		{"kura.css", "/ui/static/kura.css", "css"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			resp, err := http.Get(srv.URL + c.path)
+			if err != nil {
+				t.Fatalf("GET %s: %v", c.path, err)
+			}
+			defer resp.Body.Close()
+			if resp.StatusCode != 200 {
+				t.Fatalf("status = %d, want 200 (asset missing from internal/ui/dist/?)", resp.StatusCode)
+			}
+			if ct := resp.Header.Get("Content-Type"); !strings.Contains(ct, c.mime) {
+				t.Fatalf("Content-Type = %q, want substring %q", ct, c.mime)
+			}
+		})
+	}
+}
+
 func TestAdminDashboard_RendersJaStrings(t *testing.T) {
 	r := newTestRenderer(t)
 	srv := httptest.NewServer(r.Routes())

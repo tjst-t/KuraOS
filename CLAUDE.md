@@ -51,6 +51,7 @@ ZFS / SMB / Docker / systemd / lego ACME など実 OS 機能を伴うテスト�
 - 「動作確認」「デモ」「実機検証」を伴うタスクは VM 192.168.1.42 にバイナリをデプロイして実機で再現すること
 - **VM 上の既存 `kura` プロセスは無断で kill して新バイナリに差し替えて良い** (dev VM・共有データ無し前提)。事前確認不要、ただし state DB ファイル `/home/ubuntu/kuraos/state.db` は消さない (admin / 設定が消える)
 - 本番 NAS データを VM に持ち込まない
+- **`curl -X POST .../create` の handler 直叩きは「ブラウザでの動作確認」ではない**。htmx (`hx-get` / `hx-post`)、SSE、JS ベースのモーダル等は curl では一切発火しないため、サーバ側 handler が 200 を返しても UI は動いてないことが普通にある。GUI Story の VM 検証は最低 1 ボタンを **実ブラウザでクリックして DOM 変化を観察**するか、Playwright MCP / `playwright test --headed` で操作録画すること。これを怠ると htmx が repo に入ってないバグ (2026-05-09) のような事故が起きる
 
 ### Deploy recipe
 
