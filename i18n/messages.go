@@ -78,6 +78,7 @@ const (
 	MsgLoginPasswordRequired MessageID = "page.login.password_required"
 	MsgLoginGenericError     MessageID = "page.login.generic_error"
 	MsgLoginLogoutSuccess    MessageID = "page.login.logout_success"
+	MsgNavLogout             MessageID = "nav.logout"
 )
 
 // Storage page (added in Se3b190 — read-only views).
