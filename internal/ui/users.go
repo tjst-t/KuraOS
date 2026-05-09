@@ -15,6 +15,7 @@ import (
 // federations, or OIDC clients exist.
 type UsersDeps struct {
 	Users        UsersLister
+	Groups       GroupsLister
 	Federations  FederationLister
 	OIDCClients  OIDCClientLister
 	Providers    ProviderLister
@@ -91,6 +92,15 @@ type UsersView struct {
 	OIDCClients  []UsersOIDCClient
 	Subtitle     string
 	Issuer       string
+
+	// FormError carries the result of a previous /ui/admin/users/* POST.
+	// Populated from the ?err= query param so the page can display a
+	// translated banner without keeping per-session form-error state.
+	FormError string
+
+	// AllUserRows is the universe of selectable users for the member
+	// edit modal. Same data as Users, filtered/projected for the picker.
+	AllUserRows []UsersViewUser
 }
 
 // UsersViewUser is the per-user row the template iterates over.
@@ -109,8 +119,10 @@ type UsersViewUser struct {
 
 // UsersViewGroup is the per-group row.
 type UsersViewGroup struct {
+	ID          string
 	Name        string
 	Members     int
+	MemberIDs   []string // for the edit-members modal pre-check
 	Description string
 }
 
@@ -131,9 +143,10 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 		}
 		ctx := req.Context()
 		view := &UsersView{
-			Tab:      activeTab(req.URL.Query().Get("tab"), "users"),
-			Subtitle: r.tr.T(i18n.MsgUsersSubtitle),
-			Issuer:   "auto-generated",
+			Tab:       activeTab(req.URL.Query().Get("tab"), "users"),
+			Subtitle:  r.tr.T(i18n.MsgUsersSubtitle),
+			Issuer:    "auto-generated",
+			FormError: req.URL.Query().Get("err"),
 		}
 		if d.Users != nil {
 			users, _ := d.Users.List(ctx)
@@ -164,6 +177,7 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 			sort.Slice(view.Users, func(i, j int) bool {
 				return view.Users[i].Username < view.Users[j].Username
 			})
+			view.AllUserRows = view.Users
 		}
 		if d.Providers != nil {
 			view.Providers, _ = d.Providers.ListProviders(ctx)
@@ -171,9 +185,56 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 		if d.OIDCClients != nil {
 			view.OIDCClients, _ = d.OIDCClients.ListClients(ctx)
 		}
-		// Fixed group set in v1 (groups CRUD ships in v1.x).
-		view.Groups = []UsersViewGroup{
-			{Name: "admins", Members: countAdmins(view.Users), Description: "システム管理者"},
+		// Real groups data when the engine adapter is wired; otherwise
+		// fall through to the synthetic admins row so older acceptance
+		// tests that don't supply a GroupsLister still pass.
+		if d.Groups != nil {
+			groups, _ := d.Groups.ListGroups(ctx)
+			view.Groups = make([]UsersViewGroup, 0, len(groups))
+			usernameByID := map[string]string{}
+			for _, u := range view.Users {
+				usernameByID[u.UserID] = u.Username
+			}
+			for _, g := range groups {
+				memberIDs := make([]string, 0, len(g.Members))
+				memberNames := make([]string, 0, len(g.Members))
+				for _, mid := range g.Members {
+					memberIDs = append(memberIDs, mid)
+					if name, ok := usernameByID[mid]; ok {
+						memberNames = append(memberNames, name)
+					}
+				}
+				_ = memberNames
+				view.Groups = append(view.Groups, UsersViewGroup{
+					ID:          g.ID,
+					Name:        g.Name,
+					Members:     len(g.Members),
+					MemberIDs:   memberIDs,
+					Description: g.Description,
+				})
+			}
+			// Annotate users with the group names they belong to so the
+			// users tab can render the "Groups" column without the
+			// caller computing it. Cheap O(n*m) — n / m are tiny.
+			for i := range view.Users {
+				if len(view.Users[i].Groups) > 0 {
+					continue
+				}
+				var names []string
+				for _, g := range groups {
+					for _, mid := range g.Members {
+						if mid == view.Users[i].UserID {
+							names = append(names, g.Name)
+							break
+						}
+					}
+				}
+				view.Users[i].Groups = names
+			}
+		} else {
+			view.Groups = []UsersViewGroup{
+				{Name: "admins", Members: countAdmins(view.Users), Description: "システム管理者"},
+			}
 		}
 
 		title := r.tr.T(i18n.MsgUsersTitle)

@@ -202,6 +202,48 @@ type Engine interface {
 	// SetCredential upserts a vault row. Used by future engines (OIDC,
 	// app installer) to register their secrets.
 	SetCredential(ctx context.Context, c Credential) error
+
+	// CreateUser is the high-level transactional projection: creates the
+	// engine/user row, allocates a uid, sets the password (argon2id +
+	// NT-hash + Samba tdbsam), and re-projects /etc/passwd. Failure at
+	// any step rolls back the entire chain so the caller never observes
+	// a half-created user. (Sfix001-1 AC-3.)
+	CreateUser(ctx context.Context, in CreateUserInput) (string, error)
+
+	// UpdateUser modifies the editable fields (display_name, role).
+	// Username is immutable — see engine/user.Store.UpdateUser comment.
+	UpdateUser(ctx context.Context, userID, displayName, role string) error
+
+	// DeleteUser removes the user row, clears all vault credentials
+	// owned by that user (argon2id, nt_hash), and re-projects
+	// /etc/passwd. uid_alloc is intentionally retained so a same-name
+	// user re-created later lands on the same uid. (Sfix001-1 AC-3.)
+	DeleteUser(ctx context.Context, userID string) error
+
+	// CreateGroup creates an engine/user group row, allocates a stable
+	// gid in [GIDMin, GIDMax], and re-projects /etc/group. Returns
+	// the new group ID.
+	CreateGroup(ctx context.Context, name, description string) (string, error)
+
+	// DeleteGroup removes the group. Caller (UI) MUST first call
+	// ListSharesReferencingGroup to confirm no Share ACL still names
+	// it; this method does NOT enforce that integrity check itself
+	// because share lookup belongs in the UI/orchestration layer to
+	// keep engine/system free of an engine/share import. (Sfix001-2
+	// AC-3.)
+	DeleteGroup(ctx context.Context, groupID string) error
+
+	// SetGroupMembers replaces the membership list of groupID with
+	// userIDs and re-projects /etc/group secondary group entries.
+	SetGroupMembers(ctx context.Context, groupID string, userIDs []string) error
+}
+
+// CreateUserInput is the request shape for Engine.CreateUser.
+type CreateUserInput struct {
+	Username    string
+	DisplayName string
+	Password    string
+	Role        string
 }
 
 // ShareTarget is the slice of share data engine/system needs to chown

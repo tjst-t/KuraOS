@@ -12,6 +12,7 @@
 package ui
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -29,9 +30,24 @@ import (
 // dataset picker in the New Share form so operators can pick from existing
 // ZFS datasets instead of typing a path. Optional — when nil the form falls
 // back to free-text entry.
+//
+// PrincipalSource (Sfix001-3) returns the user / group lists used by the
+// ACL row picker. Optional — when nil the picker still renders but with
+// empty <select> options, and the operator can fall back to the legacy
+// `acl` text field (still parsed for backward compatibility).
 type SharesDeps struct {
-	Engine       ShareEngine
-	VolumeLister VolumeLister
+	Engine          ShareEngine
+	VolumeLister    VolumeLister
+	PrincipalSource PrincipalSource
+}
+
+// PrincipalSource returns the user / group identifiers the ACL picker
+// presents to the operator. Username and group name are lowercased,
+// matching the engine/user store normalisation, so the rendered <option>
+// values round-trip cleanly through engine/share validation.
+type PrincipalSource interface {
+	ListUsernames(ctx context.Context) ([]string, error)
+	ListGroupNames(ctx context.Context) ([]string, error)
 }
 
 // VolumeLister is the minimum interface the shares form needs to populate
@@ -73,6 +89,17 @@ type SharesView struct {
 	// free-text path entry.
 	AvailableDatasets []DatasetOption
 
+	// AvailableUsers / AvailableGroups feed the ACL row picker (Sfix001-3).
+	// Empty slices produce empty <select> bodies — the picker still renders
+	// the row template so the operator sees the entry-point button.
+	AvailableUsers  []string
+	AvailableGroups []string
+
+	// ACLModeOptions is the dropdown contents for the per-row mode picker
+	// (rw / r). Built by buildSharesView so the template stays free of
+	// raw mode IDs.
+	ACLModeOptions []ACLModeOption
+
 	FormError string
 
 	DefaultsHeading string
@@ -111,6 +138,8 @@ type ShareRow struct {
 // ShareACLRow is one ACL entry rendered in the detail card.
 type ShareACLRow struct {
 	Token     string // user:alice / group:family
+	Kind      string // "user" or "group" — pulled from share.PrincipalKind
+	Name      string // principal name without the kind prefix
 	ModeLabel string
 	// ModeID is the raw mode code (rw / r / w) used by the edit form to
 	// rebuild the parseACLCSV-compatible string.
@@ -145,6 +174,12 @@ type ShareDefaultRow struct {
 	Note  string
 }
 
+// ACLModeOption is one entry in the per-row mode dropdown.
+type ACLModeOption struct {
+	ID    string
+	Label string
+}
+
 // SharesHandler returns an http.Handler for /ui/admin/shares (GET = list +
 // new-share form, POST = create). Mounted under the admin-role middleware
 // by the gateway.
@@ -160,6 +195,54 @@ func (r *Renderer) SharesHandler(d SharesDeps) http.Handler {
 			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
 		}
 	})
+}
+
+// SharesACLRowHandler returns a single blank ACL row (kind / name /
+// mode / remove button) so the operator can append it to the picker
+// via htmx. The handler reads the same view-model so user / group /
+// mode options stay consistent with the form.
+//
+// hx-get target: /ui/admin/shares/acl-row, hx-swap=beforeend.
+func (r *Renderer) SharesACLRowHandler(d SharesDeps) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		view := r.buildSharesView(req.Context(), d, "")
+		frag := aclRowFragment{
+			Users:  view.AvailableUsers,
+			Groups: view.AvailableGroups,
+			Modes:  view.ACLModeOptions,
+		}
+		clone, err := r.templates.Clone()
+		if err != nil {
+			http.Error(w, "template error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		var buf bytes.Buffer
+		if err := clone.ExecuteTemplate(&buf, "share-acl-row", frag); err != nil {
+			http.Error(w, "template error: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "text/html; charset=utf-8")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(buf.Bytes())
+	})
+}
+
+// aclRowFragment is the view-model the share-acl-row partial uses for
+// both the per-row append (htmx fragment) and the inline rendering of
+// existing rows from the create / edit modal bodies.
+type aclRowFragment struct {
+	Users  []string
+	Groups []string
+	Modes  []ACLModeOption
+	// For pre-filled rows from the edit modal:
+	SelectedKind string
+	SelectedName string
+	SelectedMode string
 }
 
 // SharesUpdateHandler handles POST /ui/admin/shares/update. Form fields:
@@ -189,7 +272,7 @@ func (r *Renderer) SharesUpdateHandler(d SharesDeps) http.Handler {
 			AccessMode:  share.AccessMode(req.FormValue("access_mode")),
 			Description: strings.TrimSpace(req.FormValue("description")),
 			Disabled:    req.FormValue("disabled") == "1" || req.FormValue("disabled") == "on",
-			ACL:         parseACLCSV(req.FormValue("acl")),
+			ACL:         parseACLForm(req.Form),
 		}
 		if _, err := d.Engine.Update(req.Context(), id, in); err != nil {
 			r.handleSharesGet(w, req, d, r.tr.T(i18n.MsgSharesErrGeneric, err.Error()))
@@ -276,7 +359,7 @@ func (r *Renderer) handleSharesPost(w http.ResponseWriter, req *http.Request, d 
 		Preset:      share.Preset(req.FormValue("preset")),
 		AccessMode:  share.AccessMode(req.FormValue("access_mode")),
 		Description: strings.TrimSpace(req.FormValue("description")),
-		ACL:         parseACLCSV(req.FormValue("acl")),
+		ACL:         parseACLForm(req.Form),
 	}
 	if _, err := d.Engine.Create(req.Context(), in); err != nil {
 		r.handleSharesGet(w, req, d, classifyShareErr(r.tr, err))
@@ -314,6 +397,12 @@ func (r *Renderer) buildSharesView(ctx context.Context, d SharesDeps, formError 
 		}
 	}
 
+	var users, groups []string
+	if d.PrincipalSource != nil {
+		users, _ = d.PrincipalSource.ListUsernames(ctx)
+		groups, _ = d.PrincipalSource.ListGroupNames(ctx)
+	}
+
 	view := SharesView{
 		Subtitle:          r.tr.T(i18n.MsgSharesSubtitle, len(rows)),
 		HasShares:         len(rows) > 0,
@@ -322,6 +411,9 @@ func (r *Renderer) buildSharesView(ctx context.Context, d SharesDeps, formError 
 		Protocols:         shareProtocolOptions(r.tr),
 		Access:            shareAccessOptions(r.tr),
 		AvailableDatasets: datasets,
+		AvailableUsers:    users,
+		AvailableGroups:   groups,
+		ACLModeOptions:    aclModeOptions(r.tr),
 		FormError:         formError,
 		DefaultsHeading:   r.tr.T(i18n.MsgSharesDefaultsHeading),
 		DefaultsLead:      r.tr.T(i18n.MsgSharesDefaultsLead),
@@ -330,6 +422,13 @@ func (r *Renderer) buildSharesView(ctx context.Context, d SharesDeps, formError 
 	// Selection is decided by the handler's ?selected= parsing, not here —
 	// the placeholder pane on the right is the no-selection default.
 	return view
+}
+
+func aclModeOptions(tr translator) []ACLModeOption {
+	return []ACLModeOption{
+		{ID: "rw", Label: tr.T(i18n.MsgSharesACLModeRW)},
+		{ID: "r", Label: tr.T(i18n.MsgSharesACLModeR)},
+	}
 }
 
 // shareToRow flattens a share.Share into the renderable view-row.
@@ -351,6 +450,8 @@ func shareToRow(tr translator, s share.Share) ShareRow {
 		token := string(a.Kind) + ":" + a.Name
 		row.ACL = append(row.ACL, ShareACLRow{
 			Token:     token,
+			Kind:      string(a.Kind),
+			Name:      a.Name,
 			ModeLabel: aclModeLabel(tr, a.Mode),
 			ModeID:    string(a.Mode),
 		})
@@ -455,7 +556,8 @@ func shareDefaults() []ShareDefaultRow {
 // parseACLCSV parses comma-separated ACL entries of the form "user:NAME:rw"
 // or "group:NAME:r". Empty input returns nil. Invalid tokens are silently
 // dropped so the engine layer's validator surfaces the user-facing error in
-// one place.
+// one place. Retained for backward compatibility — callers that POST the
+// new row-form fields use parseACLRows directly.
 func parseACLCSV(s string) []share.ACLEntry {
 	s = strings.TrimSpace(s)
 	if s == "" {
@@ -475,6 +577,49 @@ func parseACLCSV(s string) []share.ACLEntry {
 			Kind: share.PrincipalKind(parts[0]),
 			Name: parts[1],
 			Mode: share.ACLMode(parts[2]),
+		})
+	}
+	return out
+}
+
+// parseACLForm consumes the row-form fields (acl_kind[], acl_name[],
+// acl_mode[]) emitted by the picker template. Falls back to parseACLCSV
+// when the legacy `acl` text field is the only one present so older
+// tests / direct API callers stay green.
+//
+// Empty rows (operator clicked "+ 追加" but never picked a name) are
+// silently dropped so the engine's "principal not found" error is only
+// produced when the operator actively selected a non-existent name.
+func parseACLForm(form map[string][]string) []share.ACLEntry {
+	kinds := form["acl_kind"]
+	names := form["acl_name"]
+	modes := form["acl_mode"]
+	if len(kinds) == 0 && len(names) == 0 && len(modes) == 0 {
+		// No row-form fields at all — fall back to the legacy CSV input.
+		if vals, ok := form["acl"]; ok && len(vals) > 0 {
+			return parseACLCSV(vals[0])
+		}
+		return nil
+	}
+	n := len(kinds)
+	if len(names) < n {
+		n = len(names)
+	}
+	if len(modes) < n {
+		n = len(modes)
+	}
+	var out []share.ACLEntry
+	for i := 0; i < n; i++ {
+		kind := strings.TrimSpace(kinds[i])
+		name := strings.TrimSpace(names[i])
+		mode := strings.TrimSpace(modes[i])
+		if name == "" {
+			continue
+		}
+		out = append(out, share.ACLEntry{
+			Kind: share.PrincipalKind(kind),
+			Name: name,
+			Mode: share.ACLMode(mode),
 		})
 	}
 	return out

@@ -249,9 +249,20 @@ in shares.go so the template stays free of CLI-output tokens.
     </select>
   </div>
   <div class="field">
-    <label for="share-acl">{{ T "page.shares.form.acl" }}</label>
-    <input id="share-acl" name="acl" type="text" class="input" placeholder="user:alice:rw, group:family:r" autocomplete="off" data-testid="shares-form-acl">
-    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.acl_hint" }}</p>
+    <label>{{ T "page.shares.form.acl" }}</label>
+    <div id="acl-rows-new" data-testid="shares-acl-rows" data-acl-rows-target="true" style="display:flex;flex-direction:column;">
+      {{ if not $v.AvailableUsers }}
+        {{ if not $v.AvailableGroups }}
+        <p class="muted" data-testid="shares-acl-empty" style="margin:0;font-size:12px;">{{ T "page.shares.acl.picker.empty" }}</p>
+        {{ end }}
+      {{ end }}
+    </div>
+    <button type="button" class="btn btn-sm" data-testid="shares-acl-add-btn"
+            hx-get="/ui/admin/shares/acl-row"
+            hx-target="#acl-rows-new"
+            hx-swap="beforeend">
+      {{ T "page.shares.acl.picker.add_btn" }}
+    </button>
   </div>
   <div class="field">
     <label for="share-description">{{ T "page.shares.form.description" }}</label>
@@ -317,11 +328,27 @@ in shares.go so the template stays free of CLI-output tokens.
     </select>
   </div>
   <div class="field">
-    <label for="edit-share-acl">{{ T "page.shares.form.acl" }}</label>
-    <input id="edit-share-acl" name="acl" type="text" class="input" autocomplete="off"
-           value="{{ range $i, $a := $sel.ACL }}{{ if $i }}, {{ end }}{{ $a.Token }}:{{ $a.ModeID }}{{ end }}"
-           placeholder="user:alice:rw, group:family:r" data-testid="shares-edit-acl">
-    <p class="field-hint" style="margin:0;">{{ T "page.shares.form.acl_hint" }}</p>
+    <label>{{ T "page.shares.form.acl" }}</label>
+    <div id="acl-rows-edit-{{ $sel.ID }}" data-testid="shares-edit-acl-rows" data-acl-rows-target="true" style="display:flex;flex-direction:column;">
+      {{ range $a := $sel.ACL }}
+      {{ template "share-acl-row" (dict
+          "Users" $v.AvailableUsers
+          "Groups" $v.AvailableGroups
+          "Modes" $v.ACLModeOptions
+          "SelectedKind" $a.Kind
+          "SelectedName" $a.Name
+          "SelectedMode" $a.ModeID) }}
+      {{ end }}
+      {{ if not $sel.ACL }}
+      <p class="muted" data-testid="shares-edit-acl-empty" style="margin:0;font-size:12px;">{{ T "page.shares.acl.picker.empty" }}</p>
+      {{ end }}
+    </div>
+    <button type="button" class="btn btn-sm" data-testid="shares-edit-acl-add-btn"
+            hx-get="/ui/admin/shares/acl-row"
+            hx-target="#acl-rows-edit-{{ $sel.ID }}"
+            hx-swap="beforeend">
+      {{ T "page.shares.acl.picker.add_btn" }}
+    </button>
   </div>
   <div class="field">
     <label for="edit-share-description">{{ T "page.shares.form.description" }}</label>

@@ -4,11 +4,11 @@
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
     "current_sprint": "S8a756d",
-    "total": 15,
-    "done": 10,
+    "total": 16,
+    "done": 11,
     "in_progress": 0,
     "remaining": 5,
-    "percentage": 66,
+    "percentage": 68,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -19,9 +19,10 @@
       "Ssys001",
       "S1bccf5",
       "S65b510",
-      "S822961"
+      "S822961",
+      "Sfix001"
     ],
-    "updated_at": "2026-05-09T06:40:09Z"
+    "updated_at": "2026-05-09T11:00:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -34,6 +35,7 @@
     "S1bccf5",
     "S65b510",
     "S822961",
+    "Sfix001",
     "S8a756d",
     "Se1e7a6",
     "Sf92666",
@@ -1663,6 +1665,94 @@
         "BL-smb-conf-include",
         "BL-share-fs-perms"
       ]
+    },
+    "Sfix001": {
+      "title": "Users/Groups CRUD + Share ACL picker (refine fix-sprint)",
+      "status": "done",
+      "description": "S822961 milestone refine 中にユーザから出た 3 件のギャップを解消する fix-sprint。Users/Groups タブを read-only から CRUD 可に、Share 作成/編集の ACL 入力を既存 user/group から選ぶ row 形式ピッカーに置換 (prototype/claude_design/Shares.html 準拠)。",
+      "milestone": false,
+      "added_in": "milestone-refine",
+      "rationale": "S822961 完了時に user が UI 操作した結果、(1) Users/Groups CRUD 不能 (2) Share ACL がテキスト直書きしか出来ず家庭用 NAS UX として弱い、ことが顕在化。次マイルストーン S99702c で吸収するには遠すぎるので fix-sprint として挿入。",
+      "stories": {
+        "Sfix001-1": {
+          "title": "Users タブに User CRUD UI",
+          "status": "done",
+          "user_story": "管理者として、Users 画面から新しいユーザーを作成・編集・削除できるようにしたい。なぜなら、家族メンバー追加のたびに CLI を触りたくないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix001-1-1",
+              "description": "Users タブに『+ ユーザー追加』ボタンが表示され、押すとモーダルで username/displayName/role/初期パスワードを入力 → POST /api/users で作成 → リロードで一覧に出る",
+              "test": "[AC-Sfix001-1-1] in internal/ui/users_crud_test.go + tests/e2e/users-crud.e2e.spec.ts",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-1-2",
+              "description": "各 user 行に編集 (displayName / role / グループ所属の変更) と削除アクションがあり、削除は確認ダイアログを挟む。admin 自身の削除は禁止",
+              "test": "[AC-Sfix001-1-2] in internal/ui/users_crud_test.go",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-1-3",
+              "description": "engine/system が CreateLocalUser → uid 採番 → /etc/passwd projection → vault credential 登録を 1 トランザクションで完了する。削除は逆順に rollback",
+              "test": "[AC-Sfix001-1-3] in engine/system/users_crud_test.go",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        },
+        "Sfix001-2": {
+          "title": "Groups タブに Group CRUD UI",
+          "status": "done",
+          "user_story": "管理者として、グループの作成・削除・メンバー編集ができるようにしたい。なぜなら、Share の権限管理を user 個別ではなくグループ単位でやりたいから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix001-2-1",
+              "description": "Groups タブに『+ グループ追加』ボタンとモーダル。name/description を入力 → POST /api/groups で作成 → /etc/group に projection",
+              "test": "[AC-Sfix001-2-1] in internal/ui/groups_crud_test.go + tests/e2e/groups-crud.e2e.spec.ts",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-2-2",
+              "description": "グループ行から「メンバー編集」モーダル → 既存ユーザーリストからチェックボックスで複数選択 → 保存で /etc/group の secondary group が更新される",
+              "test": "[AC-Sfix001-2-2] in internal/ui/groups_crud_test.go",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-2-3",
+              "description": "削除は Share の ACL で参照されているグループを拒否 (整合性保護)、エラーメッセージで「使用中の Share: <list>」を表示",
+              "test": "[AC-Sfix001-2-3] in engine/system/groups_crud_test.go",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        },
+        "Sfix001-3": {
+          "title": "Share 作成/編集モーダルの ACL ピッカー",
+          "status": "done",
+          "user_story": "管理者として、Share の権限を既存ユーザー/グループから選択して設定したい。なぜなら、user:alice:rw のような ACL 文字列を手書きするのはタイポリスクが高く家庭用 UX として悪いから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix001-3-1",
+              "description": "Share 作成モーダルの ACL 入力が row 形式 (user/group + アクセスモード dropdown) に置換される。「+ ユーザー/グループ追加」ボタンで行追加、× で削除。プロトタイプ prototype/claude_design/Shares.html のレイアウトに準拠",
+              "test": "[AC-Sfix001-3-1] in tests/e2e/shares-acl-picker.e2e.spec.ts",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-3-2",
+              "description": "Share 編集モーダルでも同じピッカーが既存 ACL を行表示で読み込み、追加/削除/モード変更で更新される",
+              "test": "[AC-Sfix001-3-2] in tests/e2e/shares-acl-picker.e2e.spec.ts",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix001-3-3",
+              "description": "user/group の候補は GET /api/users と /api/groups を htmx で取得 (Sfix001-1, Sfix001-2 で公開した endpoint を共用)。autocomplete または dropdown 選択",
+              "test": "[AC-Sfix001-3-3] in internal/ui/shares_acl_picker_test.go",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        }
+      }
     }
   },
   "dependencies": {
@@ -1750,6 +1840,12 @@
         "Sd64f38"
       ],
       "reason": "Share の dataset chown 連携を統合する必要があり、Share Engine の存在 (Sd64f38) を前提"
+    },
+    "Sfix001": {
+      "depends_on": [
+        "S822961"
+      ],
+      "reason": "milestone refine で発覚したギャップ。OIDC + Users 画面 (S822961) の上に CRUD と ACL ピッカーを追加"
     }
   },
   "backlog": [

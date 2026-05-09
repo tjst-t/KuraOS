@@ -445,6 +445,70 @@ const (
 	MsgUsersGroupsEmpty MessageID = "page.users.groups.empty"
 )
 
+// Users CRUD (Sfix001-1) — modal labels and validation.
+const (
+	MsgUsersAddBtn               MessageID = "page.users.add_btn"
+	MsgUsersAddTitle             MessageID = "page.users.add.title"
+	MsgUsersFormUsername         MessageID = "page.users.form.username"
+	MsgUsersFormUsernameHint     MessageID = "page.users.form.username_hint"
+	MsgUsersFormDisplayName      MessageID = "page.users.form.display_name"
+	MsgUsersFormPassword         MessageID = "page.users.form.password"
+	MsgUsersFormPasswordHint     MessageID = "page.users.form.password_hint"
+	MsgUsersFormRole             MessageID = "page.users.form.role"
+	MsgUsersFormCancel           MessageID = "page.users.form.cancel"
+	MsgUsersFormSubmit           MessageID = "page.users.form.submit"
+	MsgUsersEditBtn              MessageID = "page.users.edit_btn"
+	MsgUsersEditTitle            MessageID = "page.users.edit.title"
+	MsgUsersEditSubmit           MessageID = "page.users.edit.submit"
+	MsgUsersDeleteBtn            MessageID = "page.users.delete_btn"
+	MsgUsersDeleteConfirm        MessageID = "page.users.delete.confirm"
+	MsgUsersErrUsernameRequired  MessageID = "page.users.err.username_required"
+	MsgUsersErrPasswordShort     MessageID = "page.users.err.password_short"
+	MsgUsersErrUsernameTaken     MessageID = "page.users.err.username_taken"
+	MsgUsersErrUsernameInvalid   MessageID = "page.users.err.username_invalid"
+	MsgUsersErrInvalidRole       MessageID = "page.users.err.invalid_role"
+	MsgUsersErrSelfDeleteForbid  MessageID = "page.users.err.self_delete_forbidden"
+	MsgUsersErrLastAdminProtect  MessageID = "page.users.err.last_admin_protected"
+	MsgUsersErrCreateFailed      MessageID = "page.users.err.create_failed"
+	MsgUsersErrUpdateFailed      MessageID = "page.users.err.update_failed"
+	MsgUsersErrDeleteFailed      MessageID = "page.users.err.delete_failed"
+)
+
+// Groups CRUD (Sfix001-2).
+const (
+	MsgGroupsAddBtn              MessageID = "page.groups.add_btn"
+	MsgGroupsAddTitle            MessageID = "page.groups.add.title"
+	MsgGroupsFormName            MessageID = "page.groups.form.name"
+	MsgGroupsFormNameHint        MessageID = "page.groups.form.name_hint"
+	MsgGroupsFormDescription     MessageID = "page.groups.form.description"
+	MsgGroupsEditMembersBtn      MessageID = "page.groups.edit_members_btn"
+	MsgGroupsEditMembersTitle    MessageID = "page.groups.edit_members.title"
+	MsgGroupsEditMembersHint     MessageID = "page.groups.edit_members.hint"
+	MsgGroupsDeleteBtn           MessageID = "page.groups.delete_btn"
+	MsgGroupsDeleteConfirm       MessageID = "page.groups.delete.confirm"
+	MsgGroupsColName             MessageID = "page.groups.col.name"
+	MsgGroupsColMembers          MessageID = "page.groups.col.members"
+	MsgGroupsColDescription      MessageID = "page.groups.col.description"
+	MsgGroupsColActions          MessageID = "page.groups.col.actions"
+	MsgGroupsErrInvalidName      MessageID = "page.groups.err.invalid_name"
+	MsgGroupsErrNameTaken        MessageID = "page.groups.err.name_taken"
+	MsgGroupsErrInUseShares      MessageID = "page.groups.err.in_use_shares"
+	MsgGroupsErrCreateFailed     MessageID = "page.groups.err.create_failed"
+	MsgGroupsErrDeleteFailed     MessageID = "page.groups.err.delete_failed"
+	MsgGroupsErrSetMembersFailed MessageID = "page.groups.err.set_members_failed"
+)
+
+// Share ACL row picker (Sfix001-3).
+const (
+	MsgSharesACLPickerAddBtn   MessageID = "page.shares.acl.picker.add_btn"
+	MsgSharesACLPickerRemove   MessageID = "page.shares.acl.picker.remove"
+	MsgSharesACLPickerKindUser MessageID = "page.shares.acl.picker.kind.user"
+	MsgSharesACLPickerKindGrp  MessageID = "page.shares.acl.picker.kind.group"
+	MsgSharesACLPickerEmpty    MessageID = "page.shares.acl.picker.empty"
+	MsgSharesACLModeRW         MessageID = "page.shares.acl.mode.rw"
+	MsgSharesACLModeR          MessageID = "page.shares.acl.mode.r"
+)
+
 // Setup wizard (added in S1e7eeb — Step 1 only).
 const (
 	MsgSetupTitle              MessageID = "page.setup.title"

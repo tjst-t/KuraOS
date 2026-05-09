@@ -1,0 +1,92 @@
+{
+  "sprint": "Sfix001",
+  "title": "Users/Groups CRUD + Share ACL picker (refine fix-sprint)",
+  "branch": "autopilot/main/Sfix001",
+  "decisions": {
+    "planning": [
+      {
+        "topic": "engine/user.Store delete + group ops scope",
+        "decision": "Add UpdateUser/DeleteUser to existing store.go, but put group ops in a new groups.go file",
+        "rationale": "Keeps each file focused. groups.go owns CreateGroup/DeleteGroup/SetGroupMembers/MembersOfGroup; store.go stays the user-only surface. Matches the project convention of one file per major concern."
+      },
+      {
+        "topic": "engine/system Engine surface for CRUD",
+        "decision": "Expose Engine.CreateUser / DeleteUser / CreateGroup / DeleteGroup / SetGroupMembers as orchestration entry points",
+        "rationale": "DESIGN_PRINCIPLES priority #10: protocol-specific projection (uid alloc, vault credential write, /etc/passwd rewrite) MUST be inside engine/system. The UI handler must not chain engine/user.CreateLocalUser + engine/system.AllocateUID + SetUserPassword by hand — that recreates the priority #10 violation we just fixed."
+      },
+      {
+        "topic": "uid_alloc retention on user delete",
+        "decision": "Keep uid_alloc rows after DeleteUser; only scrub credentials vault",
+        "rationale": "DESIGN_PRINCIPLES priority #1 (SSOT round-trip): a backup taken yesterday + restore today must produce the same uid for the same username. Removing uid_alloc on delete would break that invariant when an operator recreates a user with the same name."
+      },
+      {
+        "topic": "Group delete: who owns the share-ACL referential check",
+        "decision": "engine/system.DeleteGroup is unconditional; the UI handler holds the ShareACLLookup adapter and refuses the delete before invoking the engine",
+        "rationale": "engine/system MUST NOT import engine/share (architecture: keep engines decoupled). The check belongs at the orchestration layer that has access to both — that is the UI handler in cmd/kura. Moving the check there also keeps the engine's behaviour predictable: if you call DeleteGroup, it deletes."
+      },
+      {
+        "topic": "ACL picker form transport",
+        "decision": "Use parallel acl_kind[] / acl_name[] / acl_mode[] arrays instead of an indexed JSON blob",
+        "rationale": "DESIGN_PRINCIPLES priority #4 (no SPA): the form must POST without JS. Parallel arrays are the standard way to send a repeating row form via plain HTML. parseACLForm zips them in the handler. Legacy `acl=...` CSV fallback retained so older tests / direct API callers stay green."
+      },
+      {
+        "topic": "ACL row template fetch via htmx",
+        "decision": "Add a `share-acl-row` partial template + a GET /ui/admin/shares/acl-row endpoint that returns one rendered row",
+        "rationale": "Operator clicks `+ ユーザー / グループを追加` -> hx-get -> rendered fragment appended via hx-swap=beforeend. The rendered fragment carries the same Users/Groups/Modes options as the in-page rows so dropdowns stay consistent. Server-side rendering preserves the no-SPA constraint while still feeling responsive."
+      },
+      {
+        "topic": "Last-admin protection on delete",
+        "decision": "UI handler checks for admin count <= 1 before invoking DeleteUser, returns translated banner when refused",
+        "rationale": "DESIGN_PRINCIPLES priority #5 (信頼性 > 機能): allowing admin count to hit 0 would lock the operator out of the management UI permanently. The check uses the same UsersLister the page already has."
+      }
+    ],
+    "implementation": [
+      {
+        "topic": "Test helpers fakeUserSource extension",
+        "decision": "Extend fakeUserSource in engine/system/testhelpers_test.go to satisfy the new full UserSource interface (Create/Update/Delete/group ops)",
+        "rationale": "Existing reconcile tests passed []SourceUser literally. Now that UserSource requires CRUD methods, the fake gets in-memory implementations so the new orchestration tests (users_crud_test.go) can exercise the full chain without booting engine/user."
+      },
+      {
+        "topic": "shareACLLookupAdapter + principalSourceAdapter live in cmd/kura, not engine",
+        "decision": "Adapters that bridge engine/user <-> ui or engine/share <-> ui live in cmd/kura/users_wiring.go",
+        "rationale": "Per DESIGN_PRINCIPLES priority #4 (modular monolith) the engine packages stay free of cross-engine imports. The wiring layer composes them."
+      },
+      {
+        "topic": "render ACL picker partial via templates.Clone + ExecuteTemplate",
+        "decision": "Reuse the existing renderToBuffer-style clone pattern but call ExecuteTemplate(name) directly for the htmx fragment",
+        "rationale": "html/template's master cannot be Executed without losing Clone-ability. The clone-then-execute pattern is the same trick the modal partial dispatch uses; we apply it to the per-row fragment too."
+      }
+    ],
+    "verification": [
+      {
+        "topic": "VM verification on 192.168.1.42",
+        "decision": "Real-machine verification covers the full chain: UI form -> handler -> engine -> /etc/passwd / /etc/group / vault / smbd",
+        "rationale": "CLAUDE.md forbids reporting 'verified' from local tests alone. VM smoke covered: alice create -> getent passwd alice -> smbclient -L 127.0.0.1 -U 'alice%pw' -> alice delete -> credentials vault scrub -> uid_alloc retention. Group: devs create -> getent group devs -> alice membership -> photos ACL refs devs -> delete-devs refused -> clear ACL -> delete-devs succeeds."
+      }
+    ]
+  },
+  "vm_smoke_results": {
+    "users_create": "POST /ui/admin/users/create -> 303; getent passwd alice -> alice:x:36097:38393:Alice:/var/empty:/usr/sbin/nologin",
+    "smb_login": "smbclient -L 127.0.0.1 -U 'alice%longenoughpw' -> photos / IPC$ visible (auth ok)",
+    "groups_create": "POST /ui/admin/groups/create devs -> 303; getent group devs -> devs:x:35600:",
+    "groups_set_members": "POST /ui/admin/groups/members alice -> 303; getent group devs -> devs:x:35600:alice",
+    "share_acl_picker_update": "POST /ui/admin/shares/update with acl_kind=group&acl_name=devs&acl_mode=r -> 303; share ACL stored",
+    "groups_delete_refused_when_in_use": "POST /ui/admin/groups/delete devs -> 303 redirect with err= 'このグループは次の Share の ACL で使われているため削除できません: photos'",
+    "users_delete": "POST /ui/admin/users/delete alice -> 303; vault credentials scrubbed (argon2id + nt_hash both gone); uid_alloc retained at 36097"
+  },
+  "ac_status": {
+    "AC-Sfix001-1-1": "pass — internal/ui/users_crud_test.go + tests/e2e/users-crud.e2e.spec.ts + VM",
+    "AC-Sfix001-1-2": "pass — internal/ui/users_crud_test.go + VM",
+    "AC-Sfix001-1-3": "pass — engine/system/users_crud_test.go + VM",
+    "AC-Sfix001-2-1": "pass — internal/ui/users_crud_test.go + tests/e2e/groups-crud.e2e.spec.ts + VM",
+    "AC-Sfix001-2-2": "pass — internal/ui/users_crud_test.go + VM",
+    "AC-Sfix001-2-3": "pass — engine/system/users_crud_test.go + VM (refusal banner shown)",
+    "AC-Sfix001-3-1": "pass — internal/ui/shares_acl_picker_test.go + tests/e2e/shares-acl-picker.e2e.spec.ts",
+    "AC-Sfix001-3-2": "pass — internal/ui/shares_acl_picker_test.go + tests/e2e/shares-acl-picker.e2e.spec.ts",
+    "AC-Sfix001-3-3": "pass — internal/ui/shares_acl_picker_test.go"
+  },
+  "drift_notes": [
+    "engine/user.Store now has DeleteUser / UpdateUser; downstream callers should prefer engine/system.DeleteUser / UpdateUser to get vault scrub + Reconcile in one shot.",
+    "engine/system.UserSource interface gained six new methods (Create/Update/Delete/ListGroups/CreateGroup/DeleteGroup/SetGroupMembers/MembersOfGroup). Any external implementation must satisfy them; UserStoreAdapter does already."
+  ]
+}

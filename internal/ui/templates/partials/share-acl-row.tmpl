@@ -1,0 +1,50 @@
+{{- /*
+share-acl-row — one row of the Share ACL picker (Sfix001-3).
+
+The picker uses three parallel form arrays so the server can rebuild
+[]share.ACLEntry without reserving an index format:
+
+    acl_kind[i]  = "user" | "group"
+    acl_name[i]  = principal name
+    acl_mode[i]  = "rw" | "r"
+
+Each row carries a "delete" button that removes itself from the DOM.
+The "+ ユーザー / グループを追加" button on the picker fetches a fresh
+copy of this template via htmx and appends it to #acl-rows.
+
+Data shape: aclRowFragment (Users / Groups / Modes / SelectedKind /
+SelectedName / SelectedMode).
+*/ -}}
+{{ define "share-acl-row" }}
+{{ $f := . }}
+{{ $kind := $f.SelectedKind }}{{ if not $kind }}{{ $kind = "user" }}{{ end }}
+{{ $mode := $f.SelectedMode }}{{ if not $mode }}{{ $mode = "rw" }}{{ end }}
+<div class="row gap-sm acl-row" data-testid="shares-acl-row" style="display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;">
+  <select name="acl_kind" class="input" data-testid="shares-acl-kind" style="flex:0 0 110px">
+    <option value="user"{{ if eq $kind "user" }} selected{{ end }}>{{ T "page.shares.acl.picker.kind.user" }}</option>
+    <option value="group"{{ if eq $kind "group" }} selected{{ end }}>{{ T "page.shares.acl.picker.kind.group" }}</option>
+  </select>
+  <select name="acl_name" class="input mono" data-testid="shares-acl-name" style="flex:1;min-width:0">
+    <option value="">—</option>
+    <optgroup label="{{ T "page.shares.acl.picker.kind.user" }}">
+      {{ range $u := $f.Users }}
+      <option value="{{ $u }}"{{ if and (eq $kind "user") (eq $u $f.SelectedName) }} selected{{ end }}>{{ $u }}</option>
+      {{ end }}
+    </optgroup>
+    <optgroup label="{{ T "page.shares.acl.picker.kind.group" }}">
+      {{ range $g := $f.Groups }}
+      <option value="{{ $g }}"{{ if and (eq $kind "group") (eq $g $f.SelectedName) }} selected{{ end }}>{{ $g }}</option>
+      {{ end }}
+    </optgroup>
+  </select>
+  <select name="acl_mode" class="input" data-testid="shares-acl-mode" style="flex:0 0 140px">
+    {{ range $m := $f.Modes }}
+    <option value="{{ $m.ID }}"{{ if eq $m.ID $mode }} selected{{ end }}>{{ $m.Label }}</option>
+    {{ end }}
+  </select>
+  <button type="button" class="btn btn-sm" data-testid="shares-acl-remove"
+          onclick="this.closest('.acl-row').remove()" aria-label="{{ T "page.shares.acl.picker.remove" }}">
+    ×
+  </button>
+</div>
+{{ end }}
