@@ -246,6 +246,14 @@ func (c *CLI) DestroyPool(ctx context.Context, name string, force bool) error {
 	for _, dev := range members {
 		_, _, _ = c.exec.Run(ctx, "zpool", "labelclear", "-f", dev)
 	}
+	// labelclear updates the on-disk label, but lsblk/blkid keep the previous
+	// fstype=zfs_member reading from udev's cache until a re-scan event fires.
+	// Without this kick the disk page keeps classifying the disk as "外部プー
+	// ル" until the next reboot. udevadm settle is best-effort; missing on a
+	// minimal system just defers the refresh, doesn't undo the destroy.
+	if len(members) > 0 {
+		_, _, _ = c.exec.Run(ctx, "udevadm", "trigger", "--settle")
+	}
 	return nil
 }
 
