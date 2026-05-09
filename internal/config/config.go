@@ -146,7 +146,25 @@ type ShareACLEntry struct {
 	Name string `json:"name"`
 	Mode string `json:"mode"`
 }
-type UsersConfig struct{}
+
+// UsersConfig is the declarative shape of "users" in config.json. Per
+// DESIGN_PRINCIPLES priority #1, the export contains structural fields
+// only — every credential is replaced by `credential_state: "set"|"unset"`
+// placeholder so a stolen config.json can never reproduce login.
+type UsersConfig struct {
+	Users []UserEntry `json:"users,omitempty"`
+}
+
+// UserEntry mirrors engine/user.User minus internal IDs / timestamps.
+// CredentialState is "set" iff the user has at least one credential row in
+// the vault (priority #1 — config.json never carries the secret itself).
+type UserEntry struct {
+	Username        string `json:"username"`
+	DisplayName     string `json:"display_name,omitempty"`
+	Role            string `json:"role"`
+	Disabled        bool   `json:"disabled,omitempty"`
+	CredentialState string `json:"credential_state"`
+}
 type NetworkConfig struct{}
 type AppsConfig struct{}
 type AuthConfig struct{}

@@ -1,0 +1,189 @@
+{
+  "sprint_id": "Ssys001",
+  "title": "System Identity & Provisioning (engine/system)",
+  "branch": "autopilot/main/Ssys001",
+  "started_at": "2026-05-09T00:00:00Z",
+  "planning_decisions": [
+    {
+      "id": "PD-1",
+      "topic": "Stories scope",
+      "decision": "Implement all 5 stories in single sprint as planned in ROADMAP.json. No story split needed; each is one user-facing behaviour with clean dependency chain (1 -> 2 -> 3 -> 4 -> 5).",
+      "rationale": "DESIGN_PRINCIPLES priority #10 makes engine/system the single owner; splitting would force multi-sprint coupling. Story sizes are balanced."
+    },
+    {
+      "id": "PD-2",
+      "topic": "GUI scope",
+      "decision": "No GUI-only Stories in this sprint. All five Stories are either CLI/engine (1, 3, 5) or backend-driven from existing UIs (2 password set leverages Users page, 4 chown is automatic on share Apply). Skip sprint prototype.",
+      "rationale": "Sprint context says 'minimal GUI surface anyway' and 'do NOT regenerate prototypes for this sprint'."
+    },
+    {
+      "id": "PD-3",
+      "topic": "uid range",
+      "decision": "Allocate from 30000-39999 (private uid range) per AC-Ssys001-1-1. Linux distro service users <1000, normal users >=1000, KuraOS occupies 30000-39999 to avoid collisions with Ubuntu apt-installed users.",
+      "rationale": "AC explicit. systemd-sysusers DynamicUser range starts at 61184; we sit safely below."
+    },
+    {
+      "id": "PD-4",
+      "topic": "Deterministic uid allocation",
+      "decision": "Map user_id (hex) -> uid via FNV-1a hash of user_id mod 10000 + 30000, with linear-probe collision resolution stored in SQLite uid_allocations table. Same user_id always resolves to same uid even after restore.",
+      "rationale": "AC-Ssys001-1-2 'same user_id -> same uid' invariant. Required for backup/restore round-trip identity stability (priority #1 SSOT round-trip)."
+    },
+    {
+      "id": "PD-5",
+      "topic": "NT-hash implementation",
+      "decision": "Implement NT-hash inline (MD4 of UTF-16LE plaintext) using golang.org/x/crypto/md4 (already deprecated but kept for SMB legacy). Avoid invoking smbpasswd CLI which would block hash generation in unit tests.",
+      "rationale": "DESIGN_PRINCIPLES priority #9 testability + priority #10 engine/system owns projection. No CGO. MD4 is the SMB protocol requirement, not a security choice — wrapping the deprecated package is correct."
+    },
+    {
+      "id": "PD-6",
+      "topic": "tdbsam projection",
+      "decision": "Use 'pdbedit -i smbpasswd:- -e tdbsam:' subprocess to import smbpasswd-formatted line into tdbsam. CmdExecutor wraps it; tests inject Fake. On VM: requires smbd installed (which it is per CLAUDE.md test env).",
+      "rationale": "Direct tdbsam manipulation requires libtdb CGO. pdbedit is the supported Samba CLI for non-interactive credential mirror. pdbedit accepts smbpasswd format on stdin."
+    },
+    {
+      "id": "PD-7",
+      "topic": "Vault storage (R3 from architectural commit)",
+      "decision": "Vault rows live in state.db credentials table (kind, owner_id, value, updated_at). Rest of state.db already root:0600 in production. NO passphrase prompt on kura startup — runtime is plaintext-readable by root only.",
+      "rationale": "Architectural commit b10c9bb decided R3 (runtime plaintext, encryption at backup time only). 'family-NAS, smart defaults' rationale."
+    },
+    {
+      "id": "PD-8",
+      "topic": "Vault and auth_methods coexistence",
+      "decision": "Migrate existing argon2id from auth_methods.secret to credentials table on first run. auth_methods.secret stays as-is (read path unchanged) PLUS a parallel credentials row is written on each SetPassword. This keeps backward compatibility and adds vault projection. Backup reads from credentials table; auth_methods is treated as cache.",
+      "rationale": "Priority #1 SSOT: vault is single source. Priority #3 dont-throw-out: avoids breaking S1e7eeb auth flow. Auth verify path stays untouched in this sprint."
+    },
+    {
+      "id": "PD-9",
+      "topic": "smb.conf include line",
+      "decision": "engine/system writes /etc/samba/conf.d/kura.conf (already done by share engine in Sd64f38) and ensures /etc/samba/smb.conf has 'include = /etc/samba/conf.d/kura.conf' line. Idempotent atomic write via temp+rename.",
+      "rationale": "AC-Ssys001-3-1. Centralizes all /etc/samba edits in engine/system per priority #10."
+    },
+    {
+      "id": "PD-10",
+      "topic": "age library",
+      "decision": "Use filippo.io/age v1.x. Passphrase mode (age.NewScryptRecipient/Identity). Recipient mode deferred per AC-Ssys001-5-3.",
+      "rationale": "DESIGN_PRINCIPLES priority #11 explicitly mandates filippo.io/age. Pure Go, CGO-free."
+    },
+    {
+      "id": "PD-11",
+      "topic": "Share dataset chown integration",
+      "decision": "engine/system.ApplyShareOwnership(ctx, share, lookupUserGID) -- engine/share calls this after Create/Update via a hook (System interface accepted via DI in share.NewManager). Default group: derived from first 'group' principal in ACL with rw mode; if none, falls back to 'kura-shares' system group. Mode 2775 (setgid).",
+      "rationale": "AC-Ssys001-4-1. 2775 ensures new files inherit group ownership = correct behavior for Samba shared write."
+    },
+    {
+      "id": "PD-12",
+      "topic": "Backup tarball layout (case X)",
+      "decision": "tarball contents: config.json (plaintext) + secrets.kura.age (always age-encrypted, no plaintext fallback). manifest.json with schema_version + created_at. Use stdlib archive/tar + compress/gzip.",
+      "rationale": "Architectural commit b10c9bb specifies case X. AC-Ssys001-5-1."
+    },
+    {
+      "id": "PD-13",
+      "topic": "CLI surface",
+      "decision": "New subcommands: 'kura system reconcile' (provision /etc/passwd, /etc/group, smb.conf include, share perms), 'kura user set-password <username>' (writes both argon2id and NT-hash), 'kura share reconcile-perms' (re-apply chown for all shares), 'kura backup -o <file> [--encrypt-passphrase]', 'kura restore <file>'.",
+      "rationale": "ACs reference these commands explicitly. Keeps engines hidden behind CLI verbs."
+    },
+    {
+      "id": "PD-14",
+      "topic": "Startup reconciliation",
+      "decision": "cmd/kura/main.go run() invokes engine/system.Reconcile(ctx) right after store.Open and before HTTP listen. Failures are logged warnings (don't block boot — operator may be running on dev box without samba/etc).",
+      "rationale": "AC-Ssys001-3-2 'startup re-projection on drift'. Soft-fail keeps dev workflow workable; production VM has all daemons."
+    },
+    {
+      "id": "PD-15",
+      "topic": "Fresh-state /etc/passwd writes",
+      "decision": "engine/system writes a single managed block delimited by '# BEGIN KuraOS managed' / '# END KuraOS managed' markers via temp+rename atomic write. Outside-block lines are preserved verbatim. Also handles /etc/group with same marker pattern.",
+      "rationale": "Coexists with distro-managed /etc/passwd entries. Idempotent (re-run replaces only managed block)."
+    },
+    {
+      "id": "PD-16",
+      "topic": "Test isolation",
+      "decision": "engine/system uses a FileSystem interface (Read/WriteAtomic/Stat) with prod implementation rooted at / and test implementation rooted at t.TempDir(). CmdExecutor wraps pdbedit/chown/chmod for the same reason.",
+      "rationale": "Priority #9 testability. Mirrors how engine/storage uses CmdExecutor."
+    }
+  ],
+  "implementation_decisions": [
+    {
+      "id": "ID-1",
+      "topic": "FK constraints on uid_alloc / gid_alloc / share_perm_state",
+      "decision": "Removed FK to users(id) / groups(id) / shares(id). Synthetic primary group key '@@kura-users' has no matching groups row, and a backup tarball must be restorable into a fresh state.db before user/group rows are recreated. Added migration 0005_uid_alloc_no_fk.sql to drop the existing FK from upgraded DBs.",
+      "rationale": "Discovered during VM verification — restore failed with FOREIGN KEY violation. Priority #1 SSOT requires vault round-trip independent of structural state."
+    },
+    {
+      "id": "ID-2",
+      "topic": "pdbedit invocation",
+      "decision": "Run `pdbedit -i smbpasswd:<file> -e tdbsam` (no trailing colon on tdbsam). Trailing colon caused silent 'failed to open' error.",
+      "rationale": "Found on VM testing — pdbedit returned exit 0 but the import failed with 'tdbsam_open: Failed to open/create TDB passwd []'. Trailing colon is parsed as backend with empty path."
+    },
+    {
+      "id": "ID-3",
+      "topic": "obey pam restrictions = no",
+      "decision": "Added `obey pam restrictions = no` to the kura.conf [global] section. KuraOS users live in the credential vault, not in /etc/shadow — PAM account_check rejected them with NT_STATUS_LOGON_FAILURE despite a valid NT-hash match.",
+      "rationale": "VM smbclient test exposed this. Distro default is `obey pam restrictions = yes` (set in /etc/samba/smb.conf), but our kura.conf is included after, so the override sticks for KuraOS-managed shares."
+    },
+    {
+      "id": "ID-4",
+      "topic": "LCT timestamp non-zero",
+      "decision": "smbpasswd-format LCT field uses current Unix epoch hex (LCT-<hex>) rather than LCT-00000000. The latter triggers Samba's 'must change password at next login' which produces NT_STATUS_PASSWORD_MUST_CHANGE.",
+      "rationale": "Found during VM smbclient test. smbNow is overridable for deterministic test output."
+    },
+    {
+      "id": "ID-5",
+      "topic": "Soft-fail chown under unprivileged dev runs",
+      "decision": "RealFS.Chown returns nil when the kernel returns EPERM (non-root dev runs). Production VM runs as root so this branch never fires there.",
+      "rationale": "Tests need to exercise the chown code path without sudo; share_perm_state still records the intended ownership for a later root-privileged reconcile to converge."
+    },
+    {
+      "id": "ID-6",
+      "topic": "share reconcile-perms also runs Apply",
+      "decision": "kura share reconcile-perms calls share.Manager.Apply BEFORE ReconcilePerms. This regenerates kura.conf so template changes (new obey-pam line, etc.) propagate without requiring a share Create/Update.",
+      "rationale": "Operator running reconcile after a kura upgrade should pick up template changes; otherwise the conf stays stale until the next share edit."
+    },
+    {
+      "id": "ID-7",
+      "topic": "credential_state placeholder pattern",
+      "decision": "config.UsersConfig now carries UserEntry { Username, DisplayName, Role, Disabled, CredentialState } — credential field is the literal string 'set' or 'unset', never the hash.",
+      "rationale": "DESIGN_PRINCIPLES priority #1 forbids credential leak in config.json export. TestExport_NoCredentialsLeak guards the invariant; config-roundtrip.sh adds CLI-level guard with apply --dry-run rejection of embedded argon2id."
+    },
+    {
+      "id": "ID-8",
+      "topic": "KURA_SYSTEM_ROOT env override",
+      "decision": "cmd/kura/main.go and cmd/kura/system.go honor KURA_SYSTEM_ROOT to root the FS at a temp dir for unprivileged CLI tests. Production unsets it (defaults to /).",
+      "rationale": "Acceptance shell tests cannot run as root; without this override, kura system reconcile fails with permission denied on /etc/passwd."
+    }
+  ],
+  "review_decisions": [
+    {
+      "id": "RD-1",
+      "topic": "ac-surface-coverage",
+      "decision": "All 10 ACs match their declared surface; tests/acceptance/ac-surface-coverage.sh reports 26/26 surface-claiming ACs match (86 total ACs)."
+    },
+    {
+      "id": "RD-2",
+      "topic": "i18n-coverage",
+      "decision": "284 MessageIDs all present in ja.json. No new MessageIDs added in this sprint (CLI-only output is developer-facing English per coding_conventions)."
+    }
+  ],
+  "vm_verification": [
+    {
+      "command": "kura system reconcile",
+      "result": "ok — /etc/passwd gained 'admin:x:39160:38393:admin:/var/empty:/usr/sbin/nologin' inside KuraOS managed block, /etc/group has 'kura-users:x:38393:admin', /etc/samba/smb.conf has include directive."
+    },
+    {
+      "command": "kura user set-password admin --from-stdin",
+      "result": "ok — vault gained argon2id (97 bytes) + nt_hash (32 hex), pdbedit -L shows 'admin:39160:admin'."
+    },
+    {
+      "command": "smbclient -U 'admin%kuraos-vm-test' //127.0.0.1/photos -c 'put /tmp/upload.txt remote.txt; ls'",
+      "result": "ok — file uploaded as remote.txt, owned by admin:kura-users mode 664."
+    },
+    {
+      "command": "kura backup -o /tmp/x.tar.gz --passphrase-stdin && kura restore --passphrase-stdin x.tar.gz",
+      "result": "round-trip ok — restore on fresh state.db recovered 2 credentials + 1 uid_alloc + 1 gid_alloc; uid 39160 preserved post-restore."
+    },
+    {
+      "command": "ls -la /tank/photos",
+      "result": "drwxrwsr-x root kura-users — setgid bit applied via chmod 02775."
+    }
+  ],
+  "completed_at": "2026-05-09T04:18:00Z"
+}

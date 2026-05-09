@@ -237,6 +237,49 @@ func TestUnmarshal_ProducesValidJSONOutput(t *testing.T) {
 	}
 }
 
+// [AC-Ssys001-2-2] config.json export carries credential placeholders
+// only — never the real argon2id verifier or NT-hash. The vault is the
+// SSOT for secret material; config.json is the SSOT for structure.
+func TestExport_NoCredentialsLeak(t *testing.T) {
+	cfg := &Config{
+		SchemaVersion: Version,
+		Users: &UsersConfig{
+			Users: []UserEntry{
+				{Username: "alice", Role: "admin", CredentialState: "set"},
+				{Username: "bob", Role: "user", CredentialState: "set"},
+				{Username: "carol", Role: "user", CredentialState: "unset"},
+			},
+		},
+	}
+	raw, err := Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	got := string(raw)
+	bannedSubstrings := []string{
+		"$argon2id$",                       // PHC verifier signature
+		"NTHASH",                           // any of our internal NT-hash labels
+		"secret",                           // generic
+		"password",                         // generic
+		"\"value\":",                       // a credential row would carry "value"
+		"8846F7EAEE8FB117AD06BDD830B7586C", // RFC test vector (canary)
+	}
+	for _, b := range bannedSubstrings {
+		if strings.Contains(got, b) {
+			t.Fatalf("config export leaked %q:\n%s", b, got)
+		}
+	}
+	for _, want := range []string{
+		`"credential_state": "set"`,
+		`"credential_state": "unset"`,
+		`"username": "alice"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("config export missing %q:\n%s", want, got)
+		}
+	}
+}
+
 type fakeAdapter struct {
 	section    string
 	planCalled bool
