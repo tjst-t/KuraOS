@@ -296,7 +296,17 @@ func (r *Renderer) buildStorageView(ctx context.Context, d StorageDeps) StorageV
 	disksView := disksToView(r.tr, disks)
 	freeDisks := make([]DiskView, 0)
 	for i, dv := range disksView {
-		if i < len(disks) && disks[i].Usage == storage.DiskUsageFree {
+		if i >= len(disks) {
+			continue
+		}
+		// "Foreign" disks are physically unused — they only carry stale ZFS
+		// labels from a destroyed/exported pool that lsblk still reads as
+		// fstype=zfs_member. Hide them from the picker would strand the
+		// hardware until labels are wiped manually; CreatePool runs
+		// `zpool labelclear -f` on every selected leaf before `zpool create`,
+		// so picking a foreign disk is safe.
+		switch disks[i].Usage {
+		case storage.DiskUsageFree, storage.DiskUsageForeign:
 			freeDisks = append(freeDisks, dv)
 		}
 	}

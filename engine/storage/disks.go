@@ -163,12 +163,15 @@ func shortDevName(p string) string {
 	return p
 }
 
-// smartctlReport is the subset of `smartctl -a -j` we read.
+// smartctlReport is the subset of `smartctl -a -j` we read. SMARTStatus is a
+// pointer so we can distinguish "block absent" (QEMU virtual disks, USB
+// enclosures — smartctl ran but the device exposes no overall-health flag)
+// from "block present, passed=false" (genuine SMART failure).
 type smartctlReport struct {
 	Smartctl struct {
 		ExitStatus int `json:"exit_status"`
 	} `json:"smartctl"`
-	SMARTStatus struct {
+	SMARTStatus *struct {
 		Passed bool `json:"passed"`
 	} `json:"smart_status"`
 	Temperature struct {
@@ -217,9 +220,15 @@ func parseSmartctl(raw []byte) SMARTInfo {
 		PowerOnHours: rep.PowerOnTime.Hours,
 		Source:       "smartctl",
 	}
-	if rep.SMARTStatus.Passed {
+	switch {
+	case rep.SMARTStatus == nil:
+		// No overall-health flag in the response (QEMU virtual disks, USB
+		// bridges, etc.). We have no failure signal — surface as "passed"
+		// rather than mis-attributing the missing field to a failure.
 		info.Status = SMARTStatusPassed
-	} else {
+	case rep.SMARTStatus.Passed:
+		info.Status = SMARTStatusPassed
+	default:
 		info.Status = SMARTStatusFailed
 	}
 	for _, a := range rep.AtaSmartAttributes.Table {

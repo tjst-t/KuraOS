@@ -97,6 +97,9 @@ func TestCreatePool_happyPath(t *testing.T) {
 	}
 	args := buildCreatePoolArgs(cfg)
 	fake.RegisterStdout("zpool", args, []byte(""))
+	for _, d := range cfg.Data.Disks {
+		fake.RegisterStdout("zpool", []string{"labelclear", "-f", d}, []byte(""))
+	}
 
 	c := NewCLI(fake)
 	if err := c.CreatePool(context.Background(), cfg); err != nil {
@@ -104,11 +107,47 @@ func TestCreatePool_happyPath(t *testing.T) {
 	}
 
 	calls := fake.Calls()
-	if len(calls) != 1 {
-		t.Fatalf("want 1 call, got %d", len(calls))
+	if len(calls) != len(cfg.Data.Disks)+1 {
+		t.Fatalf("want %d calls (labelclear×%d + create), got %d", len(cfg.Data.Disks)+1, len(cfg.Data.Disks), len(calls))
 	}
-	if !reflect.DeepEqual(calls[0].Args, args) {
-		t.Errorf("argv mismatch: got %q, want %q", calls[0].Args, args)
+	for i, d := range cfg.Data.Disks {
+		want := []string{"labelclear", "-f", d}
+		if !reflect.DeepEqual(calls[i].Args, want) {
+			t.Errorf("call %d argv = %q, want %q", i, calls[i].Args, want)
+		}
+	}
+	last := calls[len(calls)-1]
+	if !reflect.DeepEqual(last.Args, args) {
+		t.Errorf("create argv mismatch: got %q, want %q", last.Args, args)
+	}
+}
+
+// Foreign disks (stale ZFS labels from a previously-destroyed pool) must still
+// flow through CreatePool: labelclear failure is non-fatal so the create
+// proceeds even when one of the disks has nothing to clear.
+func TestCreatePool_foreignDisksLabelclearBestEffort(t *testing.T) {
+	fake := cmdexec.NewFake()
+	cfg := PoolConfig{
+		Name: "tank",
+		Data: VdevSpec{Layout: LayoutSingle, Disks: []string{"/dev/sdb"}},
+	}
+	args := buildCreatePoolArgs(cfg)
+	fake.RegisterStdout("zpool", args, []byte(""))
+	// labelclear deliberately not registered → returns error → swallowed.
+
+	c := NewCLI(fake)
+	if err := c.CreatePool(context.Background(), cfg); err != nil {
+		t.Fatalf("CreatePool: %v", err)
+	}
+	calls := fake.Calls()
+	if len(calls) != 2 {
+		t.Fatalf("want 2 calls (labelclear, create), got %d", len(calls))
+	}
+	if !reflect.DeepEqual(calls[0].Args, []string{"labelclear", "-f", "/dev/sdb"}) {
+		t.Errorf("first call argv = %q, want labelclear", calls[0].Args)
+	}
+	if !reflect.DeepEqual(calls[1].Args, args) {
+		t.Errorf("second call argv = %q, want create", calls[1].Args)
 	}
 }
 

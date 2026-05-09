@@ -1,0 +1,8 @@
+{
+  "smartctl": {"version": [7, 3], "exit_status": 4},
+  "device": {"name": "/dev/sdb", "type": "scsi"},
+  "model_name": "QEMU HARDDISK",
+  "serial_number": "drive-scsi1",
+  "temperature": {"current": 0},
+  "power_on_time": {"hours": 0}
+}

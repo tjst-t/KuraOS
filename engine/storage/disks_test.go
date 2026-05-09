@@ -48,6 +48,10 @@ func TestParseSmartctl(t *testing.T) {
 		{"passed", "smartctl-passed.json", SMARTStatusPassed, 38},
 		{"warning (passed but pending sec)", "smartctl-warning.json", SMARTStatusWarning, 42},
 		{"failed", "smartctl-failed.json", SMARTStatusFailed, 51},
+		// QEMU virtual disks return JSON without a smart_status block. The
+		// previous parser defaulted Passed=false here and rendered "異常";
+		// treat the missing block as "no failure signal" and report passed.
+		{"no smart_status block (QEMU/USB)", "smartctl-no-status.json", SMARTStatusPassed, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

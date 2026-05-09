@@ -29,11 +29,31 @@ func (c *CLI) CreatePool(ctx context.Context, cfg PoolConfig) error {
 	if err := ValidatePoolConfig(cfg); err != nil {
 		return err
 	}
+	// Pre-clear any stale ZFS labels left over from a previously-destroyed or
+	// exported pool. Without this, sdb that was once a member of a pool the
+	// user destroyed remains classified as "foreign" by ListDisks (lsblk sees
+	// fstype=zfs_member on its partitions) and `zpool create` would refuse
+	// without -f. labelclear on a clean disk fails harmlessly — best effort.
+	for _, d := range cfg.collectLeafDisks() {
+		_, _, _ = c.exec.Run(ctx, "zpool", "labelclear", "-f", d)
+	}
 	args := buildCreatePoolArgs(cfg)
 	if _, _, err := c.exec.Run(ctx, "zpool", args...); err != nil {
 		return fmt.Errorf("storage: zpool create %s: %w", cfg.Name, err)
 	}
 	return nil
+}
+
+// collectLeafDisks returns every leaf /dev path the config references across
+// data, special, and spares vdevs.
+func (cfg PoolConfig) collectLeafDisks() []string {
+	out := make([]string, 0, len(cfg.Data.Disks)+len(cfg.Spares))
+	out = append(out, cfg.Data.Disks...)
+	if cfg.Special != nil {
+		out = append(out, cfg.Special.Disks...)
+	}
+	out = append(out, cfg.Spares...)
+	return out
 }
 
 // buildCreatePoolArgs is the deterministic argv builder used both by
