@@ -95,6 +95,20 @@ KuraOS は Linux ベースの自宅 NAS OS。単一 Go バイナリ `kura` が G
 - **Location**: `engine/logging/`
 - **Key interfaces**: LogIngester, LogStore (日次ローテーション)
 
+#### engine/system (System Identity & Provisioning)
+
+- **Responsibility**: KuraOS user (engine/user の SSOT) を Linux uid/gid と各 protocol-specific credential / 設定ファイルに projection する **cross-protocol identity 層**。同時に、すべての credential を集約する **vault** の owner でもある。
+  - **uid/gid allocator**: KuraOS user_id → Linux uid (private 範囲 30000-39999、決定的、衝突回避)
+  - **Linux NSS projection**: `/etc/passwd` / `/etc/group` を atomic 書き換え (Phase 1 では tmp+rename、Phase 2 では NixOS module)
+  - **Credential vault**: 全 credential (argon2id, NT-hash, OIDC client secret, app DB password, TLS 秘密鍵 等) を state.db の credentials テーブルに集約。パスワード設定時に平文 (`Plaintext.Use(fn)` で memory lifetime 最短化) → argon2id + NT-hash + 必要なら他の protocol-specific 鍵を 1 トランザクションで生成 → vault に保存。
+  - **System file fragments**: `/etc/samba/smb.conf` への include 行追加、systemd unit、sudoers 限定エントリ (`zfs/zpool/smbpasswd` 限定) を冪等に書き込む
+  - **Reconcile**: 起動時 (`make serve` 早期段階) に SQLite (config + vault) を真として全 projection を再構築。drift 検出
+  - **Backup / Restore**: `kura backup` で config.json + vault を tarball 化、vault は **age で常に暗号化** (案 X、case file-level)。`kura restore` で復号 → state.db に書き戻し → Reconcile。詳細は Data Flow / Backup セクション参照
+- **Location**: `engine/system/`
+- **Key interfaces**: `Engine.AllocateUID(user) → (uid, gid)`, `Engine.SyncIdentity(user)`, `Engine.SyncCredential(user, plaintext Plaintext)`, `Engine.EnsureSystemFiles()`, `Engine.Reconcile(ctx)`, `Engine.ApplyShareOwnership(share)`, `Engine.ExportVault(passphrase) → []byte`, `Engine.ImportVault(data []byte, passphrase)`
+- **Depends on**: engine/user (SSOT 読み取り), engine/share (chown 連携), CmdExecutor (smbpasswd / sudo zpool 等), `filippo.io/age` (vault 暗号化)、副作用は OS の `/etc/passwd`, `/etc/group`, Samba `tdbsam`, ZFS dataset owner
+- **Architectural rule** (DESIGN_PRINCIPLES priority #10 / #11): 他の engine が直接 `useradd` / `smbpasswd` / `chown` / `/etc/passwd` を呼ぶこと、独自の env file / secret store を持つことは **禁止**。すべて engine/system / vault 経由。新 protocol (Kerberos KDC 等) を追加する時も engine/system 内で吸収。
+
 ### i18n
 
 - **Responsibility**: メッセージ ID → ロケール文字列変換、`embed.FS` でロケール埋め込み
@@ -152,6 +166,106 @@ NotificationEngine が subscribe
   ├→ event_log テーブルに永続化 (常に)
   └→ severity / category フィルタ → 設定済みチャネル (ntfy / webhook 等) に送信
 ```
+
+### Cross-Protocol Identity Resolution (engine/system)
+
+KuraOS user は engine/user の SQLite を SSOT とし、engine/system がすべての protocol への projection を所有する。各 protocol が「KuraOS user X」を解決する経路:
+
+```
+engine/user (SSOT)
+  ├ User { id, name, email, groups, password_argon2id, smb_enabled, ... }
+  ↓ Create / Update / Delete / SetPassword
+engine/system (本層 — 全 projection の owner)
+  ├─ uid/gid allocator (private 範囲 30000-39999、決定的)
+  ├─ /etc/passwd / /etc/group (Linux NSS)
+  ├─ Samba tdbsam に NT-hash 書き込み (smbpasswd -s -a 経由)
+  ├─ /etc/samba/smb.conf に include 行を冪等追加
+  └─ ZFS dataset owner (engine/share.Apply 後に chown gid:gid mode 2775)
+
+各 protocol からの認証 / 識別解決:
+
+  HTTP セッション (Web UI / Core API)
+    │ session cookie → engine/auth.SessionStore で user_id 取得
+    │ user_id → engine/system.LookupUID(user_id) → uid
+    └→ uid を File API / ZFS perms 検査に使う
+
+  SMB クライアント (Windows / macOS Finder)
+    │ NTLMv2 challenge/response (server 側に NT-hash 必須)
+    │ Samba が tdbsam で NT-hash を引き、challenge を verify
+    │ Samba の username map で SMB user → Linux user → uid
+    └→ ZFS dataset の uid/gid と照合
+
+  NFSv4 クライアント
+    │ sys (uid 数値そのまま) または krb5 (将来)
+    │ サーバ側 idmapd は不要 (kura が KuraOS user の uid を /etc/passwd に置くため、NFS 側と uid が一致する)
+    └→ ZFS owner と直接照合
+
+  App コンテナ (legacy: bind mount + forward auth)
+    │ docker compose の `user: <uid>:<gid>` で起動 (engine/app が engine/system から取得)
+    │ bind mount は engine/share の path、ZFS owner は engine/system が chown 済み
+    └→ コンテナ内 uid と外側 uid が一致 → ファイル書き込み成功
+
+  App コンテナ (native: OIDC + File API)
+    │ OIDC ID Token の `sub` = KuraOS user_id
+    │ アプリは Bearer JWT で File API 呼び出し
+    │ File API は session 解決 → uid → ZFS perms 検査
+    └→ App が直接 ZFS を mount しない設計、すべて File API 経由
+
+  外部 IdP federation (将来)
+    │ Google / GitHub OIDC token で KuraOS にログイン
+    │ engine/auth.federation が JIT で engine/user.Create
+    └→ engine/system が即時 projection (uid 採番 + /etc/passwd + tdbsam)
+```
+
+**鍵となる不変条件**: 「KuraOS user X が SMB / NFS / File API のどこから入っても、最終的に同じ Linux uid に解決される」。これにより ZFS dataset の owner / mode による単一の権限モデルが全 protocol を統制する。
+
+### Backup / Restore (config.json + vault)
+
+KuraOS の SSOT は **config.json (declarative state)** と **vault (credential bundle)** の 2 ファイル。バックアップは両方を含む tarball を 1 つ作る。
+
+```
+runtime layout:
+  /etc/kura/config.json        ← root:0644 (admin が読める)、構造のみ
+  /var/lib/kura/state.db       ← root:0600、ランタイム状態 + credentials テーブル
+
+backup primitive:
+  $ kura backup -o backup.tar.gz [--encrypt-passphrase]
+
+  backup.tar.gz の中身 (case X = file-level encryption):
+    ├ config.json              ← 平文 (構造のみ、機微情報なし)
+    └ secrets.kura.age         ← age で常に暗号化された credential vault
+                                  passphrase は --encrypt-passphrase で対話入力
+                                  v1 は passphrase mode のみ (recipient mode は v1.x)
+
+restore primitive:
+  $ kura restore backup.tar.gz
+  Enter passphrase: ****
+    → tarball を展開、secrets.kura.age を age で復号
+    → engine/system が state.db に credentials を import
+    → engine/system.Reconcile() で /etc/passwd / tdbsam / smb.conf 等を再 projection
+    → 元通り (Web UI、SMB、NFS、apps すべて復旧)
+```
+
+**Vault スキーマ** (`secrets.kura` 復号後):
+
+```json
+{
+  "version": 1,
+  "users": [
+    {"id": "u1", "argon2id": "$argon2id$...", "nt_hash": "ABC...", "kerberos_keys": []}
+  ],
+  "oidc_clients": [{"id": "immich", "client_secret": "..."}],
+  "app_secrets":  [{"app": "immich", "key": "DB_PASSWORD", "value": "..."}],
+  "tls_keys":     [{"cert_id": "default", "private_key_pem": "..."}]
+}
+```
+
+**設計原則**:
+
+- 全 credential を 1 vault に集約 (`engine/system` が owner)。`engine/{share,app,backup}` 等は env file / 別 secret store を持たない。
+- `config.json` は credential を持たず、各エンティティに `credential_state: "set" | "unset"` placeholder のみを置く → ユーザーから見た「1 ユーザー 1 パスワード」 mental model を保ち、片肺バックアップ (config だけ / state だけ) を構造的に許さない (DESIGN_PRINCIPLES priority #1)。
+- 暗号化は **age** (`filippo.io/age`、pure Go、CGO 不要)。openssl enc は openssl バージョン間でフォーマットがブレるため不採用。systemd-creds は machine-local 用途なので backup には不適。Phase 2 で sops-nix / agenix と互換が取れる副次効果。
+- `config.json` 単独であれば git に push しても credential は漏れない (構造のみ)。`backup.tar.gz` は機微情報として README で警告 — 暗号化必須にはせず、operator の運用判断 (LAN 内転送なら平文 OK、外部にコピーなら暗号化推奨) に委ねる。
 
 ### メトリクス
 

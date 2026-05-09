@@ -3,8 +3,8 @@
   "priority_rules": [
     {
       "priority": 1,
-      "rule": "宣言的設定 (config.json) > UI 実装 — SSOT は config.json",
-      "detail": "新機能を追加するときは config.json スキーマと import/export/diff/apply での扱いを先に設計する。SQLite はランタイム状態のキャッシュであり、export で必ず config.json に戻せる構造を保つ。UI から設定変更しても、再び export → apply で同じ状態が再現できなければ設計バグ。"
+      "rule": "宣言的設定 (config.json) > UI 実装 — SSOT は config.json (構造) + vault (credential bundle)",
+      "detail": "SSOT は config.json と secrets vault の 2 ファイル。config.json は declarative state (構造のみ、credential は credential_state: 'set'|'unset' placeholder のみ); vault (`secrets.kura`) は全 credential を集約 (argon2id, NT-hash, OIDC client secret, app DB password, TLS 秘密鍵 等)。runtime では両方とも root-only file (vault は state.db のテーブルとして同居) として保持され、`kura backup` で 1 つの tarball にまとめて出力 (case X: tarball 内で vault のみ age 暗号化、config.json は平文)。完全なバックアップ = config.json + vault の両方を含む tarball。検証専用ハッシュ (argon2id 等) も credential として悪用可能ハッシュ (NT-hash 等) も同じ vault に入れる — ユーザーから見て『1 ユーザー 1 パスワード』の mental model を壊さないため。新機能を追加する時は config.json スキーマと vault スキーマを最初に設計する。UI 設定変更 → export → apply で同じ状態が再現できることがロウンドトリップ不変条件。"
     },
     {
       "priority": 2,
@@ -45,6 +45,16 @@
       "priority": 9,
       "rule": "テスタビリティ > 直接呼び出し — 副作用は interface の裏に隠す",
       "detail": "ZFS / Docker / SMB / systemd / lego / 外部 IdP など、副作用を持つ依存は必ず interface 経由 (CmdExecutor, DockerClient, DNSProvider, BackupBackend 等)。テストではモック実装を差し込めるようにする。"
+    },
+    {
+      "priority": 10,
+      "rule": "Cross-protocol identity は uid/gid を共通言語とし、protocol-specific credential は engine/system が SSOT から決定論的に projection",
+      "detail": "KuraOS user (engine/user) は SSOT。SMB / NFS / ZFS / Docker / File API はすべて Linux uid/gid を共通言語として使う。protocol-specific credential (NT-hash / Kerberos AES key / Linux shadow crypt / Docker user namespace 等) は engine/system が SSOT (engine/user) からパスワード設定の同一トランザクションで決定論的に生成し、すべて vault 1 個に集約する (priority #1)。各 engine が個別に useradd / smbpasswd / chown / /etc/passwd 等を直接呼ぶのは禁止。これにより新プロトコル追加 (Kerberos KDC 等) は engine/system 内で吸収でき、他 engine への波及を最小化する。"
+    },
+    {
+      "priority": 11,
+      "rule": "Backup vault の暗号化は age を使う",
+      "detail": "`kura backup` の出力 tarball は内部に config.json (平文) + vault.age (age 暗号化) を含む (case X)。実装は filippo.io/age (pure Go、CGO 不要)。passphrase mode (`age -p` 相当) を v1 で必須サポート、recipient/X25519 keypair mode は v1.x で追加 (cron 自動バックアップ向け)。openssl enc は openssl 自体のバージョン間でフォーマットがブレる、systemd-creds は backup の用途に合わない (machine-local secret 用)、自家製暗号は禁止。Phase 2 で NixOS / sops-nix / agenix と互換が取れる副次効果も。"
     }
   ],
   "coding_conventions": [
@@ -104,7 +114,9 @@
     "管理 UI からの破壊的操作 (zpool destroy 等) を確認なしで実行しない",
     "Docker / ZFS / SMB の CLI 出力を直接画面に表示しない (i18n 経由で構造化メッセージに変換)",
     ".env / リポジトリ内に本番シークレットをコミットしない",
-    "アプリの内部パスワード / DB password / OIDC client secret を config.json export 時に平文で含めない (env 参照のみを記録)"
+    "アプリの内部パスワード / DB password / OIDC client secret / TLS 秘密鍵を config.json export に含めない。すべて vault (`secrets.kura`) に集約する (priority #1)。env 参照ファイル (`/etc/kura/.env` 等) も廃止 — 散在を許容しない。",
+    "engine/{share,app,backup,storage,...} が useradd / userdel / smbpasswd / chown / chmod / /etc/{passwd,group,samba/smb.conf,exports} を直接呼ばない (priority #10 違反)。必ず engine/system 経由で projection 経路を統一する。",
+    "credential (検証用 argon2id 含む) を config.json export に含めない。すべて vault に集約し、config.json では `credential_state: \"set\"|\"unset\"` placeholder のみで表現する — これにより『argon2id だけ入った config』『NT-hash だけ入った state』のような片肺バックアップを許さず、ユーザーから見た『1 ユーザー 1 パスワード』の mental model を保つ (priority #1)。"
   ],
   "verification_rules": [
     {

@@ -3,11 +3,11 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S1bccf5",
-    "total": 14,
+    "current_sprint": "Ssys001",
+    "total": 15,
     "done": 6,
     "in_progress": 0,
-    "remaining": 8,
+    "remaining": 9,
     "percentage": 43,
     "completed_sprints": [
       "S0ff37f",
@@ -26,6 +26,7 @@
     "Se3b190",
     "S9db742",
     "Sd64f38",
+    "Ssys001",
     "S1bccf5",
     "S65b510",
     "S822961",
@@ -1544,6 +1545,120 @@
           }
         }
       }
+    },
+    "Ssys001": {
+      "title": "System Identity & Provisioning (engine/system)",
+      "status": "pending",
+      "description": "KuraOS user モデルを Linux uid/gid に projection し、SMB / NFS / ZFS / Docker / File API が共有する system identity 層を確立する。SQLite の user (argon2id) を SSOT とし、engine/system が Linux NSS (/etc/passwd, /etc/group)、Samba tdbsam (NT-hash mirror)、ZFS dataset owner、systemd / sudoers / smb.conf の system fragments を冪等に projection。S822961 (OIDC) より前に必要 (federation user の JIT projection 先がここ)。VM での SMB 接続テスト中に 3 症状が同時発生したことから architectural backlog として promote。",
+      "milestone": false,
+      "rationale": "現状 engine/user は SQLite だけ持ち、Linux/SMB/NFS/Docker への projection が不在。各 engine が個別に useradd/smbpasswd/chown するのは禁止 (DESIGN_PRINCIPLES forbidden 追記)。projection は engine/system が一元的に owner。",
+      "stories": {
+        "Ssys001-1": {
+          "title": "uid/gid allocator + Linux NSS projection",
+          "status": "pending",
+          "user_story": "KuraOS 開発者として、KuraOS user を作成すると Linux user が自動で /etc/passwd と /etc/group に現れるようにしたい。なぜなら、ZFS dataset / SMB / NFS / Docker container がすべて Linux uid/gid を共通言語として使うから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Ssys001-1-1",
+              "description": "engine/user.Create が呼ばれると engine/system が private 範囲 (30000-39999) から uid/gid を採番し、kura が CLI (kura system reconcile) または UI 経由で /etc/passwd / /etc/group に atomic 書き込みする。再起動後も uid/gid が安定 (SQLite で保持)",
+              "test": "[AC-Ssys001-1-1] in engine/system/identity_test.go (uid 採番テーブルドリブン) + tests/acceptance/system-identity-cli.sh (kura system reconcile が /etc/passwd を更新する)",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Ssys001-1-2",
+              "description": "uid/gid 採番は決定的 (同 user_id → 同 uid) かつ衝突回避 (system uid < 1000 / 既存 distro user uid と被らない)",
+              "test": "[AC-Ssys001-1-2] in engine/system/identity_test.go::TestAllocateUID_DeterministicNoCollision",
+              "status": "pending"
+            }
+          ],
+          "tasks": {}
+        },
+        "Ssys001-2": {
+          "title": "Samba NT-hash mirror (全ユーザー強制、二重ハッシュ)",
+          "status": "pending",
+          "user_story": "管理者として、KuraOS UI で作ったユーザーで Windows / macOS から SMB 接続できるようにしたい。なぜなら、SMB プロトコル仕様上サーバ側に NT-hash 等価物の保存が必要だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Ssys001-2-1",
+              "description": "engine/user.Create / SetPassword は平文を memory 上で 1 回だけ受け取り、argon2id (state.db) と NT-hash (Samba tdbsam) を同一トランザクションで書き込む。終了後 platintext は zero-clear",
+              "test": "[AC-Ssys001-2-1] in engine/user/password_dual_hash_test.go (Plaintext.Use ヘルパで両ハッシュ生成) + tests/acceptance/system-identity-cli.sh (kura user set-password 後に smbclient -U <user>%<pw> が succeed)",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Ssys001-2-2",
+              "description": "全 credential (argon2id, NT-hash, OIDC client secret, app secrets, TLS 秘密鍵) は vault (state.db の credentials テーブル) に集約され、config.json export には含まれない (`credential_state: \"set\"|\"unset\"` placeholder のみ)。これによりユーザーから見て『1 ユーザー 1 パスワード』 の mental model が保たれ、片肺バックアップが許されない",
+              "test": "[AC-Ssys001-2-2] in tests/acceptance/config-roundtrip.sh::TestUsersExportContainsOnlyPlaceholder + internal/config/config_test.go::TestExport_NoCredentialsLeak + engine/system/vault_test.go::TestVaultRoundTrip",
+              "status": "pending"
+            }
+          ],
+          "tasks": {}
+        },
+        "Ssys001-3": {
+          "title": "System file provisioning (smb.conf include / systemd / sudoers / etc.)",
+          "status": "pending",
+          "user_story": "管理者として、kura を新規セットアップしたら SMB / NFS / systemd 連携が自動で完成するようにしたい。なぜなら、各種 /etc 編集を手作業でやるのは provisioning 層の漏れになるから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Ssys001-3-1",
+              "description": "kura system reconcile が /etc/samba/smb.conf に include = /etc/samba/conf.d/kura.conf がなければ atomic に追加。drift 検出と冪等性を保つ",
+              "test": "[AC-Ssys001-3-1] in tests/acceptance/system-identity-cli.sh::TestReconcileEnsuresSmbInclude + engine/system/provision_test.go::TestSmbIncludeIdempotent",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Ssys001-3-2",
+              "description": "起動時 (cmd/kura/main.go の早期段階) に engine/system.Reconcile() が呼ばれ、SQLite の users と /etc/passwd / tdbsam が一致しない場合は projection を再実行する",
+              "test": "[AC-Ssys001-3-2] in tests/acceptance/system-identity-cli.sh::TestStartupReconciliation",
+              "status": "pending"
+            }
+          ],
+          "tasks": {}
+        },
+        "Ssys001-4": {
+          "title": "Share dataset chown integration",
+          "status": "pending",
+          "user_story": "管理者として、SMB/NFS Share を作ると、その path の ZFS dataset が ACL に基づいて自動で chown / chmod されるようにしたい。なぜなら、root:root のままでは Samba ユーザーが書き込めないから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Ssys001-4-1",
+              "description": "engine/share.Create / Update が完了すると engine/system.ApplyShareOwnership(share) が呼ばれ、share の path が share.ACL から決定される group (gid) と mode 2775 (setgid) で chown / chmod される。CLI: kura share reconcile-perms",
+              "test": "[AC-Ssys001-4-1] in tests/acceptance/share_flow_test.go::TestAcceptance_Share_DatasetOwnership + engine/system/perms_test.go",
+              "status": "pending"
+            }
+          ],
+          "tasks": {}
+        },
+        "Ssys001-5": {
+          "title": "Backup vault: kura backup / restore + age 暗号化",
+          "status": "pending",
+          "user_story": "管理者として、`kura backup` で 1 つのアーカイブに config.json と vault を出力し、`--encrypt` で age パスフレーズ暗号化したい。なぜなら、別マシンへの移行や定期バックアップで credential もまとめて持ち運ぶ必要があるから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Ssys001-5-1",
+              "description": "`kura backup -o <file>` が config.json + vault を含む tarball を生成。tarball 内部レイアウトは config.json (平文) + secrets.kura.age (常に age 暗号化、平文出力なし) の case X 案",
+              "test": "[AC-Ssys001-5-1] in tests/acceptance/backup-restore.sh::TestBackupContainsConfigAndEncryptedVault + cmd/kura/backup_test.go::TestBackupTarballLayout",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Ssys001-5-2",
+              "description": "`kura backup --encrypt-passphrase` で対話的にパスフレーズを取得し filippo.io/age で vault を暗号化。`kura restore <file>` でパスフレーズ要求し復号 → state.db に credentials を import 完了 → SMB / web UI 含めて完全復旧",
+              "test": "[AC-Ssys001-5-2] in tests/acceptance/backup-restore.sh::TestRoundTripPassphraseEncrypted + engine/system/vault_test.go::TestAgeEncryptDecrypt",
+              "status": "pending"
+            },
+            {
+              "id": "AC-Ssys001-5-3",
+              "description": "Recipient (X25519 公開鍵) モードでの暗号化は v1.x 予定の旨を README に記載。v1 では passphrase mode のみ実装",
+              "test": "[AC-Ssys001-5-3] in tests/acceptance/backup-restore.sh::TestRecipientModeNotYetSupported (deferred 表示の確認)",
+              "status": "pending"
+            }
+          ],
+          "tasks": {}
+        }
+      },
+      "supersedes_symptoms": [
+        "BL-smb-auth-bridge",
+        "BL-smb-conf-include",
+        "BL-share-fs-perms"
+      ]
     }
   },
   "dependencies": {
@@ -1579,9 +1694,9 @@
     },
     "S1bccf5": {
       "depends_on": [
-        "Sd64f38"
+        "Ssys001"
       ],
-      "reason": "アプリ install は Share への bind mount と dataset プールが利用可能であることを前提"
+      "reason": "アプリ install は Share への bind mount + dataset プール + system identity (Linux uid 経由のコンテナ実行) を前提"
     },
     "S65b510": {
       "depends_on": [
@@ -1591,9 +1706,10 @@
     },
     "S822961": {
       "depends_on": [
-        "S65b510"
+        "S65b510",
+        "Ssys001"
       ],
-      "reason": "OIDC client 自動登録と forward_auth はアプリの install フローに組み込まれる"
+      "reason": "OIDC client 自動登録と forward_auth はアプリの install フローに組み込まれ、federation user の JIT projection 先として engine/system を前提"
     },
     "S8a756d": {
       "depends_on": [
@@ -1624,6 +1740,12 @@
         "S0eedaa"
       ],
       "reason": "完全なウィザードと総仕上げは全 Engine 揃い後に実施"
+    },
+    "Ssys001": {
+      "depends_on": [
+        "Sd64f38"
+      ],
+      "reason": "Share の dataset chown 連携を統合する必要があり、Share Engine の存在 (Sd64f38) を前提"
     }
   },
   "backlog": [
@@ -1726,29 +1848,17 @@
       "status": "open"
     },
     {
-      "id": "BL-2026-05-08-smb-auth-bridge",
-      "title": "KuraOS user → Samba auth bridge",
+      "id": "BL-2026-05-08-system-identity-architecture",
+      "title": "engine/system: KuraOS user → Linux uid/gid → SMB/NFS/ZFS への cross-protocol identity projection",
       "added_in": "hotfix-2026-05-08",
-      "reason": "S1e7eeb で KuraOS の user は argon2id でハッシュ保存。一方 Samba は NT-LM ハッシュ (smbpasswd / tdbsam) を使うため、KuraOS UI で作った admin で SMB 接続できない。setUp 時に平文パスワードを掴んで argon2id (kura) と smbpasswd 経由 NT ハッシュ (samba) の両方に書く実装が必要。S822961 (OIDC) より前に解決すべき blocker。",
-      "status": "open",
-      "blocks": [
-        "Sd64f38 SMB share の実用テスト",
-        "operator が Windows / macOS から接続"
+      "reason": "VM での SMB 接続テスト中に 3 つの症状 (smbpasswd 未連携、smb.conf に conf.d を include していない、ZFS dataset が root:root) が同時に出現。これらは別々のバグではなく『KuraOS が system identity 層 (Linux uid/gid) を所有していない』という設計欠落の異なる側面。engine/user の SSOT を Linux NSS / Samba tdbsam / ZFS owner / NFSv4 idmap / Docker uid 共通の uid/gid に projection する engine/system を新設する必要がある。S_sys sprint で実装予定。",
+      "status": "promoted_to_sprint",
+      "promoted_to": "S_sys",
+      "supersedes_symptoms": [
+        "smb-auth-bridge",
+        "smb-conf-include",
+        "share-fs-perms"
       ]
-    },
-    {
-      "id": "BL-2026-05-08-smb-conf-include",
-      "title": "Samba 主 smb.conf に conf.d/kura.conf を自動 include",
-      "added_in": "hotfix-2026-05-08",
-      "reason": "ShareEngine は /etc/samba/conf.d/kura.conf を生成するが、Ubuntu の stock /etc/samba/smb.conf はそれを include しない。kura 起動時または apt パッケージ provisioning で `include = /etc/samba/conf.d/kura.conf` を追加する必要がある。VM では手動で追加した。",
-      "status": "open"
-    },
-    {
-      "id": "BL-2026-05-08-share-fs-perms",
-      "title": "Share 作成時の Linux ファイルシステム権限管理",
-      "added_in": "hotfix-2026-05-08",
-      "reason": "ZFS dataset (/tank/photos 等) はデフォルトで root:root 0755 で作られるため、SMB ユーザーが書き込めない。Share 作成時の ACL に基づいて chown/chmod を実行する必要がある。今は VM で手動 chown した。",
-      "status": "open"
     }
   ]
 }
