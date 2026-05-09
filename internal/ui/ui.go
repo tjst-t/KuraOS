@@ -58,6 +58,7 @@ type Renderer struct {
 	sharesHandler       http.Handler
 	sharesDeleteHandler http.Handler
 	sharesUpdateHandler http.Handler
+	sharesACLRowHandler http.Handler
 
 	// Apps handlers (added in S65b510). Wired via SetAppsHandler.
 	appsListHandler         http.Handler
@@ -68,6 +69,16 @@ type Renderer struct {
 
 	// Users handler (added in S822961). Wired via SetUsersHandler.
 	usersHandler http.Handler
+
+	// Users / Groups CRUD handlers (added in Sfix001). Wired via
+	// SetUsersCRUDHandlers; nil when the binary boots without engine/system
+	// (acceptance tests that don't exercise CRUD).
+	usersCreateHandler   http.Handler
+	usersUpdateHandler   http.Handler
+	usersDeleteHandler   http.Handler
+	groupsCreateHandler  http.Handler
+	groupsDeleteHandler  http.Handler
+	groupsMembersHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -246,6 +257,12 @@ func (r *Renderer) SetSharesHandlers(get, del http.Handler) {
 // Optional — older sprints (before the share-edit feature) leave it nil.
 func (r *Renderer) SetSharesUpdateHandler(h http.Handler) { r.sharesUpdateHandler = h }
 
+// SetSharesACLRowHandler installs the GET handler that returns a single
+// blank ACL row for the htmx-driven picker (Sfix001-3). Optional — when
+// nil the picker only renders pre-existing rows and the operator cannot
+// add new ones.
+func (r *Renderer) SetSharesACLRowHandler(h http.Handler) { r.sharesACLRowHandler = h }
+
 // adminNavGroups returns the sidebar definition with the active item set.
 // IDs match the prototype's NAV_GROUPS so test fixtures and screen
 // references line up. The 7-item admin row (Dashboard / Storage / Shares /
@@ -309,10 +326,31 @@ func (r *Renderer) Routes() http.Handler {
 	if r.sharesUpdateHandler != nil {
 		mux.Handle("/ui/admin/shares/update", r.sharesUpdateHandler)
 	}
+	if r.sharesACLRowHandler != nil {
+		mux.Handle("/ui/admin/shares/acl-row", r.sharesACLRowHandler)
+	}
 	if r.usersHandler != nil {
 		mux.Handle("/ui/admin/users", r.usersHandler)
 	} else {
 		mux.HandleFunc("/ui/admin/users", r.handlePlaceholder("users", i18n.MsgNavUsers))
+	}
+	if r.usersCreateHandler != nil {
+		mux.Handle("/ui/admin/users/create", r.usersCreateHandler)
+	}
+	if r.usersUpdateHandler != nil {
+		mux.Handle("/ui/admin/users/update", r.usersUpdateHandler)
+	}
+	if r.usersDeleteHandler != nil {
+		mux.Handle("/ui/admin/users/delete", r.usersDeleteHandler)
+	}
+	if r.groupsCreateHandler != nil {
+		mux.Handle("/ui/admin/groups/create", r.groupsCreateHandler)
+	}
+	if r.groupsDeleteHandler != nil {
+		mux.Handle("/ui/admin/groups/delete", r.groupsDeleteHandler)
+	}
+	if r.groupsMembersHandler != nil {
+		mux.Handle("/ui/admin/groups/members", r.groupsMembersHandler)
 	}
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
 	if r.appsListHandler != nil {

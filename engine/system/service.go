@@ -16,6 +16,23 @@ import (
 // would also want engine/system for projection on Create).
 type UserSource interface {
 	List(ctx context.Context) ([]SourceUser, error)
+	// Create / Update / Delete are required for Engine.CreateUser /
+	// Engine.UpdateUser / Engine.DeleteUser high-level orchestration.
+	// They map 1:1 onto engine/user.Store methods of the same name —
+	// the adapter does the type translation.
+	Create(ctx context.Context, in SourceCreateUser) (SourceUser, error)
+	Update(ctx context.Context, userID, displayName, role string) error
+	Delete(ctx context.Context, userID string) error
+
+	// Group operations. Same projection-orchestration rationale as the
+	// user methods above.
+	ListGroups(ctx context.Context) ([]SourceGroup, error)
+	CreateGroup(ctx context.Context, name, description string) (SourceGroup, error)
+	DeleteGroup(ctx context.Context, groupID string) error
+	SetGroupMembers(ctx context.Context, groupID string, userIDs []string) error
+	// MembersOfGroup returns the user IDs in groupID; used to project
+	// the secondary group line into /etc/group.
+	MembersOfGroup(ctx context.Context, groupID string) ([]string, error)
 }
 
 // SourceUser is the minimal user shape engine/system needs from
@@ -24,7 +41,24 @@ type SourceUser struct {
 	ID          string
 	Username    string
 	DisplayName string
+	Role        string
 	Disabled    bool
+}
+
+// SourceCreateUser carries the fields the Source.Create adapter needs
+// to insert a new user row + 'password' AuthMethod.
+type SourceCreateUser struct {
+	Username    string
+	DisplayName string
+	Password    string
+	Role        string
+}
+
+// SourceGroup is the minimal group shape engine/system needs.
+type SourceGroup struct {
+	ID          string
+	Name        string
+	Description string
 }
 
 // Hasher computes the argon2id verifier for a plaintext password. Same
@@ -286,7 +320,49 @@ func (s *service) Reconcile(ctx context.Context) error {
 	if err := s.writePasswd(projected, primaryGID); err != nil {
 		return err
 	}
-	if err := s.writeGroup(primaryGID, usernames); err != nil {
+
+	// Project KuraOS-managed groups too: kura-users (primary) plus every
+	// engine/user.Group with members resolved to usernames. Adding new
+	// groups in this pass is what lets Sfix001-2 turn the Groups tab into
+	// a functional CRUD surface.
+	groupsToProject := []ProjectedGroup{
+		{
+			GroupID: primaryGroupKey,
+			Name:    PrimaryGroupName,
+			GID:     primaryGID,
+			Members: usernames,
+		},
+	}
+	usernameByID := map[string]string{}
+	for _, u := range users {
+		usernameByID[u.ID] = u.Username
+	}
+	groups, err := s.users.ListGroups(ctx)
+	if err == nil {
+		for _, g := range groups {
+			gid, alocErr := s.AllocateGID(ctx, g.ID)
+			if alocErr != nil {
+				return fmt.Errorf("system: allocate gid for %s: %w", g.Name, alocErr)
+			}
+			memberIDs, mErr := s.users.MembersOfGroup(ctx, g.ID)
+			if mErr != nil {
+				return fmt.Errorf("system: members of %s: %w", g.Name, mErr)
+			}
+			members := make([]string, 0, len(memberIDs))
+			for _, uid := range memberIDs {
+				if uname, ok := usernameByID[uid]; ok {
+					members = append(members, uname)
+				}
+			}
+			groupsToProject = append(groupsToProject, ProjectedGroup{
+				GroupID: g.ID,
+				Name:    g.Name,
+				GID:     gid,
+				Members: members,
+			})
+		}
+	}
+	if err := s.writeGroupsAll(groupsToProject); err != nil {
 		return err
 	}
 	if _, err := ensureSmbInclude(s.fs); err != nil {
@@ -342,6 +418,14 @@ func (s *service) writePasswd(users []ProjectedUser, primaryGID int) error {
 }
 
 func (s *service) writeGroup(primaryGID int, members []string) error {
+	// Retained for older callers / tests. Equivalent to projecting only
+	// the primary kura-users group.
+	return s.writeGroupsAll([]ProjectedGroup{
+		{GroupID: primaryGroupKey, Name: PrimaryGroupName, GID: primaryGID, Members: members},
+	})
+}
+
+func (s *service) writeGroupsAll(groups []ProjectedGroup) error {
 	original, err := s.fs.ReadFile(pathGroup)
 	if err != nil {
 		if isNotExist(err) {
@@ -350,16 +434,11 @@ func (s *service) writeGroup(primaryGID int, members []string) error {
 			return fmt.Errorf("system: read group: %w", err)
 		}
 	}
-	groups := []ProjectedGroup{
-		{
-			GroupID: primaryGroupKey,
-			Name:    PrimaryGroupName,
-			GID:     primaryGID,
-			Members: members,
-		},
-	}
 	block := renderGroupBlock(groups)
-	conflicts := []string{PrimaryGroupName}
+	conflicts := make([]string, 0, len(groups))
+	for _, g := range groups {
+		conflicts = append(conflicts, g.Name)
+	}
 	updated := mergeManagedBlock(original, block, conflicts)
 	if err := s.fs.WriteAtomic(pathGroup, updated, 0o644); err != nil {
 		return fmt.Errorf("system: write group: %w", err)
@@ -455,4 +534,147 @@ func LegacyAuthMethodMirror(db *sql.DB) func(context.Context, string, string) er
 // commands that take a username as input.
 func SanitizeUsername(s string) string {
 	return strings.ToLower(strings.TrimSpace(s))
+}
+
+// CreateUser is the orchestration step the UI calls when the operator
+// submits "+ ユーザー追加". It chains: store.Create -> uid alloc -> set
+// password (argon2id + NT-hash + Samba projection) -> Reconcile so
+// /etc/passwd reflects the new entry without waiting for the next
+// startup. Failure at any step rolls back the user row so the operator
+// never sees a half-committed state. (Sfix001-1 AC-3.)
+func (s *service) CreateUser(ctx context.Context, in CreateUserInput) (string, error) {
+	if s.users == nil {
+		return "", errors.New("system: user source not wired")
+	}
+	created, err := s.users.Create(ctx, SourceCreateUser{
+		Username:    in.Username,
+		DisplayName: in.DisplayName,
+		Password:    in.Password,
+		Role:        in.Role,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	// uid_alloc + password projection in that order — uid must exist
+	// before SmbPasswdLine can render the smbpasswd-format row.
+	if _, err := s.AllocateUID(ctx, created.ID); err != nil {
+		_ = s.users.Delete(ctx, created.ID)
+		return "", fmt.Errorf("system: allocate uid: %w", err)
+	}
+	pw := NewPlaintextPassword(in.Password)
+	if err := s.SetUserPassword(ctx, created.ID, pw); err != nil {
+		_ = s.users.Delete(ctx, created.ID)
+		return "", fmt.Errorf("system: set password: %w", err)
+	}
+
+	// Reconcile is best-effort — pdbedit / file write under non-root
+	// dev is soft-failed inside the implementation. The vault is the
+	// SSOT; a later Reconcile will converge.
+	if err := s.Reconcile(ctx); err != nil {
+		// Don't roll back the user — they're correctly persisted in
+		// the SSOT (engine/user + vault). A failed projection is a
+		// system-state issue, not a user-creation issue.
+		_ = err
+	}
+	return created.ID, nil
+}
+
+// UpdateUser modifies the editable fields and re-projects /etc/passwd
+// (the GECOS line is rewritten on the next Reconcile). Username and
+// uid are immutable.
+func (s *service) UpdateUser(ctx context.Context, userID, displayName, role string) error {
+	if s.users == nil {
+		return errors.New("system: user source not wired")
+	}
+	if err := s.users.Update(ctx, userID, displayName, role); err != nil {
+		return err
+	}
+	if err := s.Reconcile(ctx); err != nil {
+		_ = err
+	}
+	return nil
+}
+
+// DeleteUser removes the user row, scrubs the vault credentials owned
+// by them (argon2id + NT-hash), and re-projects /etc/passwd / group /
+// Samba tdbsam. uid_alloc is intentionally retained so a same-name
+// recreate lands on the same uid (priority #1 SSOT round-trip:
+// removing the uid mapping would mean a backup made yesterday and
+// restored today gets a different uid).
+func (s *service) DeleteUser(ctx context.Context, userID string) error {
+	if s.users == nil {
+		return errors.New("system: user source not wired")
+	}
+	if err := s.users.Delete(ctx, userID); err != nil {
+		return err
+	}
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("system: begin: %w", err)
+	}
+	defer tx.Rollback()
+	if _, err := tx.ExecContext(ctx, `
+		DELETE FROM credentials WHERE owner_kind = 'user' AND owner_id = ?
+	`, userID); err != nil {
+		return fmt.Errorf("system: clear vault for user: %w", err)
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("system: commit: %w", err)
+	}
+	if err := s.Reconcile(ctx); err != nil {
+		_ = err
+	}
+	return nil
+}
+
+// CreateGroup creates the group row, allocates a stable gid, and
+// re-projects /etc/group. Returns the new group ID.
+func (s *service) CreateGroup(ctx context.Context, name, description string) (string, error) {
+	if s.users == nil {
+		return "", errors.New("system: user source not wired")
+	}
+	g, err := s.users.CreateGroup(ctx, name, description)
+	if err != nil {
+		return "", err
+	}
+	if _, err := s.AllocateGID(ctx, g.ID); err != nil {
+		_ = s.users.DeleteGroup(ctx, g.ID)
+		return "", fmt.Errorf("system: allocate gid: %w", err)
+	}
+	if err := s.Reconcile(ctx); err != nil {
+		_ = err
+	}
+	return g.ID, nil
+}
+
+// DeleteGroup removes the row and re-projects /etc/group. The Share
+// ACL referential check happens in the UI handler that owns access
+// to engine/share — see internal/ui/users_groups_handlers.go.
+func (s *service) DeleteGroup(ctx context.Context, groupID string) error {
+	if s.users == nil {
+		return errors.New("system: user source not wired")
+	}
+	if err := s.users.DeleteGroup(ctx, groupID); err != nil {
+		return err
+	}
+	if err := s.Reconcile(ctx); err != nil {
+		_ = err
+	}
+	return nil
+}
+
+// SetGroupMembers writes the user_groups link rows and re-projects
+// the secondary group line into /etc/group.
+func (s *service) SetGroupMembers(ctx context.Context, groupID string, userIDs []string) error {
+	if s.users == nil {
+		return errors.New("system: user source not wired")
+	}
+	if err := s.users.SetGroupMembers(ctx, groupID, userIDs); err != nil {
+		return err
+	}
+	if err := s.Reconcile(ctx); err != nil {
+		_ = err
+	}
+	return nil
 }

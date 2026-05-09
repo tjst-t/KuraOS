@@ -170,6 +170,46 @@ func (s *Store) SetPassword(ctx context.Context, userID, password string) error 
 	return nil
 }
 
+// UpdateUser overwrites the editable fields (display_name, role) of an
+// existing user. Username is intentionally immutable — it is the stable
+// principal name baked into Linux uid_alloc, Samba tdbsam, and ACL rows;
+// renaming would silently break those projections.
+func (s *Store) UpdateUser(ctx context.Context, userID, displayName string, role Role) (User, error) {
+	if !role.Valid() {
+		return User{}, fmt.Errorf("user: invalid role %q", role)
+	}
+	now := s.now().UTC().Format(time.RFC3339Nano)
+	res, err := s.db.ExecContext(ctx, `
+		UPDATE users SET display_name = ?, role = ?, updated_at = ?
+		WHERE id = ?
+	`, displayName, string(role), now, userID)
+	if err != nil {
+		return User{}, fmt.Errorf("user: update: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return User{}, ErrNotFound
+	}
+	return s.GetByID(ctx, userID)
+}
+
+// DeleteUser removes the user row. ON DELETE CASCADE handles auth_methods,
+// user_groups, sessions. Vault credentials (argon2id, NT-hash) for this
+// user are NOT removed here — engine/system owns the vault and its
+// DeleteUser wraps both the row removal and the vault cleanup in one
+// projection step. Returns ErrNotFound when no row matched.
+func (s *Store) DeleteUser(ctx context.Context, userID string) error {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, userID)
+	if err != nil {
+		return fmt.Errorf("user: delete: %w", err)
+	}
+	n, _ := res.RowsAffected()
+	if n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // CountByRole reports how many users currently hold role. The setup wizard
 // uses CountByRole(ctx, RoleAdmin) to decide whether the bootstrap form
 // should be reachable.

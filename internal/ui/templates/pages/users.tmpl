@@ -1,9 +1,13 @@
 {{- /*
-users.tmpl — admin /ui/admin/users page (S822961). Visual SSOT:
+users.tmpl — admin /ui/admin/users page (S822961 + Sfix001). Visual SSOT:
 prototype/claude_design/Users.html. The 4 tabs (users / groups / auth /
 oidc) are implemented as plain anchor links rather than client-side
-state so a non-JS browser still navigates between them. The Auth tab is
-the entry point for AC-S822961-3-1 (Google linking).
+state so a non-JS browser still navigates between them.
+
+Sfix001-1: per-row 編集 / 削除 actions on the Users tab + a "+ ユーザー
+追加" button that opens new-user-modal. Sfix001-2: "+ グループ追加",
+"メンバー編集", and 削除 actions on the Groups tab. Both modals reuse
+the partials/modal.tmpl shell.
 
 PageData.Extra is *ui.UsersView.
 */ -}}
@@ -14,7 +18,27 @@ PageData.Extra is *ui.UsersView.
     <h1 class="page-title">{{ T "page.users.title" }}</h1>
     <p class="page-sub">{{ T "page.users.subtitle" }}</p>
   </div>
+  <div class="row gap-sm" style="display:flex;gap:8px;">
+    {{ if eq $v.Tab "users" }}
+    <button type="button" class="btn btn-primary" data-testid="users-add-btn"
+      data-modal-open="users-new-modal">
+      {{ T "page.users.add_btn" }}
+    </button>
+    {{ end }}
+    {{ if eq $v.Tab "groups" }}
+    <button type="button" class="btn btn-primary" data-testid="groups-add-btn"
+      data-modal-open="groups-new-modal">
+      {{ T "page.groups.add_btn" }}
+    </button>
+    {{ end }}
+  </div>
 </div>
+
+{{ if $v.FormError }}
+<div class="banner crit" data-testid="users-error" style="margin-bottom:20px">
+  <div style="flex:1">{{ $v.FormError }}</div>
+</div>
+{{ end }}
 
 <div class="tabs" data-testid="users-tabs"
      style="margin-bottom:16px;display:flex;gap:8px;border-bottom:1px solid var(--border)">
@@ -69,8 +93,19 @@ PageData.Extra is *ui.UsersView.
         <td class="mono">{{ if .Groups }}{{ range $i, $g := .Groups }}{{ if $i }}, {{ end }}{{ $g }}{{ end }}{{ else }}—{{ end }}</td>
         <td class="muted">{{ if .LastLogin }}{{ .LastLogin }}{{ else }}—{{ end }}</td>
         <td>
-          <a class="btn btn-sm" data-testid="users-link-google-btn"
-             href="/federation/google/link?return_to=/ui/admin/users">{{ T "page.users.auth.link_google_btn" }}</a>
+          <div class="row gap-sm" style="display:flex;gap:6px;align-items:center">
+            <a class="btn btn-sm" data-testid="users-link-google-btn"
+               href="/federation/google/link?return_to=/ui/admin/users">{{ T "page.users.auth.link_google_btn" }}</a>
+            <button type="button" class="btn btn-sm" data-testid="users-edit-btn"
+                    data-modal-open="users-edit-modal-{{ .UserID }}">{{ T "page.users.edit_btn" }}</button>
+            <form method="post" action="/ui/admin/users/delete" data-testid="users-delete-form"
+                  onsubmit="return confirm('{{ T "page.users.delete.confirm" }}');" style="display:inline">
+              <input type="hidden" name="id" value="{{ .UserID }}">
+              <button type="submit" class="btn btn-sm btn-danger" data-testid="users-delete-btn">
+                {{ T "page.users.delete_btn" }}
+              </button>
+            </form>
+          </div>
         </td>
       </tr>
       {{ end }}
@@ -80,17 +115,46 @@ PageData.Extra is *ui.UsersView.
 {{ end }}
 
 {{ if eq $v.Tab "groups" }}
-<div class="card">
+<div class="card" data-testid="groups-table-card">
   {{ if not $v.Groups }}
   <div class="card-body" style="padding:24px;text-align:center">
     <p class="muted" style="margin:0">{{ T "page.users.groups.empty" }}</p>
   </div>
   {{ else }}
-  <table class="tbl">
-    <thead><tr><th>グループ</th><th>メンバー</th><th>説明</th></tr></thead>
+  <table class="tbl" data-testid="groups-table">
+    <thead><tr>
+      <th>{{ T "page.groups.col.name" }}</th>
+      <th>{{ T "page.groups.col.members" }}</th>
+      <th>{{ T "page.groups.col.description" }}</th>
+      <th>{{ T "page.groups.col.actions" }}</th>
+    </tr></thead>
     <tbody>
       {{ range $v.Groups }}
-      <tr><td class="td-mono">{{ .Name }}</td><td>{{ .Members }}</td><td>{{ .Description }}</td></tr>
+      <tr data-testid="groups-row" data-group-id="{{ .ID }}" data-group-name="{{ .Name }}">
+        <td class="td-mono">{{ .Name }}</td>
+        <td>{{ .Members }}</td>
+        <td>{{ .Description }}</td>
+        <td>
+          {{ if .ID }}
+          <div class="row gap-sm" style="display:flex;gap:6px">
+            <button type="button" class="btn btn-sm" data-testid="groups-edit-members-btn"
+                    data-modal-open="groups-members-modal-{{ .ID }}">
+              {{ T "page.groups.edit_members_btn" }}
+            </button>
+            <form method="post" action="/ui/admin/groups/delete" data-testid="groups-delete-form"
+                  onsubmit="return confirm('{{ T "page.groups.delete.confirm" }}');" style="display:inline">
+              <input type="hidden" name="id" value="{{ .ID }}">
+              <input type="hidden" name="name" value="{{ .Name }}">
+              <button type="submit" class="btn btn-sm btn-danger" data-testid="groups-delete-btn">
+                {{ T "page.groups.delete_btn" }}
+              </button>
+            </form>
+          </div>
+          {{ else }}
+          <span class="muted" style="font-size:11px">read-only</span>
+          {{ end }}
+        </td>
+      </tr>
       {{ end }}
     </tbody>
   </table>
@@ -180,4 +244,167 @@ PageData.Extra is *ui.UsersView.
   {{ end }}
 </div>
 {{ end }}
+
+{{- /* ===== Modals ===== */ -}}
+
+{{ if eq $v.Tab "users" }}
+{{ template "modal" dict
+    "id"      "users-new-modal"
+    "testid"  "users-new-modal"
+    "title"   (T "page.users.add.title")
+    "action"  "/ui/admin/users/create"
+    "bodyTpl" "users-new-body"
+    "footTpl" "users-new-foot"
+    "ctx"     $v }}
+
+{{ range $v.Users }}
+{{ template "modal" dict
+    "id"      (printf "users-edit-modal-%s" .UserID)
+    "testid"  (printf "users-edit-modal-%s" .UserID)
+    "title"   (T "page.users.edit.title")
+    "action"  "/ui/admin/users/update"
+    "bodyTpl" "users-edit-body"
+    "footTpl" "users-edit-foot"
+    "ctx"     . }}
+{{ end }}
+{{ end }}
+
+{{ if eq $v.Tab "groups" }}
+{{ template "modal" dict
+    "id"      "groups-new-modal"
+    "testid"  "groups-new-modal"
+    "title"   (T "page.groups.add.title")
+    "action"  "/ui/admin/groups/create"
+    "bodyTpl" "groups-new-body"
+    "footTpl" "groups-new-foot"
+    "ctx"     $v }}
+
+{{ range $v.Groups }}
+{{ if .ID }}
+{{ template "modal" dict
+    "id"      (printf "groups-members-modal-%s" .ID)
+    "testid"  (printf "groups-members-modal-%s" .ID)
+    "title"   (T "page.groups.edit_members.title")
+    "action"  "/ui/admin/groups/members"
+    "bodyTpl" "groups-members-body"
+    "footTpl" "groups-members-foot"
+    "ctx"     (dict "Group" . "AllUsers" $v.AllUserRows) }}
+{{ end }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{- /* ===== users-new modal body / foot ===== */ -}}
+{{ define "users-new-body" }}
+<div data-testid="users-new-form" style="display:flex;flex-direction:column;gap:14px;">
+  <div class="field">
+    <label for="user-username">{{ T "page.users.form.username" }}</label>
+    <input id="user-username" name="username" type="text" class="input mono" required autocomplete="off" data-testid="users-form-username">
+    <p class="field-hint" style="margin:0;">{{ T "page.users.form.username_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="user-display-name">{{ T "page.users.form.display_name" }}</label>
+    <input id="user-display-name" name="display_name" type="text" class="input" autocomplete="off" data-testid="users-form-display-name">
+  </div>
+  <div class="field">
+    <label for="user-password">{{ T "page.users.form.password" }}</label>
+    <input id="user-password" name="password" type="password" class="input" minlength="8" required autocomplete="new-password" data-testid="users-form-password">
+    <p class="field-hint" style="margin:0;">{{ T "page.users.form.password_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="user-role">{{ T "page.users.form.role" }}</label>
+    <select id="user-role" name="role" class="input" data-testid="users-form-role">
+      <option value="user">{{ T "role.user" }}</option>
+      <option value="admin">{{ T "role.admin" }}</option>
+    </select>
+  </div>
+</div>
+{{ end }}
+
+{{ define "users-new-foot" }}
+<button type="button" class="btn" data-modal-close data-testid="users-new-cancel">{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="users-form-submit">{{ T "page.users.form.submit" }}</button>
+{{ end }}
+
+{{- /* ===== users-edit modal body / foot ===== */ -}}
+{{ define "users-edit-body" }}
+{{ $u := . }}
+<div data-testid="users-edit-form" style="display:flex;flex-direction:column;gap:14px;">
+  <input type="hidden" name="id" value="{{ $u.UserID }}">
+  <div class="field">
+    <label>{{ T "page.users.form.username" }}</label>
+    <div class="mono">{{ $u.Username }}</div>
+    <p class="field-hint" style="margin:0;">{{ T "page.users.form.username_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="edit-display-name-{{ $u.UserID }}">{{ T "page.users.form.display_name" }}</label>
+    <input id="edit-display-name-{{ $u.UserID }}" name="display_name" type="text" class="input" value="{{ $u.DisplayName }}" data-testid="users-edit-display-name">
+  </div>
+  <div class="field">
+    <label for="edit-role-{{ $u.UserID }}">{{ T "page.users.form.role" }}</label>
+    <select id="edit-role-{{ $u.UserID }}" name="role" class="input" data-testid="users-edit-role">
+      <option value="user"{{ if not $u.IsAdmin }} selected{{ end }}>{{ T "role.user" }}</option>
+      <option value="admin"{{ if $u.IsAdmin }} selected{{ end }}>{{ T "role.admin" }}</option>
+    </select>
+  </div>
+</div>
+{{ end }}
+
+{{ define "users-edit-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="users-edit-submit">{{ T "page.users.edit.submit" }}</button>
+{{ end }}
+
+{{- /* ===== groups-new modal body / foot ===== */ -}}
+{{ define "groups-new-body" }}
+<div data-testid="groups-new-form" style="display:flex;flex-direction:column;gap:14px;">
+  <div class="field">
+    <label for="group-name">{{ T "page.groups.form.name" }}</label>
+    <input id="group-name" name="name" type="text" class="input mono" required autocomplete="off" data-testid="groups-form-name">
+    <p class="field-hint" style="margin:0;">{{ T "page.groups.form.name_hint" }}</p>
+  </div>
+  <div class="field">
+    <label for="group-description">{{ T "page.groups.form.description" }}</label>
+    <input id="group-description" name="description" type="text" class="input" autocomplete="off" data-testid="groups-form-description">
+  </div>
+</div>
+{{ end }}
+
+{{ define "groups-new-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="groups-form-submit">{{ T "page.users.form.submit" }}</button>
+{{ end }}
+
+{{- /* ===== groups-members modal body / foot =====
+   ctx is a dict with .Group (UsersViewGroup) + .AllUsers ([]UsersViewUser).
+   The hidden member="" guarantees an empty key arrives even when the
+   operator unchecks every box, so the server can clear the membership.
+*/ -}}
+{{ define "groups-members-body" }}
+{{ $g := .Group }}
+{{ $all := .AllUsers }}
+<div data-testid="groups-members-form" style="display:flex;flex-direction:column;gap:14px;">
+  <input type="hidden" name="id" value="{{ $g.ID }}">
+  <input type="hidden" name="member" value="">
+  <p class="field-hint" style="margin:0;">{{ T "page.groups.edit_members.hint" }}</p>
+  <div class="col gap-sm" data-testid="groups-members-checkboxes" style="display:flex;flex-direction:column;gap:6px;max-height:280px;overflow-y:auto;border:1px solid var(--border);border-radius:6px;padding:8px;">
+    {{ if not $all }}
+    <p class="muted" style="margin:0;font-size:12px">先にユーザーを追加してください</p>
+    {{ end }}
+    {{ range $u := $all }}
+    <label class="row center" style="display:flex;align-items:center;gap:8px;padding:6px;cursor:pointer;">
+      <input type="checkbox" name="member" value="{{ $u.UserID }}"
+        {{ range $mid := $g.MemberIDs }}{{ if eq $mid $u.UserID }}checked{{ end }}{{ end }}
+        data-testid="groups-members-checkbox" data-user-id="{{ $u.UserID }}">
+      <span class="mono" style="font-size:13px">{{ $u.Username }}</span>
+      {{ if $u.DisplayName }}<span class="muted" style="font-size:12px">— {{ $u.DisplayName }}</span>{{ end }}
+    </label>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "groups-members-foot" }}
+<button type="button" class="btn" data-modal-close>{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="groups-members-submit">{{ T "page.users.edit.submit" }}</button>
 {{ end }}

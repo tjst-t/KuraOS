@@ -121,12 +121,6 @@ func run() error {
 	shareStore := share.NewStore(st.DB())
 	shareEngine := share.NewManager(shareStore, cmdexec.NewReal(), share.Options{})
 	share.RegisterApplyAdapter(shareEngine)
-	sharesDeps := ui.SharesDeps{Engine: shareEngine, VolumeLister: storageEngine}
-	uiRenderer.SetSharesHandlers(
-		uiRenderer.SharesHandler(sharesDeps),
-		uiRenderer.SharesDeleteHandler(sharesDeps),
-	)
-	uiRenderer.SetSharesUpdateHandler(uiRenderer.SharesUpdateHandler(sharesDeps))
 
 	hasher := user.NewHasher()
 	users := user.NewStore(st.DB(), hasher)
@@ -152,6 +146,21 @@ func run() error {
 		return fmt.Errorf("init system engine: %w", err)
 	}
 	shareEngine.SetOwnershipApplier(system.NewShareOwnershipAdapter(sysEng))
+
+	// Now that engine/user is available, the Shares page can render the
+	// ACL row picker (Sfix001-3) with real user / group dropdowns. The
+	// legacy CSV `acl` field is still parsed by parseACLForm fallback.
+	sharesDeps := ui.SharesDeps{
+		Engine:          shareEngine,
+		VolumeLister:    storageEngine,
+		PrincipalSource: &principalSourceAdapter{users: users},
+	}
+	uiRenderer.SetSharesHandlers(
+		uiRenderer.SharesHandler(sharesDeps),
+		uiRenderer.SharesDeleteHandler(sharesDeps),
+	)
+	uiRenderer.SetSharesUpdateHandler(uiRenderer.SharesUpdateHandler(sharesDeps))
+	uiRenderer.SetSharesACLRowHandler(uiRenderer.SharesACLRowHandler(sharesDeps))
 
 	// Soft-fail on a dev box without /etc/passwd write permission. Production
 	// VM has root; dev box logs the failure and continues.
@@ -197,15 +206,26 @@ func run() error {
 	// Federation provider — Google / future external IdPs. Optional in dev.
 	federationHandler := buildFederationHandler(ctx, st.DB(), sysEng, sessions)
 
-	// Wire the Users page (S822961). The view is read-only in v1: user
-	// CRUD lands in a later sprint. The crucial surface here is the
-	// "Google を紐付け" button (AC-S822961-3-1) and the OIDC clients
-	// list (auto-registered on app install).
+	// Wire the Users page (S822961 + Sfix001). View carries Users +
+	// Groups + Federations + OIDC clients + provider toggles. The
+	// CRUD endpoints (POST /ui/admin/users/* and /ui/admin/groups/*)
+	// are wired separately so older acceptance tests that only need
+	// the read-only view still work without a SystemEngine.
+	usersLister := &usersListerAdapter{users: users}
+	groupsLister := &groupsListerAdapter{users: users}
 	uiRenderer.SetUsersHandler(ui.UsersDeps{
-		Users:       &usersListerAdapter{users: users},
+		Users:       usersLister,
+		Groups:      groupsLister,
 		Federations: &federationLookupAdapter{storage: oidc.NewStorage(st.DB())},
 		OIDCClients: oidcClientListAdapter(st.DB()),
 		Providers:   &providersListAdapter{db: st.DB()},
+	})
+	uiRenderer.SetUsersCRUDHandlers(ui.UsersCRUDDeps{
+		System:       &systemEngineAdapter{eng: sysEng},
+		Lookup:       &shareACLLookupAdapter{shares: shareEngine},
+		UsersLister:  usersLister,
+		GroupsLister: groupsLister,
+		CurrentUser:  currentUserFromSession(sessions, users),
 	})
 	if root := os.Getenv("KURA_APPS_CONFIG_ROOT"); root != "" {
 		lifecycle.ConfigRoot = root
