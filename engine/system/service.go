@@ -384,7 +384,49 @@ func (s *service) Reconcile(ctx context.Context) error {
 		}
 	}
 
+	// Prune tdbsam of any users that aren't in the SSOT. Without this,
+	// a Windows client whose credential cache holds an orphaned distro
+	// user (e.g. `ubuntu`) authenticates at the SMB layer, then gets
+	// NT_STATUS_ACCESS_DENIED at the share check because the ACL only
+	// names KuraOS users — confusing for the operator and a real-world
+	// foothold (any cached cred for a non-managed user becomes a valid
+	// session). priority #10: engine/system owns Samba projection;
+	// distro users have no business being authenticatable here.
+	pruneTdbsamOrphans(ctx, s.exec, usernames)
+
 	return nil
+}
+
+// pruneTdbsamOrphans lists tdbsam users via `pdbedit -L` and removes any
+// that aren't in keep via `pdbedit -x`. Soft-fail when pdbedit is missing
+// (test envs / non-Samba hosts) — Reconcile already tolerates that path.
+func pruneTdbsamOrphans(ctx context.Context, exec cmdexec.Executor, keep []string) {
+	out, _, err := exec.Run(ctx, "pdbedit", "-L")
+	if err != nil {
+		return
+	}
+	wanted := make(map[string]struct{}, len(keep))
+	for _, u := range keep {
+		wanted[u] = struct{}{}
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue
+		}
+		// pdbedit -L format: `username:uid:fullname`. Take field 0.
+		username := line
+		if i := strings.IndexByte(line, ':'); i >= 0 {
+			username = line[:i]
+		}
+		if username == "" {
+			continue
+		}
+		if _, ok := wanted[username]; ok {
+			continue
+		}
+		_, _, _ = exec.Run(ctx, "pdbedit", "-x", username)
+	}
 }
 
 // allocatePrimaryGID gives the synthetic 'kura-users' group a stable gid.
