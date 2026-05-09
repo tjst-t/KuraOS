@@ -29,7 +29,7 @@ func newTestEngine(t *testing.T) (*Manager, *cmdexec.Fake, string, string) {
 	// Standard reload calls succeed by default — individual tests register
 	// failures via fake.Register to exercise the error paths.
 	fake.RegisterStdout("testparm", []string{"-s", "--suppress-prompt", smbPath}, nil)
-	fake.RegisterStdout("systemctl", []string{"reload", "smbd"}, nil)
+	fake.RegisterStdout("systemctl", []string{"restart", "smbd"}, nil)
 	fake.RegisterStdout("systemctl", []string{"reload", "nfs-server"}, nil)
 	fake.RegisterStdout("exportfs", []string{"-ra"}, nil)
 
@@ -91,7 +91,7 @@ func TestEngineCreateRegenAndReload(t *testing.T) {
 	}
 	mustHave := []string{
 		"testparm -s --suppress-prompt " + smbPath,
-		"systemctl reload smbd",
+		"systemctl restart smbd",
 		"exportfs -ra",
 		"systemctl reload nfs-server",
 	}

@@ -91,12 +91,15 @@ func TestRender_NonEmptyACL_DoesNotApplySentinel(t *testing.T) {
 	}
 }
 
-// Apply must invoke smbcontrol close-share for every active SMB share so
-// that an existing connection (cached by smbd from before the ACL
-// change) is severed and the next request re-checks the new ACL.
-// Without this, removing a user from the ACL leaves them with full
-// access on the connection they already had open.
-func TestApply_KicksExistingConnections(t *testing.T) {
+// Apply must restart (not reload) smbd so existing Windows SMB sessions
+// are forced to re-do session setup + tree connect against the new ACL.
+// SIGHUP-based reload alone is insufficient: empirically (VM test
+// 2026-05-09) Windows kept using its existing session with cached share
+// authority even after `smbcontrol smbd close-share`. Only a full smbd
+// restart forces the fresh re-evaluation. Brief disconnect for unrelated
+// shares is acceptable on a home NAS where Apply runs only on
+// operator-driven config changes.
+func TestApply_RestartsSmbdToFlushSessionState(t *testing.T) {
 	mgr, fake, _, _ := newTestEngine(t)
 	ctx := context.Background()
 	if _, err := mgr.Create(ctx, CreateInput{
@@ -111,15 +114,15 @@ func TestApply_KicksExistingConnections(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
-	found := false
 	for _, c := range fake.Calls() {
-		if c.Name == "smbcontrol" && len(c.Args) >= 3 &&
-			c.Args[0] == "smbd" && c.Args[1] == "close-share" && c.Args[2] == "photos" {
-			found = true
-			break
+		if c.Name == "systemctl" && len(c.Args) == 2 &&
+			c.Args[0] == "restart" && c.Args[1] == "smbd" {
+			return
+		}
+		if c.Name == "systemctl" && len(c.Args) == 2 &&
+			c.Args[0] == "reload" && c.Args[1] == "smbd" {
+			t.Fatalf("Apply used reload smbd; restart is required so Windows clients see new ACL")
 		}
 	}
-	if !found {
-		t.Fatalf("Apply did not call `smbcontrol smbd close-share photos`. Calls: %v", fake.Calls())
-	}
+	t.Fatalf("Apply did not call `systemctl restart smbd`. Calls: %v", fake.Calls())
 }

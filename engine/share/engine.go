@@ -294,28 +294,19 @@ func (m *Manager) Apply(ctx context.Context) error {
 		}
 	}
 
-	// We always reload — empty conf files are valid, and reload is cheap.
-	// `try-reload-or-restart` is the systemd verb that reloads when possible
-	// and falls back to restart, which matches Samba's recommended flow.
-	if _, _, err := m.exec.Run(ctx, m.systemctlBin, "reload", "smbd"); err != nil {
-		// Reload failures bubble up; the UI maps to a translated message.
-		// Note: we deliberately do not retry — repeated failures from the
-		// same root cause just spam logs.
-		_ = hasSMB // hasSMB observed for future "skip reload when no SMB shares" optimization (v1.x)
+	// `restart` (not `reload`) is required for ACL changes to take effect
+	// on already-connected clients. SIGHUP-based reload re-reads the config
+	// but Windows clients keep their existing SMB session and tree connects
+	// against the cached share policy — even `smbcontrol smbd close-share`
+	// only kicks tree connects, not the underlying session that Windows
+	// then re-uses with the same cached authority. Empirically (VM test
+	// 2026-05-09) only a full restart forces Windows to re-issue session
+	// setup + tree connect against the new ACL. Brief disconnect for
+	// unrelated shares is acceptable for a home NAS where Apply runs only
+	// on operator-driven config changes (create/update/delete share).
+	_ = hasSMB // future v1.x: skip restart when no SMB shares exist
+	if _, _, err := m.exec.Run(ctx, m.systemctlBin, "restart", "smbd"); err != nil {
 		return fmt.Errorf("%w: smbd: %v", ErrReloadFailed, err)
-	}
-
-	// Force-close existing connections to every share. smbd reload
-	// rewrites the config but keeps live SMB sessions open — so a user
-	// removed from the ACL still has authority on their existing
-	// connection until they disconnect. close-share kicks them so the
-	// next request re-authenticates against the new ACL. Soft-fail when
-	// smbcontrol is unavailable (test envs).
-	for _, s := range shares {
-		if s.Disabled || !s.Protocol.HasSMB() {
-			continue
-		}
-		_, _, _ = m.exec.Run(ctx, "smbcontrol", "smbd", "close-share", s.Name)
 	}
 	if _, _, err := m.exec.Run(ctx, m.exportfsBin, "-ra"); err != nil {
 		_ = hasNFS
