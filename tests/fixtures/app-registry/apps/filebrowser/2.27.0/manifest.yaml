@@ -13,10 +13,21 @@ homepage: https://filebrowser.org
 containers:
   web:
     image: filebrowser/filebrowser:v2.27.0
+    # filebrowser's FB_BASEURL env var is unreliable across docker
+    # image versions; --baseurl CLI flag is the documented contract.
+    command:
+      - --address
+      - "0.0.0.0"
+      - --port
+      - "80"
+      - --root
+      - "/srv"
+      - --database
+      - "/database/filebrowser.db"
+      - --baseurl
+      - "/apps/filebrowser"
     ports:
       - "80:80"
-    env:
-      FB_DATABASE: "/database/filebrowser.db"
 
 shares:
   - name: target_share
@@ -33,7 +44,7 @@ storage:
 
 routing:
   mode: path
-  strip_prefix: true
+  base_path_env: FB_BASEURL
   container: web
   port: 80
 

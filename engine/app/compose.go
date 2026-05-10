@@ -85,6 +85,13 @@ type InstallInputs struct {
 
 	// NetworkName overrides the default per-app bridge network name.
 	NetworkName string
+
+	// BasePath is the gateway-relative prefix where the app is mounted
+	// (e.g. "/apps/filebrowser"). Empty for non-path routing modes.
+	// Combined with manifest.Routing.BasePathEnv it becomes an env var
+	// the app reads to render correct asset / API URLs in its served
+	// HTML — required for SPA frontends behind a path-prefix proxy.
+	BasePath string
 }
 
 // PortKey identifies one port-binding lookup target.
@@ -141,6 +148,17 @@ func BuildCompose(m *Manifest, in InstallInputs) (*ComposeProject, error) {
 		env, err := renderEnv(c.Env, in)
 		if err != nil {
 			return nil, fmt.Errorf("app: compose: %s.env: %w", cname, err)
+		}
+		// Inject base_path_env for the routing target container so
+		// SPA frontends behind a path-prefix proxy (e.g. filebrowser
+		// FB_BASEURL) emit correct asset / API URLs. Only applies
+		// when routing.mode=path AND routing.base_path_env is set
+		// AND this container is the routing target.
+		if m.Routing.BasePathEnv != "" && in.BasePath != "" && cname == routingTarget(m) {
+			if env == nil {
+				env = map[string]string{}
+			}
+			env[m.Routing.BasePathEnv] = in.BasePath
 		}
 		svc.Environment = env
 
@@ -441,4 +459,19 @@ func parseManifestPort(raw string) (int, error) {
 		return 0, fmt.Errorf("port %d out of range", n)
 	}
 	return n, nil
+}
+
+// routingTarget returns the container name the gateway proxies to.
+// Defaults to the explicit Routing.Container when set, otherwise the
+// first container in the manifest (deterministic via map iteration
+// being unordered is acceptable since most apps with a single
+// container have only one entry).
+func routingTarget(m *Manifest) string {
+	if m.Routing.Container != "" {
+		return m.Routing.Container
+	}
+	for n := range m.Containers {
+		return n
+	}
+	return ""
 }

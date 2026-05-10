@@ -468,6 +468,12 @@ func (l *AppLifecycle) Install(ctx context.Context, req InstallRequest) (string,
 		ConfigOutputs: map[string]string{},
 		NetworkName:   "kura-" + manifest.Name,
 	}
+	// Derive the gateway-relative prefix so apps with base_path_env
+	// (e.g. filebrowser FB_BASEURL) get the right env var injected
+	// into the routing-target container. Only meaningful for path mode.
+	if manifest.Routing.Mode == RoutingModePath {
+		in.BasePath = "/apps/" + manifest.Name
+	}
 	state.NetworkName = in.NetworkName
 	if len(manifest.Configs) > 0 {
 		l.emit(ProgressEvent{AppID: appID, Stage: StageRenderConfigs, OK: true, Detail: "rendering configs"})
