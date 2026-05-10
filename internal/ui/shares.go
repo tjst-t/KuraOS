@@ -211,10 +211,28 @@ func (r *Renderer) SharesACLRowHandler(d SharesDeps) http.Handler {
 			return
 		}
 		view := r.buildSharesView(req.Context(), d, "")
+		// `acl_kind` arrives via hx-include on the kind <select>'s
+		// on-change swap (the form field shares the same name). When
+		// the user toggles user↔group, the row is re-rendered with
+		// only the matching name options so the middle dropdown never
+		// offers a principal that doesn't belong to the selected kind.
+		// Default to "user" so a fresh row (from the "+ ユーザー /
+		// グループを追加" button, no query) starts on user.
+		kind := req.URL.Query().Get("acl_kind")
+		if kind != "user" && kind != "group" {
+			kind = "user"
+		}
+		// Preserve the currently selected name (when compatible with
+		// the new kind — empty/nonmatching ones fall through harmlessly
+		// since the template only renders matching options) and mode
+		// across the kind-toggle swap.
 		frag := aclRowFragment{
-			Users:  view.AvailableUsers,
-			Groups: view.AvailableGroups,
-			Modes:  view.ACLModeOptions,
+			Users:        view.AvailableUsers,
+			Groups:       view.AvailableGroups,
+			Modes:        view.ACLModeOptions,
+			SelectedKind: kind,
+			SelectedName: req.URL.Query().Get("acl_name"),
+			SelectedMode: req.URL.Query().Get("acl_mode"),
 		}
 		clone, err := r.templates.Clone()
 		if err != nil {

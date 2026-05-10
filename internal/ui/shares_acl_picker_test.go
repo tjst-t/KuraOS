@@ -54,8 +54,11 @@ func TestSharesACLPicker_RendersDropdownsFromPrincipalSource(t *testing.T) {
 		}
 	}
 
-	// Hit the row endpoint — it should return a single row containing
-	// every user / group / mode option.
+	// Default row (no acl_kind query) → kind defaults to "user", so the
+	// name dropdown lists only users. Groups must be hidden (the kind
+	// toggle re-fetches with acl_kind=group to surface them). This is
+	// the refine fix from 2026-05-10: the middle dropdown was confusing
+	// when it showed both users and groups regardless of left selector.
 	rowReq := httptest.NewRequest(http.MethodGet, "/ui/admin/shares/acl-row", nil)
 	rowW := httptest.NewRecorder()
 	r.SharesACLRowHandler(deps).ServeHTTP(rowW, rowReq)
@@ -70,13 +73,39 @@ func TestSharesACLPicker_RendersDropdownsFromPrincipalSource(t *testing.T) {
 		`data-testid="shares-acl-mode"`,
 		`value="alice"`,
 		`value="bob"`,
-		`value="family"`,
-		`value="devs"`,
 		`value="rw"`,
 		`value="r"`,
+		// kind toggle wires htmx so the name list refreshes on change
+		`hx-get="/ui/admin/shares/acl-row"`,
 	} {
 		if !strings.Contains(rowBody, want) {
 			t.Fatalf("acl-row missing %q\nbody: %s", want, rowBody)
+		}
+	}
+	// Groups must NOT appear when the row is rendered with kind=user
+	// (default). Otherwise we're back to the confusing both-kinds list.
+	for _, unwanted := range []string{
+		`value="family"`,
+		`value="devs"`,
+	} {
+		if strings.Contains(rowBody, unwanted) {
+			t.Fatalf("acl-row default (kind=user) leaked group option %q\nbody: %s", unwanted, rowBody)
+		}
+	}
+
+	// Toggle to kind=group — only groups should appear, no users.
+	rowReq = httptest.NewRequest(http.MethodGet, "/ui/admin/shares/acl-row?acl_kind=group", nil)
+	rowW = httptest.NewRecorder()
+	r.SharesACLRowHandler(deps).ServeHTTP(rowW, rowReq)
+	rowBody = rowW.Body.String()
+	for _, want := range []string{`value="family"`, `value="devs"`} {
+		if !strings.Contains(rowBody, want) {
+			t.Fatalf("acl-row(kind=group) missing %q\nbody: %s", want, rowBody)
+		}
+	}
+	for _, unwanted := range []string{`value="alice"`, `value="bob"`} {
+		if strings.Contains(rowBody, unwanted) {
+			t.Fatalf("acl-row(kind=group) leaked user option %q\nbody: %s", unwanted, rowBody)
 		}
 	}
 }

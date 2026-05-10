@@ -20,22 +20,32 @@ SelectedName / SelectedMode).
 {{ $kind := $f.SelectedKind }}{{ if not $kind }}{{ $kind = "user" }}{{ end }}
 {{ $mode := $f.SelectedMode }}{{ if not $mode }}{{ $mode = "rw" }}{{ end }}
 <div class="row gap-sm acl-row" data-testid="shares-acl-row" style="display:flex;gap:8px;align-items:center;padding:6px;border:1px solid var(--border);border-radius:6px;margin-bottom:6px;">
-  <select name="acl_kind" class="input" data-testid="shares-acl-kind" style="flex:0 0 110px">
+  {{- /*
+   Kind toggle re-fetches the row with the new kind so the middle name
+   dropdown only shows principals of that kind. hx-include picks up the
+   sibling acl_name / acl_mode so the user's current selection (when
+   compatible) survives the swap.
+  */ -}}
+  <select name="acl_kind" class="input" data-testid="shares-acl-kind" style="flex:0 0 110px"
+          hx-get="/ui/admin/shares/acl-row"
+          hx-trigger="change"
+          hx-target="closest .acl-row"
+          hx-swap="outerHTML"
+          hx-include="closest .acl-row">
     <option value="user"{{ if eq $kind "user" }} selected{{ end }}>{{ T "page.shares.acl.picker.kind.user" }}</option>
     <option value="group"{{ if eq $kind "group" }} selected{{ end }}>{{ T "page.shares.acl.picker.kind.group" }}</option>
   </select>
   <select name="acl_name" class="input mono" data-testid="shares-acl-name" style="flex:1;min-width:0">
     <option value="">—</option>
-    <optgroup label="{{ T "page.shares.acl.picker.kind.user" }}">
+    {{ if eq $kind "user" }}
       {{ range $u := $f.Users }}
-      <option value="{{ $u }}"{{ if and (eq $kind "user") (eq $u $f.SelectedName) }} selected{{ end }}>{{ $u }}</option>
+      <option value="{{ $u }}"{{ if eq $u $f.SelectedName }} selected{{ end }}>{{ $u }}</option>
       {{ end }}
-    </optgroup>
-    <optgroup label="{{ T "page.shares.acl.picker.kind.group" }}">
+    {{ else }}
       {{ range $g := $f.Groups }}
-      <option value="{{ $g }}"{{ if and (eq $kind "group") (eq $g $f.SelectedName) }} selected{{ end }}>{{ $g }}</option>
+      <option value="{{ $g }}"{{ if eq $g $f.SelectedName }} selected{{ end }}>{{ $g }}</option>
       {{ end }}
-    </optgroup>
+    {{ end }}
   </select>
   <select name="acl_mode" class="input" data-testid="shares-acl-mode" style="flex:0 0 140px">
     {{ range $m := $f.Modes }}
