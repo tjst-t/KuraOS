@@ -236,6 +236,13 @@ type VolumeOpts struct {
 	SpecialSmallBlocks string `json:"special_small_blocks,omitempty"`
 	// LogBias is set to "latency" by the database preset.
 	LogBias string `json:"logbias,omitempty"`
+	// CreateParents enables `zfs create -p` so missing intermediate
+	// datasets are created automatically. The Storage page UI keeps
+	// this off (operators address each dataset explicitly), but the
+	// app lifecycle's StorageAdapter sets it to true: app installs own
+	// the tank/apps/<name>/ namespace and the tank/apps/<name>/ parent
+	// won't exist on first install of any app under tank/apps/.
+	CreateParents bool `json:"create_parents,omitempty"`
 }
 
 // SnapshotInfo is one row in `zfs list -t snapshot`. Created may be zero if

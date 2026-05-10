@@ -119,6 +119,9 @@ func (c *CLI) CreateVolume(ctx context.Context, dataset string, opts VolumeOpts)
 
 func buildCreateVolumeArgs(dataset string, opts VolumeOpts) []string {
 	args := []string{"create"}
+	if opts.CreateParents {
+		args = append(args, "-p")
+	}
 	if opts.RecordSize != "" {
 		args = append(args, "-o", "recordsize="+opts.RecordSize)
 	}

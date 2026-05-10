@@ -66,8 +66,9 @@ type storageDatasetAdapter struct {
 
 func (a storageDatasetAdapter) CreateVolume(ctx context.Context, dataset string, opts app.StorageVolumeOpts) error {
 	return a.engine.CreateVolume(ctx, dataset, storage.VolumeOpts{
-		QuotaBytes: opts.QuotaBytes,
-		MountPoint: opts.Mountpoint,
+		QuotaBytes:    opts.QuotaBytes,
+		MountPoint:    opts.Mountpoint,
+		CreateParents: opts.CreateParents,
 	})
 }
 

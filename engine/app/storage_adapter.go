@@ -31,9 +31,10 @@ type StorageDatasetEngine interface {
 
 // StorageVolumeOpts mirrors storage.VolumeOpts (subset).
 type StorageVolumeOpts struct {
-	QuotaBytes int64
-	Mountpoint string
-	Preset     string
+	QuotaBytes    int64
+	Mountpoint    string
+	Preset        string
+	CreateParents bool
 }
 
 // StorageDestroyOpts mirrors storage.DestroyOpts (subset).
@@ -51,6 +52,11 @@ func (a *StorageAdapter) CreateAppDataset(ctx context.Context, dataset string, o
 	return a.Engine.CreateVolume(ctx, dataset, StorageVolumeOpts{
 		QuotaBytes: opts.QuotaBytes,
 		Mountpoint: opts.Mountpoint,
+		// Apps own the tank/apps/<name>/ namespace; the parent path
+		// won't exist on first install of any app under tank/apps/.
+		// Storage page UI keeps CreateParents=false so operators
+		// remain explicit; here it's the right default.
+		CreateParents: true,
 	})
 }
 
