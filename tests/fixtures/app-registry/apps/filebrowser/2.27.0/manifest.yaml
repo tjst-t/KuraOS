@@ -1,0 +1,66 @@
+apiVersion: v1
+name: filebrowser
+version: "2.27.0"
+type: legacy
+display_name:
+  ja: "File Browser"
+  en: "File Browser"
+description:
+  ja: "ブラウザから KuraOS の共有ストレージを操作するファイルマネージャ。"
+  en: "Browser-based file manager for KuraOS shared storage."
+homepage: https://filebrowser.org
+
+containers:
+  web:
+    image: filebrowser/filebrowser:v2.27.0
+    ports:
+      - "80:80"
+    env:
+      FB_DATABASE: "/database/filebrowser.db"
+
+shares:
+  - name: target_share
+    access: readwrite
+    mountpoint: /srv
+    container: web
+
+storage:
+  datasets:
+    - name: db
+      pool_hint: ssd
+      backup: true
+      quota: 100M
+
+routing:
+  mode: path
+  base_path: /apps/filebrowser
+  strip_prefix: false
+  container: web
+  port: 80
+
+health:
+  http:
+    container: web
+    path: /health
+    port: 80
+    interval: 10s
+    timeout: 5s
+    retries: 5
+
+setup:
+  required:
+    - key: target_share
+      type: share_picker
+      label:
+        ja: "管理する共有"
+        en: "Share to manage"
+  optional: []
+
+settings: []
+
+backup:
+  datasets:
+    - db
+
+auth:
+  mode: none

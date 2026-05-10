@@ -184,6 +184,14 @@ func run() error {
 	// the real HTTPDockerClient against the docker daemon.
 	dockerClient := buildDockerClient(ctx)
 	verifier := app.NewLocalVerifier()
+	verifier.SetKeysDir(envOr("KURA_APP_KEYS_DIR", "/var/lib/kura/app-keys"))
+	if err := verifier.LoadFromDir(); err != nil {
+		// Soft-fail: a fresh install has no trusted signers yet and that's
+		// expected. Install attempts will fail-closed at verify time with
+		// a clear "no trusted key matched" error rather than crashing the
+		// daemon. CLI flow at app_lifecycle.go does the same.
+		log.Printf("kura: warning: load app signing keys from dir: %v", err)
+	}
 	registryClient := app.NewHTTPRegistryClient(verifier, &http.Client{Timeout: 30 * time.Second})
 	planner := app.NewDatasetPlanner(st.DB(), &app.StaticPoolLister{Pools: discoverPools(ctx, storageEngine)})
 	planner.FallbackPool = "tank"

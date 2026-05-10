@@ -96,3 +96,15 @@ tidy:
 
 clean:
 	@rm -rf $(BIN_DIR) $(PID_FILE) $(LOG_FILE) $(PORTMAN_ENV) $(TAILWIND_OUT)
+
+# ---- App registry test fixture --------------------------------------
+# Build a signed local registry under tests/fixtures/app-registry/ so the
+# Apps Store UI can be exercised without depending on an external service.
+# `sign` runs every time manifests change; `serve` exposes :9999 on the LAN
+# so the VM can fetch.
+
+app-registry-sign: build
+	bash tests/fixtures/app-registry/sign.sh
+
+app-registry-serve:
+	bash tests/fixtures/app-registry/serve.sh

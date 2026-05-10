@@ -1,0 +1,50 @@
+apiVersion: v1
+name: whoami
+version: "1.10.2"
+type: legacy
+display_name:
+  ja: "Whoami (テスト用)"
+  en: "Whoami (test app)"
+description:
+  ja: "リクエストの中身をエコーする最小 HTTP サーバ。アプリストアの動作確認用。"
+  en: "Minimal HTTP server that echoes the request. For Apps Store smoke testing."
+homepage: https://hub.docker.com/r/traefik/whoami
+
+containers:
+  web:
+    image: traefik/whoami:v1.10.2
+    ports:
+      - "80:80"
+
+routing:
+  mode: path
+  base_path: /apps/whoami
+  strip_prefix: true
+  container: web
+  port: 80
+
+health:
+  http:
+    container: web
+    path: /
+    port: 80
+    interval: 10s
+    timeout: 5s
+    retries: 3
+
+setup:
+  required: []
+  optional: []
+
+settings: []
+
+storage:
+  datasets: []
+
+shares: []
+
+backup:
+  datasets: []
+
+auth:
+  mode: none

@@ -1,0 +1,4 @@
+keys/dev-signer.key
+registry.json
+registry.json.sig
+apps/*/*/manifest.yaml.sig
