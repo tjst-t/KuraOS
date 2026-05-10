@@ -2,12 +2,16 @@
   "name": "kuraos-ui",
   "version": "0.0.0",
   "private": true,
-  "description": "Tailwind CSS build pipeline for KuraOS admin UI. Compiled output is embedded into the kura binary via embed.FS.",
+  "description": "Tailwind CSS build pipeline + Playwright E2E for KuraOS admin UI. Compiled CSS is embedded into the kura binary via embed.FS; Playwright tests gate every GUI change against a real browser.",
   "scripts": {
     "build:css": "tailwindcss -c tailwind.config.js -i internal/ui/src/kura.css -o internal/ui/dist/kura.css --minify",
-    "watch:css": "tailwindcss -c tailwind.config.js -i internal/ui/src/kura.css -o internal/ui/dist/kura.css --watch"
+    "watch:css": "tailwindcss -c tailwind.config.js -i internal/ui/src/kura.css -o internal/ui/dist/kura.css --watch",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
-    "tailwindcss": "^3.4.13"
+    "tailwindcss": "^3.4.13",
+    "@playwright/test": "^1.48.2"
   }
 }

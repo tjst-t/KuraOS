@@ -108,3 +108,32 @@ app-registry-sign: build
 
 app-registry-serve:
 	bash tests/fixtures/app-registry/serve.sh
+
+# ---- Playwright GUI E2E ---------------------------------------------
+# All GUI tests go through a real browser (chromium). KURA_BASE_URL
+# defaults to the VM at 192.168.1.42:8204; override for local dev.
+# KURA_TEST_ADMIN_PASSWORD must match what's set on the target.
+#
+# `make e2e-install` installs node deps + chromium browser (one-time).
+# `make e2e` runs every spec headless.
+# `make e2e-headed` opens a visible browser for live debugging.
+#
+# Why no curl-only "GUI" tests: the recurring Class A bug (server
+# returns 200, browser still broken because of htmx / SPA assets / etc)
+# can only be caught by actually executing the JS in a browser.
+
+e2e-install:
+	npm install
+	npx playwright install --with-deps chromium
+
+e2e:
+	KURA_BASE_URL=$${KURA_BASE_URL:-http://192.168.1.42:8204} \
+	  KURA_TEST_ADMIN_PASSWORD=$${KURA_TEST_ADMIN_PASSWORD:-password} \
+	  KURA_E2E_ADMIN_PW=$${KURA_E2E_ADMIN_PW:-password} \
+	  npx playwright test
+
+e2e-headed:
+	KURA_BASE_URL=$${KURA_BASE_URL:-http://192.168.1.42:8204} \
+	  KURA_TEST_ADMIN_PASSWORD=$${KURA_TEST_ADMIN_PASSWORD:-password} \
+	  KURA_E2E_ADMIN_PW=$${KURA_E2E_ADMIN_PW:-password} \
+	  npx playwright test --headed

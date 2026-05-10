@@ -11,7 +11,10 @@ Go (単一バイナリ・モジュラーモノリス) / htmx + Tailwind CSS / SQ
 - `make serve` — `kura` をバックグラウンド起動 (portman で port 確保)
 - `make stop` — バックグラウンド `kura` を停止
 - `make build` — `kura` バイナリをビルド (`bin/kura`)
-- `make test` — `go test ./...`
+- `make test` — `go test ./...` (Go ユニット + acceptance)
+- `make e2e` — Playwright で全 GUI E2E を chromium 実行 (target = `KURA_BASE_URL`、デフォルト `http://192.168.1.42:8204`)
+- `make e2e-headed` — 同上、ヘッドあり (デバッグ用)
+- `make e2e-install` — 初回セットアップ: `npm install` + chromium browser
 - `make lint` — `gofmt -l` + `go vet`
 - `make tidy` — `go mod tidy`
 
@@ -52,6 +55,7 @@ ZFS / SMB / Docker / systemd / lego ACME など実 OS 機能を伴うテスト�
 - **VM 上の既存 `kura` プロセスは無断で kill して新バイナリに差し替えて良い** (dev VM・共有データ無し前提)。事前確認不要、ただし state DB ファイル `/home/ubuntu/kuraos/state.db` は消さない (admin / 設定が消える)
 - 本番 NAS データを VM に持ち込まない
 - **`curl -X POST .../create` の handler 直叩きは「ブラウザでの動作確認」ではない**。htmx (`hx-get` / `hx-post`)、SSE、JS ベースのモーダル等は curl では一切発火しないため、サーバ側 handler が 200 を返しても UI は動いてないことが普通にある。GUI Story の VM 検証は最低 1 ボタンを **実ブラウザでクリックして DOM 変化を観察**するか、Playwright MCP / `playwright test --headed` で操作録画すること。これを怠ると htmx が repo に入ってないバグ (2026-05-09) のような事故が起きる
+- **GUI E2E はすべて Playwright (`tests/e2e/*.e2e.spec.ts`) で書く**。`internal/ui/*_test.go` の httptest や `tests/acceptance/*.sh` の curl は handler unit test であって GUI E2E ではない。新しい GUI Story を done にする前に、対応する `*.e2e.spec.ts` を追加または既存を pass させる。`make e2e` を CI / pre-demo で必ず実行
 
 ### Deploy recipe
 
