@@ -356,10 +356,20 @@ func buildContainerCreatePayload(spec ContainerSpec) map[string]any {
 		"Env":          envSlice,
 		"Labels":       spec.Labels,
 		"ExposedPorts": exposed,
-		"Cmd":          spec.Cmd,
-		"Entrypoint":   spec.Entrypoint,
 		"WorkingDir":   spec.WorkingDir,
 		"HostConfig":   hostConfig,
+	}
+	// Only include Cmd / Entrypoint when the manifest specified them.
+	// Sending `"Cmd": null` to /containers/create makes Docker treat it
+	// as "explicitly clear the image's CMD", which then fails with
+	// HTTP 400 {"message":"no command specified"} for images that rely
+	// on the image-level ENTRYPOINT (e.g. traefik/whoami). Omitting
+	// the key entirely lets Docker inherit from the image as usual.
+	if len(spec.Cmd) > 0 {
+		cfg["Cmd"] = spec.Cmd
+	}
+	if len(spec.Entrypoint) > 0 {
+		cfg["Entrypoint"] = spec.Entrypoint
 	}
 	if spec.Healthcheck != nil {
 		cfg["Healthcheck"] = map[string]any{

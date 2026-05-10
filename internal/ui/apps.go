@@ -239,14 +239,15 @@ func (r *Renderer) AppsInstallFormHandler(deps AppsDeps) http.Handler {
 			shares, _ = deps.SharePathLister.ListSharePaths(req.Context())
 		}
 		view := AppsInstallFormView{
-			AppName:    appName,
-			Registry:   regName,
-			Version:    ver,
-			Title:      r.tr.T(i18n.MsgAppsInstallTitle, appName),
-			SetupHdr:   r.tr.T(i18n.MsgAppsInstallSetupHdr),
-			SubmitText: r.tr.T(i18n.MsgAppsInstallSubmit),
-			CancelText: r.tr.T(i18n.MsgAppsBtnCancel),
-			Required:   buildSetupFields(manifest.Setup.Required, shares),
+			AppName:      appName,
+			Registry:     regName,
+			Version:      ver,
+			Title:        r.tr.T(i18n.MsgAppsInstallTitle, appName),
+			SetupHdr:     r.tr.T(i18n.MsgAppsInstallSetupHdr),
+			SubmitText:   r.tr.T(i18n.MsgAppsInstallSubmit),
+			CancelText:   r.tr.T(i18n.MsgAppsBtnCancel),
+			NoParamsHint: r.tr.T(i18n.MsgAppsInstallNoParams),
+			Required:     buildSetupFields(manifest.Setup.Required, shares),
 		}
 		r.renderFragment(w, "templates/pages/apps_install_form.tmpl", view)
 	})
@@ -254,14 +255,15 @@ func (r *Renderer) AppsInstallFormHandler(deps AppsDeps) http.Handler {
 
 // AppsInstallFormView is the install modal view.
 type AppsInstallFormView struct {
-	AppName    string
-	Registry   string
-	Version    string
-	Title      string
-	SetupHdr   string
-	SubmitText string
-	CancelText string
-	Required   []AppsSetupField
+	AppName      string
+	Registry     string
+	Version      string
+	Title        string
+	SetupHdr     string
+	SubmitText   string
+	CancelText   string
+	NoParamsHint string
+	Required     []AppsSetupField
 }
 
 // AppsSetupField is one field in the install form.

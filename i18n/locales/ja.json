@@ -354,6 +354,7 @@
   "page.apps.install.title": "{0} をインストール",
   "page.apps.install.submit": "インストールを開始",
   "page.apps.install.setup_heading": "セットアップ",
+  "page.apps.install.no_params": "このアプリは追加設定不要です。「インストールを開始」を押してください。",
   "page.apps.install.progress": "インストールの進捗",
   "page.apps.install.success": "{0} をインストールしました",
   "page.apps.install.failed": "{0} のインストールに失敗しました: {1}",

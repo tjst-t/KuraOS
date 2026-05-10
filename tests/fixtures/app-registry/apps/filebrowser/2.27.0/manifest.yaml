@@ -33,7 +33,7 @@ storage:
 
 routing:
   mode: path
-  strip_prefix: false
+  strip_prefix: true
   container: web
   port: 80
 

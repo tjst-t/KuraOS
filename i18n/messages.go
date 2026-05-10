@@ -370,6 +370,7 @@ const (
 	MsgAppsInstallTitle    MessageID = "page.apps.install.title"
 	MsgAppsInstallSubmit   MessageID = "page.apps.install.submit"
 	MsgAppsInstallSetupHdr MessageID = "page.apps.install.setup_heading"
+	MsgAppsInstallNoParams MessageID = "page.apps.install.no_params"
 	MsgAppsInstallProgress MessageID = "page.apps.install.progress"
 	MsgAppsInstallSuccess  MessageID = "page.apps.install.success"
 	MsgAppsInstallFailed   MessageID = "page.apps.install.failed"
