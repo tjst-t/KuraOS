@@ -54,10 +54,62 @@ test.describe("[AC-S1e7eeb-2-1] Admin login flow", () => {
 });
 
 test.describe("[AC-S1e7eeb-2-3] Role-based routing", () => {
+  // Self-contained: spin up a fresh user-role account via the admin
+  // CRUD UI (Sfix001-1), exercise the role assertion as that user,
+  // then clean up. Avoids relying on a pre-seeded fixture user that
+  // may or may not exist on the target VM.
+  const stamp = Date.now().toString().slice(-6);
+  const TMP_USER = {
+    username: `e2e_role_${stamp}`,
+    displayName: "E2E Role User",
+    password: "longenoughpw",
+  };
+
+  test.beforeAll(async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(`${BASE_URL}/login`);
+    await page.fill('input[name="username"]', ADMIN.username);
+    await page.fill('input[name="password"]', ADMIN.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => url.pathname.startsWith("/ui/admin/"));
+    await page.goto(`${BASE_URL}/ui/admin/users?tab=users`);
+    await page.click('[data-testid="users-add-btn"]');
+    await page.fill('[data-testid="users-form-username"]', TMP_USER.username);
+    await page.fill('[data-testid="users-form-display-name"]', TMP_USER.displayName);
+    await page.fill('[data-testid="users-form-password"]', TMP_USER.password);
+    await page.selectOption('[data-testid="users-form-role"]', "user");
+    await page.click('[data-testid="users-form-submit"]');
+    await page.waitForURL(/\/ui\/admin\/users/);
+    await ctx.close();
+  });
+
+  test.afterAll(async ({ browser }) => {
+    const ctx = await browser.newContext();
+    const page = await ctx.newPage();
+    await page.goto(`${BASE_URL}/login`);
+    await page.fill('input[name="username"]', ADMIN.username);
+    await page.fill('input[name="password"]', ADMIN.password);
+    await page.click('button[type="submit"]');
+    await page.waitForURL((url) => url.pathname.startsWith("/ui/admin/"));
+    await page.goto(`${BASE_URL}/ui/admin/users?tab=users`);
+    const row = page.locator(`[data-testid="users-row"]`).filter({
+      hasText: TMP_USER.username,
+    });
+    if ((await row.count()) > 0) {
+      // Per-row delete is a POST form; submit it directly.
+      await row.locator('[data-testid="users-delete-form"]').evaluate(
+        (form: HTMLFormElement) => form.submit(),
+      );
+      await page.waitForLoadState("load");
+    }
+    await ctx.close();
+  });
+
   test("user role gets 403 on /ui/admin and 200 on /ui", async ({ page }) => {
     await page.goto(`${BASE_URL}/login`);
-    await page.fill('input[name="username"]', USER.username);
-    await page.fill('input[name="password"]', USER.password);
+    await page.fill('input[name="username"]', TMP_USER.username);
+    await page.fill('input[name="password"]', TMP_USER.password);
     await page.click('button[type="submit"]');
     await page.waitForURL(`${BASE_URL}/ui`);
     const adminResp = await page.goto(`${BASE_URL}/ui/admin/dashboard`);

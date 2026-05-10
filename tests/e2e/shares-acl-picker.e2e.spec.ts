@@ -26,8 +26,11 @@ test.describe("[AC-Sfix001-3-1] Create-share modal: ACL picker", () => {
     await page.click('[data-testid="shares-new-btn"]');
     await expect(page.locator('[data-testid="shares-new-modal"]')).toBeVisible();
 
-    // Picker container + add button must be present.
-    await expect(page.locator('[data-testid="shares-acl-rows"]')).toBeVisible();
+    // Picker container + add button must be present. The container
+    // itself is empty until the operator clicks add (no rendered
+    // children), so an empty flex container has 0 height — assert it
+    // exists in the DOM rather than visible.
+    await expect(page.locator('[data-testid="shares-acl-rows"]')).toBeAttached();
     const addBtn = page.locator('[data-testid="shares-acl-add-btn"]');
     await expect(addBtn).toBeVisible();
 

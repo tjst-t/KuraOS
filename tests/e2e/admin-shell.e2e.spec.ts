@@ -6,6 +6,18 @@
 import { test, expect } from "@playwright/test";
 
 const BASE_URL = process.env.KURA_BASE_URL ?? "http://127.0.0.1:8204";
+const ADMIN_USER = process.env.KURA_E2E_ADMIN_USER ?? "admin";
+const ADMIN_PW = process.env.KURA_E2E_ADMIN_PW ?? "password";
+
+// Every /ui/admin/* page redirects to /login when unauthenticated.
+// Logging in once per test keeps each spec independent.
+test.beforeEach(async ({ page }) => {
+  await page.goto(`${BASE_URL}/login`);
+  await page.fill('input[name="username"]', ADMIN_USER);
+  await page.fill('input[name="password"]', ADMIN_PW);
+  await page.click('button[type="submit"]');
+  await page.waitForURL((url) => url.pathname.startsWith("/ui/admin/"));
+});
 
 const NAV_ITEMS = [
   { id: "dashboard", label: "ダッシュボード", path: "/ui/admin/dashboard" },
