@@ -18,19 +18,14 @@ containers:
 
 routing:
   mode: path
-  base_path: /apps/whoami
   strip_prefix: true
   container: web
   port: 80
 
 health:
-  http:
-    container: web
-    path: /
-    port: 80
-    interval: 10s
-    timeout: 5s
-    retries: 3
+  endpoint: /
+  container: web
+  interval: 10s
 
 setup:
   required: []

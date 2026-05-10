@@ -33,19 +33,14 @@ storage:
 
 routing:
   mode: path
-  base_path: /apps/filebrowser
   strip_prefix: false
   container: web
   port: 80
 
 health:
-  http:
-    container: web
-    path: /health
-    port: 80
-    interval: 10s
-    timeout: 5s
-    retries: 5
+  endpoint: /health
+  container: web
+  interval: 10s
 
 setup:
   required:
