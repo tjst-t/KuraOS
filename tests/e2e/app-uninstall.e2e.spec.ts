@@ -25,10 +25,16 @@ test("[AC-S65b510-3-2] uninstall confirm dialog has delete-data unchecked by def
     test.skip(true, "No installed app on target — install one (whoami / filebrowser via dev fixture) to enable this test");
     return;
   }
-  // Uninstall btn is an <a href> — clicking navigates to the GET endpoint
-  // that renders the confirm modal as a full-page fragment.
+  // Modal must open in-place (htmx swap), NOT a full-page navigation.
+  // The earlier <a href> bug regressed the install pattern; this URL
+  // assertion catches it. 2026-05-11 regression.
+  const urlBefore = page.url();
   await card.locator('[data-testid="apps-uninstall-btn"]').click();
   await expect(page.locator('[data-testid="apps-uninstall-modal"]')).toBeVisible();
+  expect(page.url()).toBe(urlBefore);
   const checkbox = page.locator('[data-testid="apps-uninstall-delete-data"]');
   await expect(checkbox).not.toBeChecked();
+  // Sidebar must still be present — proves we're on the original page
+  // with the modal overlaid, not on a bare fragment response.
+  await expect(page.locator('[data-testid="sidebar-nav"]')).toBeVisible();
 });

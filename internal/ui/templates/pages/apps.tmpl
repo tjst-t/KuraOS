@@ -70,7 +70,19 @@ PageData.Extra is an ui.AppsView.
         <p class="muted" style="margin:0 0 12px 0;font-size:12px">{{ .Description }}</p>
         <div style="display:flex;gap:6px;justify-content:flex-end">
           <a class="btn btn-sm" href="{{ .OpenURL }}" data-testid="apps-open-btn">{{ T "page.apps.btn.open" }}</a>
-          <a class="btn btn-sm" href="{{ .UninstallURL }}" data-testid="apps-uninstall-btn">{{ T "page.apps.btn.uninstall" }}</a>
+          {{- /*
+           Uninstall opens the confirm modal in-place via htmx,
+           matching the install pattern (button + hx-get + modal target).
+           Using `<a href>` would full-page-navigate to the fragment
+           endpoint and break the form submit afterwards (no htmx in
+           the navigated response → standard POST → app_id required).
+          */ -}}
+          <button type="button" class="btn btn-sm" data-testid="apps-uninstall-btn"
+                  hx-get="/ui/admin/apps/uninstall?app_id={{ .AppID }}"
+                  hx-target="#apps-modal-target"
+                  hx-swap="innerHTML">
+            {{ T "page.apps.btn.uninstall" }}
+          </button>
         </div>
       </div>
     </div>
