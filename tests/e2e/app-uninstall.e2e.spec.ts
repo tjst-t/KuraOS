@@ -37,4 +37,18 @@ test("[AC-S65b510-3-2] uninstall confirm dialog has delete-data unchecked by def
   // Sidebar must still be present — proves we're on the original page
   // with the modal overlaid, not on a bare fragment response.
   await expect(page.locator('[data-testid="sidebar-nav"]')).toBeVisible();
+  // The modal's inner .card must be horizontally and vertically
+  // centered in the viewport. .modal uses flex centering, which
+  // requires display:flex; an earlier bug used display:block and
+  // the card stuck to the top-left. 2026-05-11 regression.
+  const cardBox = await page.locator('[data-testid="apps-uninstall-modal"] > .card').boundingBox();
+  const vp = page.viewportSize();
+  expect(cardBox).not.toBeNull();
+  expect(vp).not.toBeNull();
+  if (cardBox && vp) {
+    const cx = cardBox.x + cardBox.width / 2;
+    const cy = cardBox.y + cardBox.height / 2;
+    expect(Math.abs(cx - vp.width / 2)).toBeLessThan(20);
+    expect(Math.abs(cy - vp.height / 2)).toBeLessThan(40);
+  }
 });

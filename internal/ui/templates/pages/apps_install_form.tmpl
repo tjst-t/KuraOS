@@ -2,7 +2,7 @@
 apps_install_form.tmpl — htmx fragment for the install dialog.
 Returned by /ui/admin/apps/install/form.
 */ -}}
-<div class="modal" data-testid="apps-install-modal" style="display:block">
+<div class="modal" data-testid="apps-install-modal" style="display:flex">
   <form class="card" hx-post="/ui/admin/apps/install/start"
         hx-target="#apps-modal-target" hx-swap="innerHTML">
     <input type="hidden" name="app" value="{{ .AppName }}">

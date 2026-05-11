@@ -1,7 +1,7 @@
 {{- /*
 apps_uninstall_form.tmpl — uninstall confirm dialog (htmx fragment).
 */ -}}
-<div class="modal" data-testid="apps-uninstall-modal" style="display:block">
+<div class="modal" data-testid="apps-uninstall-modal" style="display:flex">
   <form class="card" hx-post="/ui/admin/apps/uninstall?app_id={{ .AppID }}"
         hx-target="#apps-modal-target" hx-swap="innerHTML">
     <div class="card-head"><h3 class="card-title">{{ .Title }}</h3></div>

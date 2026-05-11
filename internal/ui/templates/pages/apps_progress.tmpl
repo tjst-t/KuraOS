@@ -5,7 +5,7 @@ Returned by /ui/admin/apps/install/start.
 Connects to {{ .StreamURL }} via EventSource (the small inline script below
 is sufficient — keeps the htmx sse extension out of the dist for now).
 */ -}}
-<div class="modal" data-testid="apps-progress-modal" style="display:block">
+<div class="modal" data-testid="apps-progress-modal" style="display:flex">
   <div class="card">
     <div class="card-head"><h3 class="card-title">{{ .Title }}</h3></div>
     <div class="card-body">
