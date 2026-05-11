@@ -329,9 +329,17 @@ func (l *AppLifecycle) Install(ctx context.Context, req InstallRequest) (string,
 		return appID, fmt.Errorf("%w: %v", ErrDockerUnavailable, err)
 	}
 
-	// Already installed?
-	if existing, err := l.LookupApp(ctx, appID); err == nil && existing.AppID != "" {
-		return appID, fmt.Errorf("%w: %s", ErrAppAlreadyInstalled, appID)
+	// Singleton-per-app: design.md uses path scheme tank/apps/<name>/<dataset>
+	// (no install-instance suffix) and the family-NAS UX targets a single
+	// instance per app. Multiple installs of the same manifest.Name would
+	// share the same dataset path → concurrent writes corrupt the DB and
+	// gateway routing only delivers traffic to the last-registered
+	// container. Reject up-front before any side effect (datasets, ports,
+	// containers) is provisioned. 2026-05-11.
+	if existing, err := l.LookupByName(ctx, req.AppName); err == nil && existing.AppID != "" {
+		l.emit(ProgressEvent{AppID: appID, Stage: StageError, OK: false, Final: true,
+			Detail: req.AppName + " is already installed as " + existing.AppID})
+		return appID, fmt.Errorf("%w: %s (existing app_id=%s)", ErrAppAlreadyInstalled, req.AppName, existing.AppID)
 	}
 
 	manifest, _, err := l.Registry.FetchManifest(ctx, req.Source, req.AppName, req.Version)
@@ -766,6 +774,28 @@ func (l *AppLifecycle) LookupApp(ctx context.Context, appID string) (AppRecord, 
 		SELECT app_id, name, version, registry, state, setup_json, settings_json
 		FROM app_installs WHERE app_id = ?
 	`, appID)
+	var rec AppRecord
+	var setupJSON, settingsJSON string
+	if err := row.Scan(&rec.AppID, &rec.Name, &rec.Version, &rec.Registry, &rec.State, &setupJSON, &settingsJSON); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return AppRecord{}, nil
+		}
+		return AppRecord{}, err
+	}
+	rec.Setup = jsonToMap(setupJSON)
+	rec.Settings = jsonToMap(settingsJSON)
+	return rec, nil
+}
+
+// LookupByName returns the install record (if any) whose manifest.Name
+// matches. Empty AppRecord with nil error means "not installed". The
+// singleton-per-app guard in Install() calls this BEFORE any side
+// effect so a duplicate-install request fails cheaply.
+func (l *AppLifecycle) LookupByName(ctx context.Context, name string) (AppRecord, error) {
+	row := l.DB.QueryRowContext(ctx, `
+		SELECT app_id, name, version, registry, state, setup_json, settings_json
+		FROM app_installs WHERE name = ? LIMIT 1
+	`, name)
 	var rec AppRecord
 	var setupJSON, settingsJSON string
 	if err := row.Scan(&rec.AppID, &rec.Name, &rec.Version, &rec.Registry, &rec.State, &setupJSON, &settingsJSON); err != nil {

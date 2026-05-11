@@ -20,6 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/http"
 	"sort"
 	"strings"
@@ -89,6 +90,11 @@ type AppsStoreCard struct {
 	Description string
 	Registry    string
 	Version     string
+	// Installed flips the card's CTA from Install to a disabled
+	// "インストール済" badge. KuraOS is singleton-per-app: only one
+	// instance of any manifest.Name may live at a time (design.md
+	// dataset path tank/apps/<name>/<dataset> has no instance suffix).
+	Installed bool
 }
 
 // AppsHandler returns the GET /ui/admin/apps handler.
@@ -147,6 +153,14 @@ func (r *Renderer) buildAppsView(ctx context.Context, req *http.Request, deps Ap
 	}
 	view.Installed = installedRows
 
+	// Build the set of already-installed manifest.Names so the Store
+	// grid can flip duplicate cards to "インストール済" (singleton-per-app
+	// invariant, enforced server-side in AppLifecycle.Install).
+	installedNames := map[string]bool{}
+	for _, row := range installedRows {
+		installedNames[row.Name] = true
+	}
+
 	// Store: enumerate every (registry, app, version=latest) the trusted
 	// registries advertise. Failures (signature, hash) bubble to the empty
 	// state — DESIGN_PRINCIPLES forbidden: never silently approve.
@@ -171,6 +185,7 @@ func (r *Renderer) buildAppsView(ctx context.Context, req *http.Request, deps Ap
 					Description: name,
 					Registry:    src.Name,
 					Version:     ver,
+					Installed:   installedNames[name],
 				}
 				storeRows = append(storeRows, card)
 				if card.Category != "" {
@@ -318,6 +333,25 @@ func (r *Renderer) AppsInstallStartHandler(deps AppsDeps) http.Handler {
 			case strings.HasPrefix(k, "setting."):
 				settings[strings.TrimPrefix(k, "setting.")] = vs[0]
 			}
+		}
+		// Singleton-per-app: short-circuit BEFORE returning the progress
+		// modal. Otherwise the goroutine emits the rejection synchronously
+		// before the SSE client connects → modal hangs with no feedback.
+		// The engine guard still catches anything that races past this.
+		if existing, err := deps.Lifecycle.LookupByName(req.Context(), appName); err == nil && existing.AppID != "" {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			fmt.Fprintf(w,
+				`<div class="modal" data-testid="apps-install-error" style="display:flex">`+
+					`<div class="card" style="max-width:480px"><div class="card-head"><h3 class="card-title">%s</h3></div>`+
+					`<div class="card-body"><p>%s</p></div>`+
+					`<div class="card-foot" style="justify-content:flex-end">`+
+					`<button type="button" class="btn" `+
+					`hx-on:click="document.getElementById('apps-modal-target').innerHTML=''">%s</button>`+
+					`</div></div></div>`,
+				html.EscapeString(r.tr.T(i18n.MsgAppsBtnInstall)),
+				html.EscapeString(r.tr.T(i18n.MsgAppsAlreadyInstalled)),
+				html.EscapeString(r.tr.T(i18n.MsgAppsBtnCancel)))
+			return
 		}
 		appID := app.NewAppIDForName(appName)
 		go func() {

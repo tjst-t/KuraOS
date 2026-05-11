@@ -423,3 +423,66 @@ func readAll(t *testing.T, r interface{ Read([]byte) (int, error) }) []byte {
 	}
 	return out
 }
+
+// TestLifecycleInstallRejectsDuplicateByName covers the
+// singleton-per-app invariant added 2026-05-11. design.md's dataset
+// path scheme tank/apps/<name>/<dataset> has no install-instance
+// suffix, so multiple installs of the same manifest.Name would share
+// the on-disk dataset → concurrent writes corrupt the app DB and only
+// the last-registered route gets traffic. The lifecycle MUST reject
+// the second install before any side effect (datasets / ports /
+// containers) is provisioned.
+func TestLifecycleInstallRejectsDuplicateByName(t *testing.T) {
+	manifest := loadFixture(t, "immich.yaml")
+	src, _ := startTestRegistry(t, manifest)
+	verifier := NewFakeVerifier()
+	verifier.Allow(manifest, "kuraos-test:installer", "kuraos-test")
+
+	db := newTestDB(t)
+	planner := NewDatasetPlanner(db, &StaticPoolLister{Pools: []PoolInfo{
+		{Name: "tank", Role: PoolHintTank},
+		{Name: "fast", Role: PoolHintSSD},
+	}})
+	ports := NewPortAllocator(db)
+	sys := &fakeSystemEngine{}
+	secrets := NewSecretStore(sys)
+	docker := NewFakeDockerClient()
+	storage := NewFakeStorageWriter(t.TempDir())
+	routes := NewMemoryRouteRegistry()
+
+	regCli := NewHTTPRegistryClient(verifier, nil)
+	regBody, _ := http.Get(src.URL + "/registry.json")
+	defer regBody.Body.Close()
+	verifier.Allow(readAll(t, regBody.Body), "kuraos-test:installer", "kuraos-test")
+
+	lc := NewLifecycle(regCli, planner, ports, secrets, docker, storage, routes, db)
+	lc.HealthTimeout = 5 * time.Second
+	lc.HealthPoll = 10 * time.Millisecond
+	lc.ConfigRoot = t.TempDir()
+
+	req := InstallRequest{
+		Source:      src,
+		AppName:     "immich",
+		Version:     "1.111.0",
+		AppID:       "immich.first",
+		SetupValues: map[string]string{"photo_share": "/tank/photos"},
+	}
+	if _, err := lc.Install(context.Background(), req); err != nil {
+		t.Fatalf("first install: %v", err)
+	}
+
+	// Second install — fresh AppID, same manifest.Name. Must be
+	// rejected cheaply with ErrAppAlreadyInstalled BEFORE any
+	// container/dataset/port/etc is touched.
+	containersBefore := len(docker.Containers)
+	req2 := req
+	req2.AppID = "immich.second"
+	_, err := lc.Install(context.Background(), req2)
+	if !errors.Is(err, ErrAppAlreadyInstalled) {
+		t.Fatalf("second install error = %v, want ErrAppAlreadyInstalled", err)
+	}
+	if len(docker.Containers) != containersBefore {
+		t.Fatalf("second install side-effected containers: before=%d after=%d",
+			containersBefore, len(docker.Containers))
+	}
+}

@@ -110,12 +110,25 @@ PageData.Extra is an ui.AppsView.
           </div>
         </div>
         <p class="muted" style="margin:0 0 12px 0;font-size:12px">{{ .Description }}</p>
+        {{- /*
+         Singleton-per-app: one install per manifest.Name. The Store
+         card flips to a disabled "installed" badge so the operator
+         can't double-install (the server-side AppLifecycle.Install
+         would reject anyway, but hiding the button avoids dead-end UX).
+        */ -}}
+        {{ if .Installed }}
+        <button class="btn btn-sm" data-testid="apps-store-installed" disabled
+                aria-disabled="true" title="{{ T "page.apps.store.installed_hint" }}">
+          {{ T "page.apps.store.installed" }}
+        </button>
+        {{ else }}
         <button class="btn btn-sm btn-primary" data-testid="apps-install-btn"
                 hx-get="/ui/admin/apps/install/form?app={{ .Name }}&registry={{ .Registry }}"
                 hx-target="#apps-modal-target"
                 hx-swap="innerHTML">
           {{ T "page.apps.btn.install" }}
         </button>
+        {{ end }}
       </div>
     </div>
     {{ end }}

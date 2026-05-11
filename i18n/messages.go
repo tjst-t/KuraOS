@@ -355,7 +355,10 @@ const (
 	MsgAppsTabStore     MessageID = "page.apps.tab.store"
 	MsgAppsCategoryAll  MessageID = "page.apps.category.all"
 
-	MsgAppsBtnInstall   MessageID = "page.apps.btn.install"
+	MsgAppsBtnInstall      MessageID = "page.apps.btn.install"
+	MsgAppsStoreInstalled  MessageID = "page.apps.store.installed"
+	MsgAppsStoreInstHint   MessageID = "page.apps.store.installed_hint"
+	MsgAppsAlreadyInstalled MessageID = "page.apps.error.already_installed"
 	MsgAppsBtnUpdate    MessageID = "page.apps.btn.update"
 	MsgAppsBtnUninstall MessageID = "page.apps.btn.uninstall"
 	MsgAppsBtnOpen      MessageID = "page.apps.btn.open"

@@ -41,7 +41,16 @@ test.describe("[AC-S65b510-1-1] One-click install reaches healthy", () => {
       test.skip(true, "No store registry seeded — see KURA_APPS_FIXTURE_REGISTRY");
     }
     await expect(cards.first()).toBeVisible();
-    await cards.first().locator('[data-testid="apps-install-btn"]').click();
+    // Singleton-per-app: cards whose app is already installed render
+    // a disabled badge instead of the install button. Pick the first
+    // card that still exposes the install button.
+    const installable = page.locator('[data-testid="apps-store-card"]')
+      .filter({ has: page.locator('[data-testid="apps-install-btn"]') });
+    if ((await installable.count()) === 0) {
+      test.skip(true, "All store apps already installed on this target — singleton invariant. Uninstall one to re-enable.");
+      return;
+    }
+    await installable.first().locator('[data-testid="apps-install-btn"]').click();
     await expect(page.locator('[data-testid="apps-install-modal"]')).toBeVisible();
     // Pick the first share_picker option (FakeStorageWriter prepopulates one).
     const sharePicker = page.locator('select[name^="setup."]').first();
