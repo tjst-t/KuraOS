@@ -29,6 +29,11 @@ type StorageDeps struct {
 	// Tests that only need read coverage leave it unset; the production
 	// wiring in cmd/kura passes a *storage.CLI which implements both.
 	Writer StorageEngineWriter
+	// InstalledAppNames returns the set of manifest.Names currently in
+	// app_installs. Used by the volume list to grey out the delete
+	// button on a dataset whose owning app is still installed (data
+	// loss guard). Nil = treat every app dataset as orphan.
+	InstalledAppNames func(ctx context.Context) map[string]bool
 }
 
 // StorageEngineReader is the read-only subset of storage.Engine the UI uses.
@@ -77,6 +82,13 @@ type StorageView struct {
 	ActiveTab string
 	Tabs      []TabOption
 
+	// ShowAllDatasets reflects the ?showAll=1 query param. When false
+	// (default) the volume list hides every IsAppDataset row so the
+	// operator sees only datasets they created. When true the list
+	// includes app datasets with badges + the relevant disabled-delete
+	// reason. The checkbox above the table flips this.
+	ShowAllDatasets bool
+
 	Pools     []PoolView
 	Disks     []DiskView
 	Imports   []ImportableView
@@ -108,6 +120,23 @@ type VolumeView struct {
 	RecordSize  string
 	Compression string
 	IsPoolRoot  bool
+	// IsAppDataset is true when the path matches the app-namespace
+	// convention <pool>/apps/<appname>(/<sub>...). The default volume
+	// list hides these so operators see only user-created datasets; a
+	// "show all datasets" checkbox surfaces them.
+	IsAppDataset bool
+	// AppName is the manifest.Name extracted from the path (empty when
+	// the row is the <pool>/apps parent itself).
+	AppName string
+	// DeleteDisabled greys out the destroy-volume button. True when:
+	//  - the row is a pool root (covered by IsPoolRoot already)
+	//  - the row is the <pool>/apps parent
+	//  - the row belongs to an app currently installed (data-loss guard)
+	// False (delete enabled) on app dataset orphans = the install was
+	// uninstalled with deleteData=false and the operator now wants to
+	// reclaim the space.
+	DeleteDisabled bool
+	DeleteReason   string
 }
 
 // SnapshotView is one row in the Snapshot tab.
@@ -225,9 +254,26 @@ func (r *Renderer) StorageHandler(d StorageDeps) http.Handler {
 			return
 		}
 		tab := normalizeStorageTab(req.URL.Query().Get("tab"))
+		showAll := req.URL.Query().Get("showAll") == "1"
 		view := r.buildStorageView(req.Context(), d)
 		view.ActiveTab = tab
 		view.Tabs = storageTabs(r.tr, tab)
+		view.ShowAllDatasets = showAll
+		// When the operator hasn't asked for "all", strip app-managed
+		// rows so the table shows only datasets they created. Done
+		// here (not in buildStorageView) so unit tests can exercise
+		// classification independently of the query param.
+		if !showAll {
+			kept := view.Volumes[:0]
+			for _, v := range view.Volumes {
+				if v.IsAppDataset {
+					continue
+				}
+				kept = append(kept, v)
+			}
+			view.Volumes = kept
+			view.HasVolumes = len(view.Volumes) > 0
+		}
 		data := r.buildPageData("storage", i18n.MsgStorageTitle)
 		data.Extra = view
 		r.render(w, "templates/pages/storage.tmpl", data)
@@ -315,7 +361,7 @@ func (r *Renderer) buildStorageView(ctx context.Context, d StorageDeps) StorageV
 		Pools:        poolsToView(r.tr, pools),
 		Disks:        disksView,
 		Imports:      importsToView(r.tr, imports),
-		Volumes:      volumesToView(volumes, pools),
+		Volumes:      volumesToView(volumes, pools, installedAppsFromDeps(ctx, d)),
 		Snapshots:    snapshotsToView(snapshots),
 		HasPools:     len(pools) > 0,
 		HasDisks:     len(disks) > 0,
@@ -435,11 +481,45 @@ func vdevsToView(tr translator, vs []storage.Vdev) []VdevView {
 	return out
 }
 
+// installedAppsFromDeps invokes the optional callback and returns its
+// result, or nil if the dep wasn't wired. nil makes volumesToView treat
+// every app dataset as an orphan (= delete enabled), which is the right
+// fallback for tests + the first few moments before cmd/kura finishes
+// wiring AppLifecycle.
+func installedAppsFromDeps(ctx context.Context, d StorageDeps) map[string]bool {
+	if d.InstalledAppNames == nil {
+		return nil
+	}
+	return d.InstalledAppNames(ctx)
+}
+
+// classifyAppDataset matches <pool>/apps/<appName>[/<sub>...] paths.
+// Returns isApp=true with appName="" for the <pool>/apps parent itself,
+// isApp=true with the manifest.Name for per-app rows, isApp=false for
+// regular user datasets. Pool roots short-circuit (handled separately).
+func classifyAppDataset(path string) (isApp bool, appName string) {
+	// Strip pool prefix: split into at most 4 parts so deep names like
+	// tank/apps/immich/db keep `db` (and anything below) intact.
+	parts := strings.SplitN(path, "/", 4)
+	if len(parts) < 2 || parts[1] != "apps" {
+		return false, ""
+	}
+	if len(parts) == 2 {
+		return true, "" // <pool>/apps parent
+	}
+	return true, parts[2]
+}
+
 // volumesToView converts engine VolumeInfo rows into the template view-model.
 // A volume's Name == its pool's Name marks it as the pool root, which the
 // template renders specially (the operator can't delete a pool root from the
 // Volume tab — that's a Pool-level destructive op, scoped out for v1).
-func volumesToView(vols []storage.VolumeInfo, pools []storage.Pool) []VolumeView {
+//
+// installedApps holds the manifest.Names currently in app_installs; an
+// app dataset whose owning app is still installed gets the destroy button
+// greyed out (data-loss guard). Pass nil to treat every app dataset as
+// orphan-with-delete-enabled (tests, early dev).
+func volumesToView(vols []storage.VolumeInfo, pools []storage.Pool, installedApps map[string]bool) []VolumeView {
 	poolNames := make(map[string]bool, len(pools))
 	for _, p := range pools {
 		poolNames[p.Name] = true
@@ -450,7 +530,8 @@ func volumesToView(vols []storage.VolumeInfo, pools []storage.Pool) []VolumeView
 		if v.QuotaBytes > 0 {
 			quotaDisplay = formatBytes(v.QuotaBytes)
 		}
-		out = append(out, VolumeView{
+		isApp, appName := classifyAppDataset(v.Name)
+		view := VolumeView{
 			Name:         v.Name,
 			UsedBytes:    v.UsedBytes,
 			QuotaBytes:   v.QuotaBytes,
@@ -461,7 +542,27 @@ func volumesToView(vols []storage.VolumeInfo, pools []storage.Pool) []VolumeView
 			RecordSize:   v.RecordSize,
 			Compression:  v.Compression,
 			IsPoolRoot:   poolNames[v.Name],
-		})
+			IsAppDataset: isApp,
+			AppName:      appName,
+		}
+		// Decide whether destroy is enabled. Pool root already
+		// suppresses the form in the template; here we only annotate
+		// app-namespace rows.
+		switch {
+		case isApp && appName == "":
+			// <pool>/apps parent — never deletable from the UI.
+			view.DeleteDisabled = true
+			view.DeleteReason = "ds.delete.reason.apps_parent"
+		case isApp && installedApps[appName]:
+			// App still installed → deletion would destroy live data.
+			view.DeleteDisabled = true
+			view.DeleteReason = "ds.delete.reason.app_installed"
+		case isApp:
+			// App dataset orphan — uninstall left data behind. The
+			// operator may legitimately reclaim the space here.
+			view.DeleteDisabled = false
+		}
+		out = append(out, view)
 	}
 	return out
 }

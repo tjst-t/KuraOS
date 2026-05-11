@@ -143,10 +143,26 @@ in storage.go so the template stays free of CLI-output tokens.
   <div class="card">
     <div class="card-head">
       <h3 class="card-title">{{ T "page.storage.volumes.heading" }}</h3>
-      {{ if $v.WriteEnabled }}
-      <button type="button" class="btn btn-sm btn-primary" data-testid="storage-volume-new-btn"
-        data-modal-open="new-volume-modal">{{ T "page.storage.volume.new" }}</button>
-      {{ end }}
+      <div style="display:flex;align-items:center;gap:16px">
+        {{- /*
+         "show all datasets" toggle. App-managed datasets
+         (tank/apps/<name>/...) are hidden by default so the operator
+         sees only datasets they created. Toggling persists via
+         ?showAll=1 so refresh / back-button keeps the state. The
+         link form keeps it htmx-free (just a navigation).
+        */ -}}
+        <label class="row center" data-testid="storage-volume-showall-label"
+               style="display:flex;align-items:center;gap:6px;font-size:13px;cursor:pointer">
+          <input type="checkbox" data-testid="storage-volume-showall"
+                 {{ if $v.ShowAllDatasets }}checked{{ end }}
+                 onchange="location.href='?tab=volumes' + (this.checked ? '&amp;showAll=1' : '')">
+          {{ T "page.storage.volume.show_all" }}
+        </label>
+        {{ if $v.WriteEnabled }}
+        <button type="button" class="btn btn-sm btn-primary" data-testid="storage-volume-new-btn"
+          data-modal-open="new-volume-modal">{{ T "page.storage.volume.new" }}</button>
+        {{ end }}
+      </div>
     </div>
     {{ if $v.HasVolumes }}
     <table class="tbl">
@@ -163,8 +179,8 @@ in storage.go so the template stays free of CLI-output tokens.
       </thead>
       <tbody>
         {{ range $v.Volumes }}
-        <tr data-testid="storage-volume-row" data-dataset="{{ .Name }}">
-          <td><span class="mono">{{ .Name }}</span>{{ if .IsPoolRoot }} <span class="badge">{{ T "page.storage.volume.pool_root" }}</span>{{ end }}</td>
+        <tr data-testid="storage-volume-row" data-dataset="{{ .Name }}" data-app-dataset="{{ if .IsAppDataset }}true{{ else }}false{{ end }}">
+          <td><span class="mono">{{ .Name }}</span>{{ if .IsPoolRoot }} <span class="badge">{{ T "page.storage.volume.pool_root" }}</span>{{ end }}{{ if .IsAppDataset }}{{ if .AppName }} <span class="badge info" data-testid="storage-volume-app-badge" title="{{ T "page.storage.volume.app_badge_hint" }}">{{ T "page.storage.volume.app_badge" }} · <span class="mono">{{ .AppName }}</span></span>{{ else }} <span class="badge" data-testid="storage-volume-apps-parent">{{ T "page.storage.volume.apps_parent" }}</span>{{ end }}{{ end }}</td>
           <td class="td-num">{{ .UsedDisplay }}</td>
           <td class="td-num">{{ .AvailDisplay }}</td>
           <td class="td-num">{{ .QuotaDisplay }}</td>
@@ -187,10 +203,25 @@ in storage.go so the template stays free of CLI-output tokens.
               data-modal-open="new-snapshot-modal" data-volume-name="{{ .Name }}"
               onclick="(function(){var d=document.getElementById('new-snapshot-modal');if(!d)return;var s=d.querySelector('select[name=&quot;dataset&quot;]');if(s){s.value='{{ .Name }}';}})();">{{ T "page.storage.snapshot.new" }}</button>
             {{ if not .IsPoolRoot }}
-            <button type="button" class="btn btn-sm" data-testid="storage-volume-destroy-btn"
-              data-modal-open="destroy-volume-modal-{{ .Name }}" style="color:var(--crit);border-color:var(--crit)">
-              {{ T "page.storage.destroy.volume" }}
-            </button>
+              {{ if .DeleteDisabled }}
+              {{- /*
+               App-managed row with the owning app still installed,
+               or the <pool>/apps parent itself. Either case destroying
+               would corrupt the running app or leave a dangling
+               namespace, so greyed out. Tooltip names the reason.
+              */ -}}
+              <button type="button" class="btn btn-sm" data-testid="storage-volume-destroy-btn"
+                disabled aria-disabled="true"
+                title="{{ T .DeleteReason }}"
+                style="color:var(--text-3);border-color:var(--border)">
+                {{ T "page.storage.destroy.volume" }}
+              </button>
+              {{ else }}
+              <button type="button" class="btn btn-sm" data-testid="storage-volume-destroy-btn"
+                data-modal-open="destroy-volume-modal-{{ .Name }}" style="color:var(--crit);border-color:var(--crit)">
+                {{ T "page.storage.destroy.volume" }}
+              </button>
+              {{ end }}
             {{ end }}
           </td>
           {{ end }}

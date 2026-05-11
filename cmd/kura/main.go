@@ -105,7 +105,30 @@ func run() error {
 	// methods will return errors which the UI surfaces as a translated
 	// banner rather than crashing.
 	storageEngine := storage.NewCLI(cmdexec.NewReal())
-	storageDeps := ui.StorageDeps{Engine: storageEngine, Writer: storageEngine}
+	// InstalledAppNames is a closure over the shared state DB so the
+	// Storage page can grey out destroy-volume on datasets whose owning
+	// app is currently installed. Lives here (not buried in ui pkg) so
+	// the SQL stays alongside the other state-DB readers in cmd/kura.
+	installedApps := func(ctx context.Context) map[string]bool {
+		out := map[string]bool{}
+		rows, err := st.DB().QueryContext(ctx, `SELECT DISTINCT name FROM app_installs`)
+		if err != nil {
+			return out
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var n string
+			if err := rows.Scan(&n); err == nil {
+				out[n] = true
+			}
+		}
+		return out
+	}
+	storageDeps := ui.StorageDeps{
+		Engine:            storageEngine,
+		Writer:            storageEngine,
+		InstalledAppNames: installedApps,
+	}
 	uiRenderer.SetStorageHandler(uiRenderer.StorageHandler(storageDeps))
 	uiRenderer.SetStorageWriteHandler(uiRenderer.StorageWriteHandler(storageDeps))
 	// SSOT (DESIGN_PRINCIPLES priority #1): config.json apply must be able
