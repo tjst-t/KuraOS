@@ -94,8 +94,21 @@ PageData.Extra is *ui.UsersView.
         <td class="muted">{{ if .LastLogin }}{{ .LastLogin }}{{ else }}—{{ end }}</td>
         <td>
           <div class="row gap-sm" style="display:flex;gap:6px;align-items:center">
+            {{- /*
+             "Google を紐付け" は本人のみ表示。/federation/google/link は
+             セッションの user_id に紐付くため、他人の行に出すと「押した
+             相手にリンクされるはず」という UX 誤認の罠になる
+             (2026-05-12 incident — admin がログイン中に takumi の行を
+             押したら admin にリンクされた)。本人 (= CurrentUserID
+             一致) の行にだけボタンを出し、他は「—」とする。
+            */ -}}
+            {{ if eq .UserID $v.CurrentUserID }}
             <a class="btn btn-sm" data-testid="users-link-google-btn"
                href="/federation/google/link?return_to=/ui/admin/users">{{ T "page.users.auth.link_google_btn" }}</a>
+            {{ else }}
+            <span class="muted" data-testid="users-link-google-na"
+                  title="{{ T "page.users.auth.link_google_self_only" }}">—</span>
+            {{ end }}
             <button type="button" class="btn btn-sm" data-testid="users-edit-btn"
                     data-modal-open="users-edit-modal-{{ .UserID }}">{{ T "page.users.edit_btn" }}</button>
             <form method="post" action="/ui/admin/users/delete" data-testid="users-delete-form"

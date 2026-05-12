@@ -52,6 +52,14 @@ func TestUsersPage_LinkGoogleButton_AC_S822961_3_1(t *testing.T) {
 		Providers: &fakeProvLister{rows: []UsersProvider{
 			{Name: "google", Enabled: true, ClientID: "test-client", AutoProvision: false},
 		}},
+		// Link button is now self-only — pretend the test request is
+		// authenticated as the admin user so the button renders on
+		// their row. Without CurrentUser, all link buttons hide
+		// (which is what real production sees for unauthenticated
+		// page renders, but breaks this AC fixture).
+		CurrentUser: func(*http.Request) (string, string, bool) {
+			return "u-1", "admin", true
+		},
 	})
 	srv := httptest.NewServer(r.usersHandler)
 	defer srv.Close()

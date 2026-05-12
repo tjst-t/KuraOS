@@ -19,6 +19,13 @@ type UsersDeps struct {
 	Federations  FederationLister
 	OIDCClients  OIDCClientLister
 	Providers    ProviderLister
+	// CurrentUser resolves the authenticated session to (user_id,
+	// username). Used to render the "Google を紐付け" button only on
+	// the row of the logged-in user — every row had it before, and
+	// /federation/google/link always binds to the session user, so
+	// clicking a different row's button silently bound the wrong
+	// account (2026-05-12 incident). Nil = hide all link buttons.
+	CurrentUser func(*http.Request) (id, username string, ok bool)
 }
 
 // UsersLister returns the operator-managed user accounts. Implemented in
@@ -101,6 +108,11 @@ type UsersView struct {
 	// AllUserRows is the universe of selectable users for the member
 	// edit modal. Same data as Users, filtered/projected for the picker.
 	AllUserRows []UsersViewUser
+
+	// CurrentUserID is the authenticated session's user_id. Used by
+	// the template to render the link button only on the matching
+	// user's row (the user can only bind their own Google account).
+	CurrentUserID string
 }
 
 // UsersViewUser is the per-user row the template iterates over.
@@ -147,6 +159,11 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 			Subtitle:  r.tr.T(i18n.MsgUsersSubtitle),
 			Issuer:    "auto-generated",
 			FormError: req.URL.Query().Get("err"),
+		}
+		if d.CurrentUser != nil {
+			if id, _, ok := d.CurrentUser(req); ok {
+				view.CurrentUserID = id
+			}
 		}
 		if d.Users != nil {
 			users, _ := d.Users.List(ctx)

@@ -48,22 +48,32 @@ func buildFederationHandler(ctx context.Context, db *sql.DB, sysEng system.Engin
 		if issuer == "" {
 			issuer = defaultIssuer(name)
 		}
-		secretCred, err := sysEng.LookupCredential(ctx,
+		// Secret resolution order: env wins when set, otherwise fall
+		// back to the vault. If env is set AND differs from vault,
+		// the env value is re-persisted so a future start without env
+		// uses the latest value. Older logic let vault silently
+		// shadow env, so changing the env var was a no-op after the
+		// first persist — caused 2026-05-12 incident where a mock
+		// dev secret kept being sent to Google even after the env was
+		// updated to the real Google secret.
+		envSecret := os.Getenv("KURA_FED_" + envName(name) + "_CLIENT_SECRET")
+		vaultCred, vaultErr := sysEng.LookupCredential(ctx,
 			system.CredentialFederationClientSec, system.OwnerSystem, name)
 		var secret string
-		if err == nil {
-			secret = secretCred.Value
-		} else if v := os.Getenv("KURA_FED_" + envName(name) + "_CLIENT_SECRET"); v != "" {
-			// Dev convenience: env var fallback. Persist to the vault so
-			// subsequent runs don't need the env var.
-			secret = v
-			_ = sysEng.SetCredential(ctx, system.Credential{
-				Kind:      system.CredentialFederationClientSec,
-				OwnerKind: system.OwnerSystem,
-				OwnerID:   name,
-				Value:     v,
-			})
-		} else if !errors.Is(err, system.ErrUserNotFound) {
+		switch {
+		case envSecret != "":
+			secret = envSecret
+			if vaultErr != nil || vaultCred.Value != envSecret {
+				_ = sysEng.SetCredential(ctx, system.Credential{
+					Kind:      system.CredentialFederationClientSec,
+					OwnerKind: system.OwnerSystem,
+					OwnerID:   name,
+					Value:     envSecret,
+				})
+			}
+		case vaultErr == nil:
+			secret = vaultCred.Value
+		case !errors.Is(vaultErr, system.ErrUserNotFound):
 			// real lookup error — surface to logs but don't crash.
 			continue
 		}

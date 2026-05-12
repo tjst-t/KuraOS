@@ -250,6 +250,7 @@ func run() error {
 		Federations: &federationLookupAdapter{storage: oidc.NewStorage(st.DB())},
 		OIDCClients: oidcClientListAdapter(st.DB()),
 		Providers:   &providersListAdapter{db: st.DB()},
+		CurrentUser: currentUserFromSession(sessions, users),
 	})
 	uiRenderer.SetUsersCRUDHandlers(ui.UsersCRUDDeps{
 		System:       &systemEngineAdapter{eng: sysEng},

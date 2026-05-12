@@ -415,6 +415,7 @@
   "page.users.auth.link": "紐付け",
   "page.users.auth.unlink": "解除",
   "page.users.auth.link_google_btn": "Google を紐付け",
+  "page.users.auth.link_google_self_only": "Google 紐付けは本人がログインして操作してください",
   "page.users.auth.enabled": "有効",
   "page.users.auth.disabled": "無効",
   "page.users.auth.client_id_label": "Client ID",
