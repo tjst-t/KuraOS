@@ -1,0 +1,21 @@
+[Unit]
+Description=KuraOS dev mock OIDC Provider (federation e2e fixture)
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/home/ubuntu/dev-oidc-mock/oidc-mock
+Environment=OIDC_MOCK_PORT=9998
+# Issuer URL must be reachable from BOTH kura (server-side discovery
+# fetch) AND the browser (302 redirect from /authorize). LAN IP works
+# for both; 127.0.0.1 only works for kura. 0.0.0.0 listener is the
+# Go default for http.ListenAndServe(":9998",...).
+Environment=OIDC_MOCK_ISSUER=http://192.168.1.42:9998
+Environment=OIDC_MOCK_SUBJECT=e2e-google-user
+Environment=OIDC_MOCK_EMAIL=e2e-google-user@oidc-mock.example.com
+Environment=OIDC_MOCK_NAME=E2E Google User
+Restart=on-failure
+User=ubuntu
+
+[Install]
+WantedBy=multi-user.target

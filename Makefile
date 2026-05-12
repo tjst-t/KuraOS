@@ -109,6 +109,26 @@ app-registry-sign: build
 app-registry-serve:
 	bash tests/fixtures/app-registry/serve.sh
 
+# ---- Mock OIDC Provider (federation e2e fixture) ---------------------
+# Build the standalone mock OIDC provider, deploy to the dev VM as a
+# systemd service. Pairs with tests/e2e/google-federation-flow.e2e.spec.ts.
+# See tests/fixtures/oidc-mock/README.md for the kura env vars that wire
+# federation to point at it.
+
+oidc-mock-build:
+	CGO_ENABLED=0 go build -o bin/oidc-mock ./cmd/oidc-mock
+
+oidc-mock-deploy: oidc-mock-build
+	ssh ubuntu@192.168.1.42 'mkdir -p /home/ubuntu/dev-oidc-mock'
+	rsync -az bin/oidc-mock ubuntu@192.168.1.42:/home/ubuntu/dev-oidc-mock/oidc-mock
+	rsync -az tests/fixtures/oidc-mock/dev-oidc-mock.service ubuntu@192.168.1.42:/tmp/dev-oidc-mock.service
+	ssh ubuntu@192.168.1.42 'sudo mv /tmp/dev-oidc-mock.service /etc/systemd/system/dev-oidc-mock.service && \
+	  sudo systemctl daemon-reload && \
+	  sudo systemctl enable --now dev-oidc-mock && \
+	  sleep 1 && \
+	  systemctl is-active dev-oidc-mock && \
+	  curl -sI http://127.0.0.1:9998/.well-known/openid-configuration | head -1'
+
 # ---- Playwright GUI E2E ---------------------------------------------
 # All GUI tests go through a real browser (chromium). KURA_BASE_URL
 # defaults to the VM at 192.168.1.42:8204; override for local dev.
