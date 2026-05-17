@@ -5,22 +5,22 @@
 //
 // Flow per provider:
 //
-//   GET /federation/<provider>/start?return_to=<path>
-//        -> 302 to provider's authorize endpoint (PKCE-protected,
-//           opaque state stored in pending_state).
+//	GET /federation/<provider>/start?return_to=<path>
+//	     -> 302 to provider's authorize endpoint (PKCE-protected,
+//	        opaque state stored in pending_state).
 //
-//   GET /federation/<provider>/callback?code=...&state=...
-//        -> exchange code for token at provider, decode id_token,
-//           lookup federation_links by (provider, sub),
-//           - bound: issue KuraOS session for the linked user.
-//           - unbound + auto_provision=true: create user via
-//             engine/system.AllocateUID + write federation_links row,
-//             issue session.
-//           - unbound + auto_provision=false: 403.
+//	GET /federation/<provider>/callback?code=...&state=...
+//	     -> exchange code for token at provider, decode id_token,
+//	        lookup federation_links by (provider, sub),
+//	        - bound: issue KuraOS session for the linked user.
+//	        - unbound + auto_provision=true: create user via
+//	          engine/system.AllocateUID + write federation_links row,
+//	          issue session.
+//	        - unbound + auto_provision=false: 403.
 //
-//   POST /federation/<provider>/link  (authenticated KuraOS user)
-//        -> begins the same authorize redirect but the callback path
-//           tags the operator's user_id onto the resulting link.
+//	POST /federation/<provider>/link  (authenticated KuraOS user)
+//	     -> begins the same authorize redirect but the callback path
+//	        tags the operator's user_id onto the resulting link.
 //
 // The implementation uses only stdlib + crypto/rand for PKCE; the
 // id_token is verified against the provider's JWKS fetched once at
@@ -75,12 +75,12 @@ type Provider struct {
 // /callback. State is short-lived (10 min) so a stale tab opening
 // doesn't pile up.
 type pendingState struct {
-	Provider     string
-	UserID       string // set when /link initiated; empty for unbound login
-	Verifier     string
-	Nonce        string
-	ReturnTo     string
-	Expires      time.Time
+	Provider string
+	UserID   string // set when /link initiated; empty for unbound login
+	Verifier string
+	Nonce    string
+	ReturnTo string
+	Expires  time.Time
 }
 
 // UserProvisioner is the slice of engine/system the auto-provision path
@@ -92,13 +92,31 @@ type UserProvisioner interface {
 	CreateFromFederation(ctx context.Context, username, displayName, email string) (string, error)
 }
 
+// RoleLookup returns the role tier of a KuraOS user so the federation
+// callback can pick a redirect target the user actually has permission
+// to reach. Provided by cmd/kura wiring. When nil (in tests), the
+// callback uses /ui as a universally-permitted fallback.
+type RoleLookup interface {
+	// LookupRole returns "admin", "user", or "" when not found.
+	LookupRole(ctx context.Context, userID string) (string, error)
+}
+
+// ErrorRenderer renders a user-facing federation error page (i18n,
+// Fog palette, 戻る button). Wired by cmd/kura; tests fall back to
+// http.Error when nil so the test fixture stays minimal.
+type ErrorRenderer interface {
+	RenderFederationError(w http.ResponseWriter, r *http.Request, msgID string, status int)
+}
+
 // Manager owns all registered providers and the /federation/* routes.
 type Manager struct {
-	storage      *oidc.Storage
-	sessions     *session.Store
-	creds        CredentialStore
-	provisioner  UserProvisioner
-	httpClient   *http.Client
+	storage     *oidc.Storage
+	sessions    *session.Store
+	creds       CredentialStore
+	provisioner UserProvisioner
+	roles       RoleLookup
+	errorPage   ErrorRenderer
+	httpClient  *http.Client
 
 	mu        sync.RWMutex
 	providers map[string]*Provider
@@ -120,6 +138,18 @@ func New(storage *oidc.Storage, sessions *session.Store, creds CredentialStore) 
 
 // SetProvisioner wires the auto-provision adapter. Call before Register.
 func (m *Manager) SetProvisioner(p UserProvisioner) { m.provisioner = p }
+
+// SetRoleLookup wires the role-aware redirect chooser. Without it, the
+// callback assumes the user has only user-role permissions and falls
+// back to /ui (never /ui/admin/*) — safe under-grant rather than
+// over-grant (DESIGN_PRINCIPLES priority #5 信頼性).
+func (m *Manager) SetRoleLookup(r RoleLookup) { m.roles = r }
+
+// SetErrorRenderer wires the i18n error page used when auto_provision
+// is off and the inbound user is unbound, or when provision itself
+// fails. Without it the callback falls back to http.Error (used by
+// existing unit tests).
+func (m *Manager) SetErrorRenderer(e ErrorRenderer) { m.errorPage = e }
 
 // SetHTTPClient overrides the HTTP client. Tests use this to point at a
 // httptest.Server fixture.
@@ -332,13 +362,17 @@ func (m *Manager) handleCallback(w http.ResponseWriter, r *http.Request, p *Prov
 
 	if ps.UserID != "" {
 		// Link flow: bind the (provider, subject) to ps.UserID and return.
+		// The operator is already logged in, so we apply the same
+		// role-safe redirect rule that the login branch uses — a
+		// non-admin who just linked their Google must not bounce to
+		// /ui/admin/users (Sfix002-1).
 		if err := m.storage.LinkFederation(r.Context(), oidc.FederationLink{
 			Provider: p.Name, Subject: subject, UserID: ps.UserID, Email: email,
 		}); err != nil {
 			http.Error(w, "link failed: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
-		http.Redirect(w, r, ifReturn(ps.ReturnTo, "/ui/admin/users"), http.StatusFound)
+		http.Redirect(w, r, m.redirectTarget(r.Context(), ps.UserID, ps.ReturnTo, "/ui/admin/users"), http.StatusFound)
 		return
 	}
 
@@ -351,11 +385,13 @@ func (m *Manager) handleCallback(w http.ResponseWriter, r *http.Request, p *Prov
 	}
 	// Not bound. Auto-provision if allowed.
 	if !p.AutoProvision {
-		http.Error(w, "user is not linked; auto_provision disabled", http.StatusForbidden)
+		m.renderError(w, r, "page.federation.unbound_error", http.StatusForbidden,
+			"user is not linked; auto_provision disabled")
 		return
 	}
 	if m.provisioner == nil {
-		http.Error(w, "auto_provision enabled but no provisioner wired", http.StatusInternalServerError)
+		m.renderError(w, r, "page.federation.provision_unavailable", http.StatusInternalServerError,
+			"auto_provision enabled but no provisioner wired")
 		return
 	}
 	username := emailLocalPart(email)
@@ -364,7 +400,8 @@ func (m *Manager) handleCallback(w http.ResponseWriter, r *http.Request, p *Prov
 	}
 	userID, err := m.provisioner.CreateFromFederation(r.Context(), username, email, email)
 	if err != nil {
-		http.Error(w, "provision failed: "+err.Error(), http.StatusInternalServerError)
+		m.renderError(w, r, "page.federation.provision_failed", http.StatusInternalServerError,
+			"provision failed: "+err.Error())
 		return
 	}
 	if err := m.storage.LinkFederation(r.Context(), oidc.FederationLink{
@@ -374,6 +411,17 @@ func (m *Manager) handleCallback(w http.ResponseWriter, r *http.Request, p *Prov
 		return
 	}
 	m.issueSession(w, r, userID, ps.ReturnTo)
+}
+
+// renderError uses the wired ErrorRenderer when available; falls back
+// to plain http.Error so unit tests still see a meaningful status
+// code without standing up a full UI renderer.
+func (m *Manager) renderError(w http.ResponseWriter, r *http.Request, msgID string, status int, devMsg string) {
+	if m.errorPage != nil {
+		m.errorPage.RenderFederationError(w, r, msgID, status)
+		return
+	}
+	http.Error(w, devMsg, status)
 }
 
 func (m *Manager) issueSession(w http.ResponseWriter, r *http.Request, userID, returnTo string) {
@@ -389,7 +437,60 @@ func (m *Manager) issueSession(w http.ResponseWriter, r *http.Request, userID, r
 		HttpOnly: true,
 		MaxAge:   int(time.Until(sess.ExpiresAt).Seconds()),
 	})
-	http.Redirect(w, r, ifReturn(returnTo, "/ui/admin/dashboard"), http.StatusFound)
+	// Pick a redirect target the user is actually allowed to reach
+	// — without this, a `user` role hitting /ui/admin/dashboard
+	// (the historical default) gets a 403 immediately after a
+	// successful Google login (Sfix002-1).
+	http.Redirect(w, r, m.redirectTarget(r.Context(), userID, returnTo, "/ui/admin/dashboard"), http.StatusFound)
+}
+
+// redirectTarget chooses the post-callback URL the user has permission
+// to reach:
+//
+//   - admin -> explicit return_to (if safe), else adminFallback.
+//   - user  -> explicit return_to (if safe AND not /ui/admin/*),
+//     else /ui.
+//   - role unknown / RoleLookup nil -> treat as user (under-grant).
+//
+// "safe" means starts with "/" (open-redirect guard, same rule as
+// ifReturn). adminFallback is the legacy default the caller wants
+// admins to land on when they didn't supply an explicit return_to
+// (login flow: /ui/admin/dashboard, link flow: /ui/admin/users).
+func (m *Manager) redirectTarget(ctx context.Context, userID, returnTo, adminFallback string) string {
+	role := ""
+	if m.roles != nil && userID != "" {
+		if r, err := m.roles.LookupRole(ctx, userID); err == nil {
+			role = r
+		}
+	}
+	switch role {
+	case "admin":
+		// admin can go anywhere; honour explicit return_to when valid.
+		if isSafeReturnTo(returnTo) {
+			return returnTo
+		}
+		return adminFallback
+	default:
+		// user role (or unknown). Explicit return_to is honoured iff
+		// it isn't /ui/admin/* — otherwise we'd just hand them a 403.
+		if isSafeReturnTo(returnTo) && !strings.HasPrefix(returnTo, "/ui/admin") && !strings.HasPrefix(returnTo, "/setup") {
+			return returnTo
+		}
+		return "/ui"
+	}
+}
+
+// isSafeReturnTo gates open-redirect: only "/<path>" forms are honoured.
+// "//evil.example/" is explicitly rejected — it would resolve to a
+// scheme-relative URL once the browser sees it in the Location header.
+func isSafeReturnTo(s string) bool {
+	if s == "" || s[0] != '/' {
+		return false
+	}
+	if len(s) >= 2 && s[1] == '/' {
+		return false
+	}
+	return true
 }
 
 // exchangeCode POSTs the authorization code + PKCE verifier to the
