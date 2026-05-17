@@ -4,11 +4,11 @@
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
     "current_sprint": "S8a756d",
-    "total": 16,
-    "done": 11,
+    "total": 17,
+    "done": 12,
     "in_progress": 0,
     "remaining": 5,
-    "percentage": 68,
+    "percentage": 70,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -20,9 +20,10 @@
       "S1bccf5",
       "S65b510",
       "S822961",
-      "Sfix001"
+      "Sfix001",
+      "Sfix002"
     ],
-    "updated_at": "2026-05-09T11:00:00Z"
+    "updated_at": "2026-05-17T00:35:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -36,6 +37,7 @@
     "S65b510",
     "S822961",
     "Sfix001",
+    "Sfix002",
     "S8a756d",
     "Se1e7a6",
     "Sf92666",
@@ -1753,6 +1755,82 @@
           "tasks": {}
         }
       }
+    },
+    "Sfix002": {
+      "title": "Federation 完成 (Google でログイン + auto_provision + return_to 修正)",
+      "status": "done",
+      "description": "S822961 の federation 検証ギャップを埋める fix-sprint。実 Google で case A 検証中に発覚した 3 件: (1) callback 後の return_to が role を考慮せず user role が 403 食らう、(2) /login に「Google でログイン」ボタンが無く linked user が password 経由でしか入れない、(3) auto_provision の engine コードはあるが実機未検証 + 失敗時 UI がプレーンテキスト。家族メンバーが Google account でサインアップできて初めて federation が VISION 通り機能する。",
+      "milestone": false,
+      "added_in": "post-S822961-real-google-test",
+      "rationale": "実 Google federation 検証で「紐付けは動くがログインも provision も実機で 1 度も通ってない」ことが発覚 (2026-05-12)。S99702c の portal 着手前に federation 完成度を上げる方が、portal 設計が確定する。",
+      "stories": {
+        "Sfix002-1": {
+          "title": "Federation callback の return_to を role-safe に",
+          "status": "done",
+          "user_story": "KuraOS 操作者として、Google 連携完了後に自分の役割に合った画面に戻りたい。なぜなら、user role なのに /ui/admin/dashboard に飛ばされて 403 を見せられるのは UX として完全に壊れているから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix002-1-1",
+              "description": "federation/{provider}/callback 完了後、session の role が admin なら /ui/admin/dashboard、user なら /ui に redirect する。明示的な return_to があれば最優先 (ただし role が拒否される URL なら role default に fallback)",
+              "test": "[AC-Sfix002-1-1] in engine/auth/federation/federation_test.go::TestCallbackReturnToRoleSafe + tests/e2e/google-federation-flow.e2e.spec.ts (role-safe redirect observed in browser)",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        },
+        "Sfix002-2": {
+          "title": "/login 画面に「Google でログイン」ボタン",
+          "status": "done",
+          "user_story": "既に Google を紐付けた KuraOS ユーザーとして、login 画面でワンクリックで Google ログインしたい。なぜなら、毎回 KuraOS パスワードを覚えて入力するより Google の認証 (パスキー / 2 段階認証 / 既ログイン session) を再利用する方が安全で楽だから。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix002-2-1",
+              "description": "google federation provider が enabled (env vars 設定済) の時、/login 画面に「Google でログイン」ボタンが表示される。disabled の時は表示されない",
+              "test": "[AC-Sfix002-2-1] in tests/e2e/login-google-button.e2e.spec.ts + internal/ui/auth_test.go",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix002-2-2",
+              "description": "ボタンクリック → /federation/google/start に遷移 → Google 認可画面 → callback → 既存 link がある場合は KuraOS session 発行 + role-safe redirect",
+              "test": "[AC-Sfix002-2-2] in tests/e2e/login-google-button.e2e.spec.ts (mock IdP 経由)",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix002-2-3",
+              "description": "視覚仕様: ボタンは password フォームの下、divider「または」と共に表示。Fog palette の outline スタイル + Google ロゴ",
+              "test": "[AC-Sfix002-2-3] in tests/e2e/login-google-button.e2e.spec.ts (button visible + Google ロゴ alt-text)",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        },
+        "Sfix002-3": {
+          "title": "auto_provision flow の実機検証 + 失敗時 UI",
+          "status": "done",
+          "user_story": "KuraOS 管理者として、家族メンバーが自分の Google アカウントでサインアップして自動で KuraOS user が作られるようにしたい。なぜなら、家族 1 人ずつ admin 画面で user 作成 → 初期 password を伝える、より、家族が手元の Google アカウントでログイン押すだけの方が遥かに簡単だから (= VISION の「家族向けの体験設計」)。",
+          "acceptance_criteria": [
+            {
+              "id": "AC-Sfix002-3-1",
+              "description": "auto_provision=1 で未紐付けの Google subject がサインインしたら、KuraOS が user を新規作成 (username = Google email の local-part、role=user) + federation_links に紐付け + session 発行 + role-safe redirect。engine/system 経由なので /etc/passwd projection も実行される",
+              "test": "[AC-Sfix002-3-1] in engine/auth/federation/federation_test.go::TestAutoProvisionCreatesUser + tests/e2e/google-federation-flow.e2e.spec.ts (mock IdP 新 subject)",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix002-3-2",
+              "description": "auto_provision=0 で未紐付けの Google subject が来たら、403 でなく親切なエラー画面を返す (i18n 経由「このアカウントは KuraOS に紐付いていません。管理者に連絡してください」+ 戻る button)。現状は http.Error の plain text",
+              "test": "[AC-Sfix002-3-2] in tests/e2e/google-federation-no-provision.e2e.spec.ts",
+              "status": "pass"
+            },
+            {
+              "id": "AC-Sfix002-3-3",
+              "description": "auto-provisioned user は通常の KuraOS user と同等に扱われる: SMB 認証可 (engine/system が NT-hash を vault に保存)、UI で表示される、admin による削除も可能",
+              "test": "[AC-Sfix002-3-3] in tests/acceptance/federation-auto-provision.sh + tests/acceptance/auth_flow_test.go (engine/system CreateUser + UI delete path)",
+              "status": "pass"
+            }
+          ],
+          "tasks": {}
+        }
+      }
     }
   },
   "dependencies": {
@@ -1846,6 +1924,14 @@
         "S822961"
       ],
       "reason": "milestone refine で発覚したギャップ。OIDC + Users 画面 (S822961) の上に CRUD と ACL ピッカーを追加"
+    },
+    "Sfix002": {
+      "depends_on": [
+        "S822961",
+        "S1e7eeb",
+        "Sfix001"
+      ],
+      "reason": "federation engine (S822961), login UI (S1e7eeb), Sfix001 で確立した CRUD/CurrentUser 規約に依存"
     }
   },
   "backlog": [
@@ -2061,6 +2147,132 @@
       "target": "v1.x",
       "added_in": "S822961",
       "reason": "v1 auto-approves all clients (single-tenant NAS); third-party RPs registered manually need explicit consent"
+    },
+    {
+      "title": "Share ACL CSV fallback removal",
+      "target": "v1",
+      "added_in": "Sfix001",
+      "reason": "Sfix001 で row-form picker を導入後も後方互換のため parseACLCSV (旧 acl=user:alice:rw,...) を保持。次 milestone で parseACLForm に統一して二重実装解消"
+    },
+    {
+      "title": "Users tab の Groups カラムを engine/user.GroupsForUser に置換",
+      "target": "v1",
+      "added_in": "Sfix001",
+      "reason": "現状は users x groups の全件 O(n*m) scan。engine/user.GroupsForUser は Sfix001 で実装済みだが未配線。グループ数が増えた段階で N+1 になる前に置き換え"
+    },
+    {
+      "title": "Group members modal E2E に uncheck/recheck パターン",
+      "target": "v1.x",
+      "added_in": "Sfix001",
+      "reason": "現状 e2e は initial check → save の正常系のみ。member を外す + 戻す + 全外しのケースが未カバー (UI 仕様としては動作 OK だが回帰防止の観点で追加検討)"
+    },
+    {
+      "title": "engine/system: tdbsam SSOT 整合性の acceptance test",
+      "target": "v1",
+      "added_in": "tdbsam-prune-hotfix",
+      "reason": "tests/acceptance/system-identity-cli.sh に「pdbedit -L が KuraOS users と完全一致する」アサーションを追加。距離のある distro user (smbpasswd -a で混入) や DeleteUser 後の orphan を検出できる negative test として価値がある。priority #10 を CI で enforce"
+    },
+    {
+      "title": "DeleteUser 系で『全 projection が SSOT と diff 0』を確認するテストヘルパ",
+      "target": "v1",
+      "added_in": "tdbsam-prune-hotfix",
+      "reason": "engine/system_users_crud_test.go の Delete 系 test で /etc/passwd, /etc/group, tdbsam, vault, uid_alloc retention の 5 軸を 1 ヘルパで diff 確認。Sfix001 で 5 軸のうち 4 軸しか確認してなかったのが根本原因"
+    },
+    {
+      "title": "Windows / macOS Finder からの SMB E2E テスト",
+      "target": "v1.x",
+      "added_in": "tdbsam-prune-hotfix",
+      "reason": "smbclient (Linux) は明示 user 指定で credential cache 問題を起こさないが、Windows Explorer / macOS Finder は cache hit が起きる。ヘッドレス Windows VM or container の Samba client 自動化 (e.g. impacket smbclient.py with cache mimicry) で検出。重いので v1.x"
+    },
+    {
+      "title": "UI: Share 詳細に「Windows / macOS から接続」ヘルプ",
+      "target": "v1",
+      "added_in": "tdbsam-prune-hotfix",
+      "reason": "Windows credential cache を消す手順 (cmdkey /delete + 別ユーザーオプション) を share の詳細パネルに表示。priority #2 (賢いデフォルト) の延長で、家庭用ユーザーが \"アクセス拒否\" の謎エラーで詰まらないようにする"
+    },
+    {
+      "title": "Share ACL 空保存時の警告ダイアログ",
+      "target": "v1",
+      "added_in": "empty-acl-hotfix",
+      "reason": "現状: 空 ACL を保存すると静かに deny-by-default になる (i18n hint で警告するのみ)。priority #5 (信頼性) の延長で、保存ボタン押下時に確認モーダル表示 (例: 「このまま保存すると誰もアクセスできません. 続行しますか?」) を追加。本人ロックアウト防止"
+    },
+    {
+      "title": "「自分自身を ACL に追加」ショートカット",
+      "target": "v1.x",
+      "added_in": "empty-acl-hotfix",
+      "reason": "Share 作成/編集時に「+ 自分を rw で追加」ワンクリックボタン。家庭用 NAS UX として 99% は admin が自分の rw アクセスを欲しがる"
+    },
+    {
+      "title": "Share ACL 変更時に SMB 切断警告 (UX)",
+      "target": "v1",
+      "added_in": "smb-restart-hotfix",
+      "reason": "ACL 編集の保存ボタン押下時に「保存中、SMB 共有が一瞬切れます (アイドル client は自動再接続)」モーダル表示。restart smbd は Samba プロトコル仕様上避けられないので UX で fallback。同 sprint で「空 ACL 警告」と一緒に実装可"
+    },
+    {
+      "title": "Daemon の AppsDeps.Sources を request 毎にロード",
+      "target": "v1",
+      "added_in": "app-registry-fixture",
+      "reason": "現状 cmd/kura/main.go で daemon 起動時に loadAppSources() を 1 回呼ぶだけ。CLI で `kura app registry add` 後、daemon を再起動するまで UI Apps Store に反映されない。S65b510 の既存 backlog 項目「CLI/daemon shared-state route registry」と同じ class。AppsHandler の処理開始時に sources を都度ロードする方式が最も簡潔"
+    },
+    {
+      "title": "Dev app registry serve を VM 側で systemd 化",
+      "target": "v1.x",
+      "added_in": "app-registry-fixture",
+      "reason": "ローカル開発機の python3 -m http.server は session 終了で落ちる。tests/fixtures/app-registry/ を VM の /home/ubuntu/dev-app-registry/ 等に rsync し、systemd unit `kura-dev-registry.service` で常時起動できるようにすると VM 上で完結し dev/QA 両方が安定。registry URL も http://127.0.0.1:9999 になり LAN 依存が消える"
+    },
+    {
+      "title": "Apps install ボタン: manifest fetch 失敗時に UI で原因表示",
+      "target": "v1",
+      "added_in": "app-registry-fixture",
+      "reason": "現状 manifest YAML schema 違反で /ui/admin/apps/install/form が 502 を返すと、htmx は target を更新せず button が無反応に見える。modal-target に「マニフェスト取得失敗: <reason>」のエラーカードを返すか、トースト通知を出すと operator が原因に到達できる"
+    },
+    {
+      "title": "Playwright headed smoke for admin UI 7 画面 × 各 1 ボタン",
+      "target": "v1",
+      "added_in": "post-mortem-2026-05-10",
+      "reason": "htmx 未 vendor / install ボタン無反応 / + ACL 行 無反応 等の Class A bug は全部 curl では検出不能。ブラウザで実 click → DOM 変化 を 1 ハンドラ 1 アサーションで CI 化。当初 ~200 行で 7 画面カバー想定"
+    },
+    {
+      "title": "Real-Docker integration test on VM",
+      "target": "v1",
+      "added_in": "post-mortem-2026-05-10",
+      "reason": "tests/fixtures/app-registry/ + 実 docker daemon で whoami install → /apps/whoami/ → 200 を回す smoke。docker_http.go の null Cmd bug 等 Class B (mock too forgiving) を即検出。VM 上の make smoke target として実装"
+    },
+    {
+      "title": "engine/system に SSOT diff helper",
+      "target": "v1",
+      "added_in": "post-mortem-2026-05-10",
+      "reason": "DeleteUser / DeleteGroup の test で「state.db / passwd / group / tdbsam / vault / uid_alloc 全部の差分が SSOT と一致」を 1 ヘルパで assert。priority #10 (asymmetric projection 禁止) を programmatic に enforce。tdbsam orphan retention 等 Class D bug 防止"
+    },
+    {
+      "title": "cmd/kura wired_test (CLI vs daemon 配線整合性)",
+      "target": "v1",
+      "added_in": "post-mortem-2026-05-10",
+      "reason": "CLI と daemon が verifier / sources / その他依存を共通の builder で組み立てているか比較する unit test。daemon の verifier 配線抜け (Class E) を即検出"
+    },
+    {
+      "title": "Pre-demo smoke checklist を docs に明文化",
+      "target": "v1",
+      "added_in": "post-mortem-2026-05-10",
+      "reason": "CLAUDE.md / sprint demo phase に「ブラウザ click + happy/delete path 1 回 + 失敗注入 1 回」のチェックリスト追記。sub-agent / autopilot がこれを skip しないよう明文化"
+    },
+    {
+      "title": "htmx fragment modal の共通化 (modal-fragment partial)",
+      "target": "v1",
+      "added_in": "modal-centering-hotfix",
+      "reason": "現状 partials/modal.tmpl は static embedding 用 (data-modal-open JS toggle 前提)。htmx fetch される install/uninstall/progress の 3 fragment は同じ .modal CSS class を使っているが partial を経由していない。`modal-fragment` partial を作って (1) display:flex 強制 (2) hx-target/swap の共通 wrap (3) close button 共通化 で 3 fragment を集約。priority #8 (明示的 > 暗黙的) の延長"
+    },
+    {
+      "title": "manifest.multi_instance フラグで opt-in 多重インストール",
+      "target": "v2+",
+      "added_in": "singleton-enforcement",
+      "reason": "v1 は singleton-per-app (design.md path scheme tank/apps/<name>/<dataset> に従う)。将来 dev/prod 並走など正当な multi-instance ユースケースが出てきたら manifest.multi_instance: true を opt-in 追加。dataset path に instance suffix (tank/apps/<name>/<app_id>/<dataset>)、routing path に suffix (/apps/<name>-<n>/)、install form に instance label 入力欄、を一式追加"
+    },
+    {
+      "title": "Google federation: 実 OAuth flow を実機 or mock IdP で end-to-end 検証",
+      "target": "v1",
+      "added_in": "post-mortem-google-fed",
+      "reason": "S822961 で実 Google ログインフローは 1 度も通してない。engine/auth/federation の httptest mock + UI ボタンの存在チェックのみ。実 IdP の挙動 (consent screen / nonce / id_token 署名) は未検証。Playwright + mock OIDC Provider (go 100行 or oauth2-mock-server npm) を立てて /federation/google/start クリック → mock 認可 → callback → session 発行 → admin リンクされた を自動化推奨。実 Google でも 1 度は手動テストして retention"
     }
   ]
 }
