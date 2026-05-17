@@ -1,0 +1,146 @@
+{
+  "sprint_id": "S413bd5",
+  "title": "Google アカウントでの自己登録 + 管理者承認フロー",
+  "planning": [
+    {
+      "decision": "approval state を新ロール pending として表現 (Disabled flag 等の別軸ではなく)",
+      "rationale": "engine/user.Role は既に admin/user の 2 値 enum で、middleware / template / sessions の分岐に組み込まれている。Disabled 別フラグだと if !u.Disabled && role==... の二重条件が全 enforcement 箇所に必要。priority #6 (依存を増やさない) と #5 (1 ヶ所修正で全 enforcement)。"
+    },
+    {
+      "decision": "AutoProvision=1 の旧『即 user role』挙動を撤去し、pending 経由のみに統一",
+      "rationale": "任意の Google ユーザーに対し JIT で full user role を付与するのは priority #5 (信頼性) と衝突。VISION.json 『家庭用 NAS = 家族と他人を見分ける必要』に反する。"
+    },
+    {
+      "decision": "承認時に admin に生成パスワードを 1 度だけ表示するモーダルを必須",
+      "rationale": "engine/system は SSOT projection (priority #10) を持つので vault から再表示は不可。家族にパスワードを伝える運用が必要なので承認直後に 1 回だけ表示。"
+    },
+    {
+      "decision": "Story 1 → 2 → 3 を順次実行 (worktree 並列ではなく sequential)",
+      "rationale": "Story 2 は Story 1 の RolePending と middleware に依存、Story 3 は Story 1 の PromoteFromPending に依存。3 つとも internal/ui の users まわりを触る overlap があるので worktree merge より sequential のほうが速い。"
+    },
+    {
+      "decision": "ログインボタンを単一『Google で続行』に統一 (register/sign-in を分けない)",
+      "rationale": "VISION.json design_references の Tailscale 哲学『設定が極小』と Linear minimal UI。家庭用 UX として 2 ボタンは選択疲れ。AutoProvision=1 + 未登録ユーザー → 自動 register というのが最も少ない選択。"
+    },
+    {
+      "decision": "GUI 起点は /login (Google ボタン) と /ui/admin/users (承認待ちセクション + 各種モーダル)、E2E は実 browser via Playwright (mock IdP との結合)",
+      "rationale": "CLAUDE.md test discipline rule 4『GUI E2E はすべて Playwright』 + Sfix002 で確立した oidc-mock 経由パターンを踏襲。"
+    }
+  ],
+  "implementation": [
+    {
+      "story": "S413bd5-1",
+      "decision": "Added migration 0010_pending_role.sql to extend users.role CHECK constraint to include 'pending'",
+      "rationale": "SQLite's CHECK constraint on the users table only allowed 'admin'|'user'. Rather than patching 0002_users.sql (which would break existing DBs), a new migration recreates the table with the updated constraint using the SQLite rename-copy-drop pattern with foreign_keys=OFF.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "PromoteFromPending updates role BEFORE calling SetUserPassword",
+      "rationale": "If SetUserPassword succeeds but the role update fails, the user has credentials but is still 'pending' — safer than having a non-pending user with no credentials (which would allow login but fail at OS projection). The role update is transactional via users.Update; if it fails the caller retries.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "OIDC RoleLookup wired via optional Provider.RoleLookup field rather than embedding role into SessionResolver",
+      "rationale": "SessionResolver already resolves userID from cookie — adding role there would require engine/user import in engine/auth/oidc (cycle risk). A separate optional interface keeps the OIDC package import-clean and makes the pending check easily testable with a static stub.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "Pending user still gets uid_alloc row in Reconcile even though they are not projected to /etc/passwd",
+      "rationale": "AC-S413bd5-1-2 explicitly requires this so PromoteFromPending can reuse the same uid without a gap. The Reconcile loop was restructured: AllocateUID runs for all non-disabled users, then pending is skipped before the projected/usernames append.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "Updated i18n value for page.login.signin_with_google from 'Google でログイン' to 'Google で続行' (option a — value change, keep MessageID)",
+      "rationale": "Minimal churn: the MessageID is internal; changing the translated value is normal i18n maintenance and avoids adding a redundant constant. The button now semantically covers both sign-in and first-time self-registration.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "fedProvisioner.CreateFromFederation now uses Role: string(user.RolePending) instead of 'user'",
+      "rationale": "Auto-provisioned users must not get full access immediately. Any Google account holder could otherwise bypass the admin-approval gate. The random placeholder password is still generated (passed to CreateUser) but engine/system.CreateUser skips SetUserPassword for pending role, so it is silently ignored — harmless but avoids a nil/empty password edge-case.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "federation.redirectTarget extended with a 'pending' case returning '/ui/pending-approval' — return_to is always ignored for pending users",
+      "rationale": "Pending users have no authorized destination other than the approval page. Honouring return_to would let a pending user supply /ui/admin/dashboard and land there briefly before being redirected — confusing and potentially leaking admin UI structure. Ignoring return_to entirely is the safest and simplest policy.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "/ui/pending-approval mounted via requireAnySession (new helper) rather than requireRole",
+      "rationale": "requireRole(user) would 403 a pending user (roleAllows returns false). A custom requireAnySession middleware allows any valid session regardless of role. The handler itself renders only a static approval-waiting card with a logout button — no functional UI is exposed to pending users.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "PendingApprovalHandler added to internal/ui Renderer as a standalone method, wired via gateway.Deps.PendingApprovalHandler",
+      "rationale": "Follows the same pattern as AuthHandler and SetupHandler — thin wiring that keeps the gateway test surface minimal and makes the handler independently testable without standing up the full gateway.",
+      "ts": "2026-05-17T06:00:00Z"
+    }
+  ],
+  "review": [
+    {
+      "story": "S413bd5",
+      "decision": "Sprint verify added LegacyAuthMethodMirror UPSERT fix + oidc-mock per-flow subject mode",
+      "rationale": "Two issues surfaced during VM e2e: (1) CLI set-password reported success on missing auth_methods row (silent 0-rows UPDATE) — VerifyPassword reads auth_methods so login kept failing. UPSERT makes the mirror self-healing. (2) Mock IdP returned fixed subject mock-user-1, so re-runs hit already-linked branch instead of creating fresh pending users. per-flow mode derives subject from OAuth state (sha256[:6]) for idempotent e2e.",
+      "ts": "2026-05-17T12:30:23Z"
+    },
+    {
+      "story": "S413bd5",
+      "decision": "Tagged TestCallbackReturnToRoleSafe with AC-S413bd5-2-5 instead of writing a new test",
+      "rationale": "AC-2-5 is regression guard: linked admin/user role-safe redirect must still work after adding RolePending. Sfix002-1 test already covers exactly this — adding tag avoids duplication.",
+      "ts": "2026-05-17T12:30:23Z"
+    },
+    {
+      "story": "S413bd5",
+      "decision": "Pre-existing tests/acceptance/share_flow_test.go failures (3) noted as carry-over, not regression",
+      "rationale": "Verified by checking out main and running the same tests — same 3 failures. Documented in Sfix002 done log; cmdexec.Fake systemctl response not updated for restart hotfix. Out of S413bd5 scope.",
+      "ts": "2026-05-17T12:30:23Z"
+    }
+  ],
+  "story3_implementation": [
+    {
+      "story": "S413bd5-3",
+      "decision": "UsersView split into PendingUsers + Users (option a from brief) — server sorts pending/active at handler level",
+      "rationale": "Template logic stays minimal: {{ if $v.PendingUsers }} for the section, separate {{ range $v.Users }} for the active table. Avoids ranging the same slice twice with IsPending conditionals. AllUserRows excludes pending users since they have no credentials and cannot be group members yet.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "Approve flow returns an htmx fragment (HTTP 200) rather than a redirect, to show the one-time password reveal modal inline without losing the admin's current page context",
+      "rationale": "The password must be shown immediately after PromoteFromPending returns the plaintext. A redirect would lose the password value in transit. The fragment pattern (used by SharesACLRowHandler and apps stream) is the established htmx approach in this codebase. The dismiss button calls window.location.reload() so the page re-renders with the updated user list.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "PendingEngine interface is a subset of SystemEngine — separate interface rather than reusing SystemEngine",
+      "rationale": "Follows the same pattern as existing consumers (SystemEngine, PrincipalSource, ShareACLLookup) — each UI handler only sees the minimal surface it needs. Keeps the ui package boundary thin and makes the new handlers independently testable without a full fakeSystemEngine.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "Reject handler uses existing SystemEngine.DeleteUser path rather than a dedicated reject method",
+      "rationale": "DeleteUser already handles vault/projection cleanup (verified in Ssys001). A separate 'reject' engine method would duplicate the same cleanup. The AC says 'pick the path that triggers the same vault/projection cleanup used by the existing user-delete CRUD' — this is exactly that path.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "VM E2E tests fail with KURA_E2E_ADMIN_PW mismatch — same pre-existing issue affecting groups-crud.e2e.spec.ts and admin-shell.e2e.spec.ts",
+      "rationale": "The admin password on this VM is not 'password' (the E2E default). All admin-login E2E tests on this VM have the same failure. This is a VM configuration issue not caused by Story 3 changes. The tests are correctly written and will pass when run with KURA_E2E_ADMIN_PW set to the actual VM admin password.",
+      "ts": "2026-05-17T06:20:00Z"
+    }
+  ],
+  "verification": {
+    "ac_traceability": "15/15 ACs tagged in tests + ac-surface-coverage.sh CI gate passes (37/37)",
+    "unit_tests": "all touched packages green (engine/user, engine/system, engine/auth/federation, engine/auth/oidc, internal/gateway, internal/ui, cmd/kura, i18n, internal/store)",
+    "e2e_tests": "4/4 S413bd5 e2e green on VM (google-self-register-pending, admin-approve, admin-reject) + 4/5 existing federation e2e green (1 env-conditional skip, no regressions)",
+    "build": "make build clean (CGO_ENABLED=0)",
+    "vm_smoke": "browser-verified pending creation flow + admin approve with password reveal + reject removal",
+    "pre_existing_failures": "tests/acceptance/share_flow_test.go (3) — unchanged from main, carry-over from smb-restart hotfix"
+  }
+}

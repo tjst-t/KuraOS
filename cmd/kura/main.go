@@ -268,6 +268,11 @@ func run() error {
 		GroupsLister: groupsLister,
 		CurrentUser:  currentUserFromSession(sessions, users),
 	})
+	// Pending-user approval / rejection (S413bd5-3). Uses the same
+	// systemEngineAdapter; PendingEngine is a subset of SystemEngine.
+	uiRenderer.SetPendingHandlers(ui.PendingDeps{
+		Engine: &systemEngineAdapter{eng: sysEng},
+	})
 	if root := os.Getenv("KURA_APPS_CONFIG_ROOT"); root != "" {
 		lifecycle.ConfigRoot = root
 	}
@@ -300,6 +305,7 @@ func run() error {
 	if federationHandler != nil {
 		depsBuild.FederationHandler = federationHandler
 	}
+	depsBuild.PendingApprovalHandler = uiRenderer.PendingApprovalHandler()
 	handler := gateway.New(depsBuild)
 
 	srv := &http.Server{

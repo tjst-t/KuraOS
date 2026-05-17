@@ -78,6 +78,25 @@ func withPrincipal(r *http.Request, u user.User) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), principalKey{}, u))
 }
 
+// requireAnySession allows any authenticated session regardless of role, 302s
+// to /login when no valid session is present. Used exclusively for
+// /ui/pending-approval so pending users (who fail requireRole checks) can
+// still reach that page.
+func (a *authBundle) requireAnySession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, ok, err := a.resolvePrincipal(r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		next.ServeHTTP(w, withPrincipal(r, u))
+	})
+}
+
 // requireAdminExists wraps a handler so that it 302s to /setup whenever zero
 // admin users exist in the DB. Used by the front-door redirect from "/" so
 // fresh installs land on the wizard.
@@ -99,6 +118,9 @@ func (a *authBundle) requireAdminExists(next http.Handler) http.Handler {
 // requireRole returns a middleware that enforces role hierarchy: admin > user.
 // Unauthenticated requests get a 302 to /login; authenticated-but-wrong-role
 // requests get a 403 (DESIGN_PRINCIPLES priority #8 明示的 — never fail-open).
+// Pending users (role=pending) are redirected to /ui/pending-approval for any
+// path other than /ui/pending-approval itself — they must not reach any
+// functional UI until an admin promotes them.
 func (a *authBundle) requireRole(min user.Role, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, ok, err := a.resolvePrincipal(r)
@@ -108,6 +130,11 @@ func (a *authBundle) requireRole(min user.Role, next http.Handler) http.Handler 
 		}
 		if !ok {
 			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		// Pending users may only view the approval-pending page.
+		if u.Role == user.RolePending && r.URL.Path != "/ui/pending-approval" {
+			http.Redirect(w, r, "/ui/pending-approval", http.StatusFound)
 			return
 		}
 		if !roleAllows(u.Role, min) {

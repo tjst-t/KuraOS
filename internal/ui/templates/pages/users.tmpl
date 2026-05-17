@@ -65,6 +65,58 @@ PageData.Extra is *ui.UsersView.
 </div>
 
 {{ if eq $v.Tab "users" }}
+
+{{- /* ===== 承認待ちセクション — hidden when PendingUsers is empty ===== */ -}}
+{{ if $v.PendingUsers }}
+<div class="card" data-testid="pending-users-section" style="margin-bottom:16px;border:1px solid var(--warning, #d97706);">
+  <div class="card-head" style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);">
+    <h3 class="card-title" style="margin:0;color:var(--warning, #d97706);" data-testid="pending-section-title">
+      {{ T "page.users.pending_section_title" }}
+      <span class="muted mono" style="font-size:12px;">({{ len $v.PendingUsers }})</span>
+    </h3>
+  </div>
+  <table class="tbl" data-testid="pending-users-table">
+    <thead><tr>
+      <th>{{ T "page.users.col.user" }}</th>
+      <th>{{ T "page.users.col.methods" }}</th>
+      <th>{{ T "page.users.col.actions" }}</th>
+    </tr></thead>
+    <tbody>
+      {{ range $v.PendingUsers }}
+      <tr data-testid="pending-users-row" data-user-id="{{ .UserID }}">
+        <td>
+          <span class="row center" style="display:flex;align-items:center;gap:10px">
+            <span class="avatar" style="width:24px;height:24px;font-size:10px;border-radius:6px;background:var(--surface-2);display:inline-grid;place-items:center;font-weight:600">{{ .Initials }}</span>
+            <span style="font-weight:500">{{ .Username }}</span>
+          </span>
+        </td>
+        <td>
+          <div style="display:flex;gap:4px;flex-wrap:wrap">
+            {{ range .Federations }}<span class="badge mono" data-method="{{ .Provider }}">{{ .Provider }}</span>{{ end }}
+          </div>
+        </td>
+        <td>
+          <div class="row gap-sm" style="display:flex;gap:6px;align-items:center">
+            {{- /* 承認ボタン: htmx でモーダルフラグメントを取得 */ -}}
+            <button type="button" class="btn btn-sm btn-primary" data-testid="pending-approve-btn"
+              data-modal-open="pending-approve-modal-{{ .UserID }}">
+              {{ T "page.users.approve_button" }}
+            </button>
+            {{- /* 却下ボタン: confirm モーダルを開く */ -}}
+            <button type="button" class="btn btn-sm btn-danger" data-testid="pending-reject-btn"
+              data-modal-open="pending-reject-modal-{{ .UserID }}">
+              {{ T "page.users.reject_button" }}
+            </button>
+          </div>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ end }}
+
+{{- /* ===== アクティブユーザーテーブル ===== */ -}}
 <div class="card" data-testid="users-table-card">
   <table class="tbl" data-testid="users-table">
     <thead><tr>
@@ -280,6 +332,26 @@ PageData.Extra is *ui.UsersView.
     "footTpl" "users-edit-foot"
     "ctx"     . }}
 {{ end }}
+
+{{- /* ===== 承認待ちユーザーの承認 / 却下モーダル ===== */ -}}
+{{ range $v.PendingUsers }}
+{{ template "modal" dict
+    "id"      (printf "pending-approve-modal-%s" .UserID)
+    "testid"  (printf "pending-approve-modal-%s" .UserID)
+    "title"   (T "page.users.approve_modal_title")
+    "action"  (printf "/ui/admin/users/%s/approve" .UserID)
+    "bodyTpl" "pending-approve-body"
+    "footTpl" "pending-approve-foot"
+    "ctx"     . }}
+{{ template "modal" dict
+    "id"      (printf "pending-reject-modal-%s" .UserID)
+    "testid"  (printf "pending-reject-modal-%s" .UserID)
+    "title"   (T "page.users.reject_modal_title")
+    "action"  (printf "/ui/admin/users/%s/reject" .UserID)
+    "bodyTpl" "pending-reject-body"
+    "footTpl" "pending-reject-foot"
+    "ctx"     . }}
+{{ end }}
 {{ end }}
 
 {{ if eq $v.Tab "groups" }}
@@ -420,4 +492,43 @@ PageData.Extra is *ui.UsersView.
 {{ define "groups-members-foot" }}
 <button type="button" class="btn" data-modal-close>{{ T "page.users.form.cancel" }}</button>
 <button type="submit" class="btn btn-primary" data-testid="groups-members-submit">{{ T "page.users.edit.submit" }}</button>
+{{ end }}
+
+{{- /* ===== pending-approve modal body / foot ===== */ -}}
+{{ define "pending-approve-body" }}
+{{ $u := . }}
+<div data-testid="pending-approve-form" style="display:flex;flex-direction:column;gap:14px;">
+  <p style="margin:0;font-size:14px;">{{ T "page.users.approve_modal_body" $u.Username }}</p>
+  <div class="field">
+    <label>{{ T "page.users.form.role" }}</label>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="radio" name="role" value="user" checked data-testid="pending-approve-role-user">
+        <span>{{ T "page.users.approve_modal_role_user" }}</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+        <input type="radio" name="role" value="admin" data-testid="pending-approve-role-admin">
+        <span>{{ T "page.users.approve_modal_role_admin" }}</span>
+      </label>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "pending-approve-foot" }}
+<button type="button" class="btn" data-modal-close data-testid="pending-approve-cancel">{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-primary" data-testid="pending-approve-submit">{{ T "page.users.approve_modal_submit" }}</button>
+{{ end }}
+
+{{- /* ===== pending-reject modal body / foot ===== */ -}}
+{{ define "pending-reject-body" }}
+{{ $u := . }}
+<div data-testid="pending-reject-form" style="display:flex;flex-direction:column;gap:14px;">
+  <p style="margin:0;font-size:14px;color:var(--danger, #dc2626);">{{ T "page.users.reject_modal_body" $u.Username }}</p>
+</div>
+{{ end }}
+
+{{ define "pending-reject-foot" }}
+<button type="button" class="btn" data-modal-close data-testid="pending-reject-cancel">{{ T "page.users.form.cancel" }}</button>
+<button type="submit" class="btn btn-danger" data-testid="pending-reject-submit">{{ T "page.users.reject_modal_submit" }}</button>
 {{ end }}

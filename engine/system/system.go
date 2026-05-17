@@ -94,13 +94,13 @@ type ProjectedGroup struct {
 type CredentialKind string
 
 const (
-	CredentialArgon2id              CredentialKind = "argon2id"
-	CredentialNTHash                CredentialKind = "nt_hash"
-	CredentialOIDCClientSecret      CredentialKind = "oidc_client_secret"
-	CredentialOIDCSigningKey        CredentialKind = "oidc_signing_key"
-	CredentialFederationClientSec   CredentialKind = "federation_client_secret"
-	CredentialAppDBPassword         CredentialKind = "app_db_password"
-	CredentialTLSKey                CredentialKind = "tls_key"
+	CredentialArgon2id            CredentialKind = "argon2id"
+	CredentialNTHash              CredentialKind = "nt_hash"
+	CredentialOIDCClientSecret    CredentialKind = "oidc_client_secret"
+	CredentialOIDCSigningKey      CredentialKind = "oidc_signing_key"
+	CredentialFederationClientSec CredentialKind = "federation_client_secret"
+	CredentialAppDBPassword       CredentialKind = "app_db_password"
+	CredentialTLSKey              CredentialKind = "tls_key"
 )
 
 // CredentialOwnerKind partitions the vault rows by the kind of entity that
@@ -236,6 +236,13 @@ type Engine interface {
 	// SetGroupMembers replaces the membership list of groupID with
 	// userIDs and re-projects /etc/group secondary group entries.
 	SetGroupMembers(ctx context.Context, groupID string, userIDs []string) error
+
+	// PromoteFromPending moves a pending (unapproved) user to newRole,
+	// generates a random password, writes argon2id + NT-hash credentials,
+	// and re-projects /etc/passwd + tdbsam. Returns the plaintext password
+	// exactly once — the caller must show it to the operator immediately
+	// and discard it; it cannot be recovered afterward.
+	PromoteFromPending(ctx context.Context, userID, newRole string) (string, error)
 }
 
 // CreateUserInput is the request shape for Engine.CreateUser.

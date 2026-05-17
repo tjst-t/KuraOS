@@ -92,7 +92,7 @@ func TestLogin_GETShowsGoogleButtonWhenEnabled(t *testing.T) {
 	for _, want := range []string{
 		`data-testid="login-google-btn"`,
 		`href="/federation/google/start"`,
-		`Google でログイン`,
+		`Google で続行`, // AC-S413bd5-2-1: label updated from "でログイン" to "で続行"
 		`data-testid="login-fed-divider"`,
 	} {
 		if !strings.Contains(body, want) {

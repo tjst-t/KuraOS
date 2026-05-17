@@ -391,10 +391,12 @@ func (f roleLookupFn) LookupRole(_ context.Context, userID string) (string, erro
 	return f(userID), nil
 }
 
-// [AC-Sfix002-1-1] TestCallbackReturnToRoleSafe verifies the federation
-// callback never redirects a user to a URL their role can't reach. A
-// user role landing on /ui/admin/* would 403 immediately and look like
-// a broken login (Sfix002 rationale).
+// [AC-Sfix002-1-1] [AC-S413bd5-2-5] TestCallbackReturnToRoleSafe verifies the
+// federation callback never redirects a user to a URL their role can't reach.
+// A user role landing on /ui/admin/* would 403 immediately and look like a
+// broken login (Sfix002 rationale). S413bd5-2-5 reuses this test as the
+// regression guard that adding RolePending didn't break the linked-user
+// admin/user redirect.
 func TestCallbackReturnToRoleSafe(t *testing.T) {
 	cases := []struct {
 		name     string
@@ -556,6 +558,97 @@ func TestPKCEHelper(t *testing.T) {
 	got := PKCEHelper("verifier-1")
 	if len(got) == 0 {
 		t.Fatalf("empty challenge")
+	}
+}
+
+// [AC-S413bd5-2-3] TestPendingUserRedirectsToPendingApproval verifies that
+// after federation login, a pending user always lands on /ui/pending-approval
+// regardless of any return_to they supplied. Exercises redirectTarget directly
+// as well as an end-to-end provisioning + callback flow via a fake provisioner
+// whose returned userID is mapped to "pending" by the fake role lookup.
+func TestPendingUserRedirectsToPendingApproval(t *testing.T) {
+	cases := []struct {
+		name     string
+		returnTo string
+	}{
+		{"no return_to", ""},
+		{"return_to /ui/admin/dashboard", "/ui/admin/dashboard"},
+		{"return_to /ui", "/ui"},
+		{"return_to /someplace", "/someplace"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := newTestDB(t)
+			sessions := session.NewStore(db)
+			mgr := New(oidc.NewStorage(db), sessions, newMemCreds())
+			mgr.SetRoleLookup(roleLookupFn(func(_ string) string {
+				return "pending"
+			}))
+			got := mgr.redirectTarget(context.Background(), "u-pending", c.returnTo, "/ui/admin/dashboard")
+			if got != "/ui/pending-approval" {
+				t.Fatalf("redirectTarget = %q, want /ui/pending-approval (pending role)", got)
+			}
+		})
+	}
+}
+
+// [AC-S413bd5-2-3] TestCallbackAutoProvisionPendingLandsOnPendingApproval drives
+// the full callback flow: an unbound user hits /start with auto_provision=true,
+// the provisioner creates a user, the fake RoleLookup returns "pending" for that
+// user, and the callback 302s to /ui/pending-approval rather than any return_to.
+func TestCallbackAutoProvisionPendingLandsOnPendingApproval(t *testing.T) {
+	db := newTestDB(t)
+	idp := newMockIdP(t, "google-pending-777", "newperson@example.com")
+	defer idp.server.Close()
+
+	storage := oidc.NewStorage(db)
+	sessions := session.NewStore(db)
+	mgr := New(storage, sessions, newMemCreds())
+	mgr.SetHTTPClient(idp.server.Client())
+
+	prov := &fakeProvisioner{}
+	mgr.SetProvisioner(prov)
+
+	mgr.SetRoleLookup(roleLookupFn(func(_ string) string {
+		return "pending"
+	}))
+
+	gateway := httptest.NewServer(mgr.Routes())
+	defer gateway.Close()
+
+	_ = mgr.Register(context.Background(), Provider{
+		Name: "google", Issuer: idp.server.URL, ClientID: "c",
+		RedirectURI:   gateway.URL + "/federation/google/callback",
+		AutoProvision: true,
+	})
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	// Start with an explicit return_to that a non-pending user would reach.
+	res, _ := client.Get(gateway.URL + "/federation/google/start?return_to=/ui/admin/dashboard")
+	res.Body.Close()
+	loc, _ := url.Parse(res.Header.Get("Location"))
+	res2, _ := client.Get(loc.String())
+	res2.Body.Close()
+	cb, _ := url.Parse(res2.Header.Get("Location"))
+
+	res3, err := client.Get(cb.String())
+	if err != nil {
+		t.Fatalf("callback: %v", err)
+	}
+	res3.Body.Close()
+
+	if res3.StatusCode != http.StatusFound {
+		t.Fatalf("callback status = %d, want 302", res3.StatusCode)
+	}
+	if got := res3.Header.Get("Location"); got != "/ui/pending-approval" {
+		t.Fatalf("Location = %q, want /ui/pending-approval (pending user must not reach return_to)", got)
+	}
+	if len(prov.created) != 1 {
+		t.Fatalf("provisioner created %d users, want 1", len(prov.created))
 	}
 }
 

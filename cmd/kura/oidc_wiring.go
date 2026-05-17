@@ -42,6 +42,7 @@ func buildOIDCProvider(ctx context.Context, db *sql.DB, sysEng system.Engine, se
 		&sessionResolverAdapter{sessions: sessions, users: users},
 		&userInfoAdapter{users: users},
 	)
+	p.RoleLookup = &oidcRoleLookupAdapter{users: users}
 	p.SecretLookup = func(ctx context.Context, clientID string) (string, error) {
 		cred, err := sysEng.LookupCredential(ctx,
 			system.CredentialOIDCClientSecret, system.OwnerApp, clientID)
@@ -131,13 +132,28 @@ func (a *userInfoAdapter) GetClaims(ctx context.Context, userID string) (map[str
 	return claims, nil
 }
 
+// oidcRoleLookupAdapter implements oidc.UserRoleLookup so the OIDC OP can
+// reject pending users before issuing an auth-code.
+type oidcRoleLookupAdapter struct{ users *user.Store }
+
+func (a *oidcRoleLookupAdapter) LookupRole(ctx context.Context, userID string) (string, error) {
+	if a.users == nil {
+		return "", nil
+	}
+	u, err := a.users.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return string(u.Role), nil
+}
+
 // appOIDCRegistrar implements app.OIDCRegistrar by delegating to the
 // OIDC storage + the credential vault. Constructed once at startup and
 // passed into AppLifecycle.OIDC.
 type appOIDCRegistrar struct {
-	op       *oidc.Provider
-	sysEng   system.Engine
-	gateway  string // public origin used to build absolute redirect URIs
+	op      *oidc.Provider
+	sysEng  system.Engine
+	gateway string // public origin used to build absolute redirect URIs
 }
 
 func newAppOIDCRegistrar(op *oidc.Provider, sysEng system.Engine, gateway string) *appOIDCRegistrar {

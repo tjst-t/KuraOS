@@ -14,11 +14,11 @@ import (
 // state, which matches what a fresh install looks like before any users,
 // federations, or OIDC clients exist.
 type UsersDeps struct {
-	Users        UsersLister
-	Groups       GroupsLister
-	Federations  FederationLister
-	OIDCClients  OIDCClientLister
-	Providers    ProviderLister
+	Users       UsersLister
+	Groups      GroupsLister
+	Federations FederationLister
+	OIDCClients OIDCClientLister
+	Providers   ProviderLister
 	// CurrentUser resolves the authenticated session to (user_id,
 	// username). Used to render the "Google を紐付け" button only on
 	// the row of the logged-in user — every row had it before, and
@@ -93,12 +93,16 @@ type UsersProvider struct {
 type UsersView struct {
 	Tab          string
 	UsersHeading string
-	Users        []UsersViewUser
-	Groups       []UsersViewGroup
-	Providers    []UsersProvider
-	OIDCClients  []UsersOIDCClient
-	Subtitle     string
-	Issuer       string
+	// PendingUsers are accounts with role=pending awaiting admin approval.
+	// The template hides the pending section when this is empty.
+	PendingUsers []UsersViewUser
+	// Users are active (non-pending) accounts.
+	Users       []UsersViewUser
+	Groups      []UsersViewGroup
+	Providers   []UsersProvider
+	OIDCClients []UsersOIDCClient
+	Subtitle    string
+	Issuer      string
 
 	// FormError carries the result of a previous /ui/admin/users/* POST.
 	// Populated from the ?err= query param so the page can display a
@@ -168,6 +172,7 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 		if d.Users != nil {
 			users, _ := d.Users.List(ctx)
 			view.Users = make([]UsersViewUser, 0, len(users))
+			view.PendingUsers = make([]UsersViewUser, 0)
 			for _, u := range users {
 				row := UsersViewUser{
 					UserID:      u.UserID,
@@ -189,11 +194,20 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 						}
 					}
 				}
-				view.Users = append(view.Users, row)
+				if u.Role == "pending" {
+					view.PendingUsers = append(view.PendingUsers, row)
+				} else {
+					view.Users = append(view.Users, row)
+				}
 			}
 			sort.Slice(view.Users, func(i, j int) bool {
 				return view.Users[i].Username < view.Users[j].Username
 			})
+			sort.Slice(view.PendingUsers, func(i, j int) bool {
+				return view.PendingUsers[i].Username < view.PendingUsers[j].Username
+			})
+			// AllUserRows excludes pending users — pending users have no credentials
+			// yet and cannot be assigned to groups.
 			view.AllUserRows = view.Users
 		}
 		if d.Providers != nil {
@@ -283,7 +297,7 @@ func initials(name string) string {
 		return "?"
 	}
 	if len(name) == 1 {
-		return string(byte(name[0]&^32)) // upper
+		return string(byte(name[0] &^ 32)) // upper
 	}
 	return string(byte(name[0]&^32)) + string(byte(name[1]&^32))
 }

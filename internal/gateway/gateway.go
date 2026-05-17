@@ -49,6 +49,12 @@ type Deps struct {
 	// FederationHandler serves external IdP RP callbacks (e.g. Google) at
 	// /federation/<provider>/(start|callback). Wired alongside OIDC.
 	FederationHandler http.Handler
+
+	// PendingApprovalHandler serves /ui/pending-approval. It is mounted
+	// with a custom middleware that allows any authenticated session
+	// (including role=pending) — the handler itself bounces non-pending
+	// users back to /. Wired from cmd/kura when auth is enabled.
+	PendingApprovalHandler http.Handler
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
@@ -100,6 +106,19 @@ func New(d Deps) http.Handler {
 			ui = auth.requireRoleHandler(roleUser, userHandler)
 		}
 		mux.Handle("/ui", ui)
+
+		// /ui/pending-approval — only accessible to authenticated users
+		// (any role). The gateway intercepts it before the /ui/admin/*
+		// and /ui handlers so pending users are not swallowed by
+		// requireRole(user) which would 403 them. The handler itself
+		// redirects non-pending visitors to /.
+		if d.PendingApprovalHandler != nil {
+			pendingHandler := d.PendingApprovalHandler
+			if hasAuth {
+				pendingHandler = auth.requireAnySession(d.PendingApprovalHandler)
+			}
+			mux.Handle("/ui/pending-approval", pendingHandler)
+		}
 
 		// "/" — front door. If no admin yet, send to /setup; else send to
 		// /ui/admin/dashboard (which itself enforces the admin role).

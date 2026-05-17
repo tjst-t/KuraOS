@@ -59,6 +59,38 @@ func TestStore_CreateLocalUser_AdminAndUserRoles(t *testing.T) {
 	}
 }
 
+// [AC-S413bd5-1-1] RolePending is accepted by CreateLocalUser and Role.Valid().
+func TestStore_CreateLocalUser_PendingRole(t *testing.T) {
+	s := newTestStore(t)
+	ctx := context.Background()
+
+	// Role.Valid() must accept pending.
+	if !RolePending.Valid() {
+		t.Fatalf("RolePending.Valid() = false, want true")
+	}
+
+	// CreateLocalUser with empty password must succeed for pending users.
+	u, err := s.CreateLocalUser(ctx, "pending-alice", "Alice Pending", "", RolePending)
+	if err != nil {
+		t.Fatalf("CreateLocalUser pending: %v", err)
+	}
+	if u.Role != RolePending {
+		t.Fatalf("role = %q, want %q", u.Role, RolePending)
+	}
+	if u.ID == "" {
+		t.Fatalf("ID is empty")
+	}
+
+	// Pending user should not be verified by password (empty secret).
+	_, ok, err := s.VerifyPassword(ctx, "pending-alice", "")
+	if err != nil {
+		t.Fatalf("VerifyPassword: %v", err)
+	}
+	if ok {
+		t.Fatalf("pending user should not authenticate via password")
+	}
+}
+
 func TestStore_CreateLocalUser_RejectsInvalidRole(t *testing.T) {
 	s := newTestStore(t)
 	if _, err := s.CreateLocalUser(context.Background(), "x", "", "pw", Role("root")); err == nil {

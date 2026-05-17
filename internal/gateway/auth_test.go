@@ -209,6 +209,45 @@ func TestAuth_DBErrorReturns500(t *testing.T) {
 	}
 }
 
+// [AC-S413bd5-1-4] Pending user gets 302 to /ui/pending-approval for any
+// /ui/* path other than /ui/pending-approval itself. The pending-approval
+// page handler is added in Story 2; Story 1 only tests that the redirect
+// fires correctly.
+func TestRequireRole_PendingUserRedirects(t *testing.T) {
+	sessions := &fakeSessions{
+		sessions: map[string]session.Session{
+			"tok": {ID: "tok", UserID: "u-pend", ExpiresAt: time.Now().Add(time.Hour)},
+		},
+	}
+	users := &fakeUsers{
+		byID: map[string]user.User{
+			"u-pend": {ID: "u-pend", Username: "pending-alice", Role: user.RolePending},
+		},
+		count: map[user.Role]int{user.RoleAdmin: 1},
+	}
+	h := newGateway(t, sessions, users, okHandler("page"))
+
+	// Paths that must redirect a pending user to /ui/pending-approval.
+	redirectCases := []string{
+		"/ui",
+		"/ui/admin/dashboard",
+	}
+	for _, path := range redirectCases {
+		t.Run(path, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, path, nil)
+			req.AddCookie(&http.Cookie{Name: session.CookieName, Value: "tok"})
+			rec := httptest.NewRecorder()
+			h.ServeHTTP(rec, req)
+			if rec.Code != http.StatusFound {
+				t.Fatalf("status = %d, want 302 (pending redirect) for path %s", rec.Code, path)
+			}
+			if loc := rec.Header().Get("Location"); loc != "/ui/pending-approval" {
+				t.Fatalf("Location = %q, want /ui/pending-approval for path %s", loc, path)
+			}
+		})
+	}
+}
+
 func TestAuth_DisabledUserTreatedAsUnauth(t *testing.T) {
 	sessions := &fakeSessions{
 		sessions: map[string]session.Session{

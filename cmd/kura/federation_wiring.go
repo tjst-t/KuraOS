@@ -148,7 +148,7 @@ func (p *fedProvisioner) CreateFromFederation(ctx context.Context, username, dis
 		Username:    username,
 		DisplayName: displayName,
 		Password:    pw,
-		Role:        "user",
+		Role:        string(user.RolePending),
 	})
 	if err != nil {
 		return "", err

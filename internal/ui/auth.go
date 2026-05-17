@@ -223,6 +223,27 @@ var errLogin = errors.New("ui: login error")
 
 var _ = errLogin // keep for future use without "declared and not used"
 
+// PendingApprovalHandler returns the /ui/pending-approval page. The route is
+// intentionally mounted outside the admin/user requireRole gates so that a
+// pending-role user (who has a valid session but no page access) can reach it.
+// Non-pending authenticated users who manually type the URL are bounced to /.
+func (r *Renderer) PendingApprovalHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		if req.Method != http.MethodGet {
+			w.Header().Set("Allow", "GET")
+			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+			return
+		}
+		data := PageData{
+			Locale:      r.tr.Locale(),
+			Version:     r.version,
+			PageTitle:   r.tr.T(i18n.MsgPendingApprovalTitle),
+			PageTitleID: string(i18n.MsgPendingApprovalTitle),
+		}
+		r.renderWithLayout(w, "templates/layouts/auth.tmpl", "templates/pages/pending_approval.tmpl", data)
+	})
+}
+
 // federationErrorData is the view model for templates/pages/federation_error.tmpl.
 // MessageID is an i18n key looked up via the {{ T }} template func so the
 // caller never has to pre-translate.

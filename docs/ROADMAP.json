@@ -4,11 +4,11 @@
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
     "current_sprint": "S8a756d",
-    "total": 17,
-    "done": 12,
+    "total": 18,
+    "done": 13,
     "in_progress": 0,
     "remaining": 5,
-    "percentage": 70,
+    "percentage": 72,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -21,9 +21,10 @@
       "S65b510",
       "S822961",
       "Sfix001",
-      "Sfix002"
+      "Sfix002",
+      "S413bd5"
     ],
-    "updated_at": "2026-05-17T00:35:00Z"
+    "updated_at": "2026-05-17T12:35:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -38,6 +39,7 @@
     "S822961",
     "Sfix001",
     "Sfix002",
+    "S413bd5",
     "S8a756d",
     "Se1e7a6",
     "Sf92666",
@@ -1831,6 +1833,188 @@
           "tasks": {}
         }
       }
+    },
+    "S413bd5": {
+      "title": "Google アカウントでの自己登録 + 管理者承認フロー",
+      "status": "done",
+      "milestone": false,
+      "description": "ログイン画面の『Google で続行』から未登録 Google アカウントの利用申請を受け付ける。新規ユーザーは権限ゼロの『承認待ち (pending)』ロールで作成され、SMB / OIDC / UI 操作はすべて拒否される。管理者が Users 画面の『承認待ち』セクションから承認 (user/admin ロール付与) または却下 (アカウント削除) を選ぶ。Sfix002 で landing した auto_provision=1 の挙動 (即座に role=user を付与) を pending 経由に切り替え、家庭用 NAS の安全な family-onboarding 体験を完成させる。",
+      "stories": {
+        "S413bd5-1": {
+          "title": "承認待ち (pending) ロールと projection スキップ",
+          "user_story": "NAS 管理者として、Google でログインしただけのユーザーが NAS のファイルにアクセスできない『承認待ち』状態を持てるようにしたい。なぜなら、家族と他人を見分けて初めて NAS の安全性が成り立つから。",
+          "status": "done",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S413bd5-1-1",
+              "text": "engine/user.RolePending が定義され、Role.Valid() が pending を許可する",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-1-2",
+              "text": "role=pending でユーザーを作成すると /etc/passwd・/etc/group・pdbedit -L のいずれにもエントリが現れない (uid_alloc 予約のみ)",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-1-3",
+              "text": "engine/system.PromoteFromPending(userID, newRole) を呼ぶと vault にランダムパスワード保存 + /etc/passwd + smbpasswd の projection がまとめて完了する",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-1-4",
+              "text": "pending ユーザーのブラウザセッションは /ui/pending-approval / /logout / /static/* 以外のすべての /ui パスに対し 302 で /ui/pending-approval に戻される",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-1-5",
+              "text": "pending ユーザーは OIDC Provider の /authorize に対しても拒否される (SMB / アプリへの SSO は無効)",
+              "status": "pass"
+            }
+          ],
+          "tasks": {
+            "S413bd5-1-1": {
+              "title": "engine/user に RolePending 追加 + Valid() / migration なし",
+              "status": "done"
+            },
+            "S413bd5-1-2": {
+              "title": "engine/system: pending ユーザーで passwd/smb/vault projection をスキップ",
+              "status": "done"
+            },
+            "S413bd5-1-3": {
+              "title": "engine/system.PromoteFromPending(userID, newRole) 新設",
+              "status": "done"
+            },
+            "S413bd5-1-4": {
+              "title": "session middleware: pending ユーザーは pending-approval ページに強制リダイレクト",
+              "status": "done"
+            },
+            "S413bd5-1-5": {
+              "title": "OIDC Provider /authorize: pending ユーザーを拒否",
+              "status": "done"
+            },
+            "S413bd5-1-6": {
+              "title": "tests/acceptance/pending-user-projection.sh (real-VM: pending ユーザー作成→各 projection が空→Promote 後埋まる)",
+              "status": "done"
+            }
+          }
+        },
+        "S413bd5-2": {
+          "title": "ログイン画面の『Google で続行』 + 承認待ちランディング",
+          "user_story": "NAS を使いたい家族メンバーとして、ログイン画面から自分の Google アカウントで KuraOS の利用申請を出したい。なぜなら、管理者からパスワードを事前にもらわなくても、利用開始の意思を伝えて承認を待てるから。",
+          "status": "done",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S413bd5-2-1",
+              "text": "/login の Google ボタンラベルが『Google で続行』(i18n) になり、未登録ユーザーも押せる",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-2-2",
+              "text": "KURA_FED_GOOGLE_AUTO_PROVISION=1 のとき、未登録 Google ユーザーが /federation/google/start を踏むと user が auto-create され、role=pending で federation_links が貼られる",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-2-3",
+              "text": "pending ユーザーは callback 後 return_to に関係なく /ui/pending-approval にランディングする",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-2-4",
+              "text": "/ui/pending-approval は『承認待ち』の i18n 説明文と『ログアウト』ボタンを表示する",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-2-5",
+              "text": "既存 (linked / role!=pending) ユーザーの Google ログイン flow は従来どおりロール別 dashboard にリダイレクトされる (Sfix002-1 の挙動を保持)",
+              "status": "pass"
+            }
+          ],
+          "tasks": {
+            "S413bd5-2-1": {
+              "title": "i18n: page.login.signin_with_google → continue_with_google にラベル変更",
+              "status": "done"
+            },
+            "S413bd5-2-2": {
+              "title": "federation_wiring.go: fedProvisioner.CreateFromFederation を RolePending で作成するよう変更",
+              "status": "done"
+            },
+            "S413bd5-2-3": {
+              "title": "internal/ui に /ui/pending-approval ハンドラ + pending_approval.tmpl 追加",
+              "status": "done"
+            },
+            "S413bd5-2-4": {
+              "title": "federation callback: role==pending なら return_to を無視して pending-approval に飛ばす",
+              "status": "done"
+            },
+            "S413bd5-2-5": {
+              "title": "tests/e2e/google-self-register-pending.e2e.spec.ts (実ブラウザ: 未登録 mock Google → register → pending ランディング)",
+              "status": "done"
+            }
+          }
+        },
+        "S413bd5-3": {
+          "title": "管理者の承認 / 却下 UI",
+          "user_story": "NAS 管理者として、Google で利用申請してきたユーザーを Users 画面で一覧確認し、信頼できる人だけを承認 (role を user/admin に変更) または却下 (アカウント削除) したい。なぜなら、家族の参加と他人の侵入を区別したいから。",
+          "status": "done",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S413bd5-3-1",
+              "text": "Users 画面 (/ui/admin/users) の上部に『承認待ち』セクションが表示され、pending ユーザーがそこに集まる (pending が 0 件なら非表示)",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-3-2",
+              "text": "承認モーダル: role select (user / admin) → 承認 で engine/system.PromoteFromPending が呼ばれ、ユーザーは SMB と UI 両方で利用可能になる",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-3-3",
+              "text": "却下モーダル: 確認後 engine/user.DeleteUser が呼ばれ、federation_links / federation_identities / vault レコードが ON DELETE CASCADE / 明示削除で消える",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-3-4",
+              "text": "承認後ユーザーが SMB クライアントから username + (Promote 時にメールで通知されたか、あるいは admin が表示してコピペ送付する) パスワードでアクセスできる (vault に保存されたパスワードを admin が一度だけ表示できる UI を含む)",
+              "status": "pass"
+            },
+            {
+              "id": "AC-S413bd5-3-5",
+              "text": "承認 / 却下 はすべて i18n 表記、ボタン無反応や 502 が出ないことを e2e で確認する",
+              "status": "pass"
+            }
+          ],
+          "tasks": {
+            "S413bd5-3-1": {
+              "title": "users.tmpl に『承認待ち』セクション + 承認/却下ボタン追加 (pending=0 なら非表示)",
+              "status": "done"
+            },
+            "S413bd5-3-2": {
+              "title": "POST /ui/admin/users/:id/approve handler + role select モーダル fragment",
+              "status": "done"
+            },
+            "S413bd5-3-3": {
+              "title": "POST /ui/admin/users/:id/reject handler + 削除確認モーダル fragment",
+              "status": "done"
+            },
+            "S413bd5-3-4": {
+              "title": "承認時に生成されたパスワードを admin に 1 度だけ表示するモーダル (vault からは取り消し不可、コピペ後 dismiss)",
+              "status": "done"
+            },
+            "S413bd5-3-5": {
+              "title": "i18n: page.users.pending_section, approve_button, reject_button, role_select_label 等を追加",
+              "status": "done"
+            },
+            "S413bd5-3-6": {
+              "title": "tests/e2e/admin-approve-pending-user.e2e.spec.ts (実ブラウザ: pending ユーザー → admin 承認 → user role → smbclient OK)",
+              "status": "done"
+            },
+            "S413bd5-3-7": {
+              "title": "tests/e2e/admin-reject-pending-user.e2e.spec.ts (実ブラウザ: pending ユーザー → 却下 → 行が消え federation_links が空)",
+              "status": "done"
+            }
+          }
+        }
+      }
     }
   },
   "dependencies": {
@@ -1932,6 +2116,14 @@
         "Sfix001"
       ],
       "reason": "federation engine (S822961), login UI (S1e7eeb), Sfix001 で確立した CRUD/CurrentUser 規約に依存"
+    },
+    "S413bd5": {
+      "depends_on": [
+        "Sfix002",
+        "Ssys001",
+        "S822961"
+      ],
+      "reason": "federation の完成形 (Sfix002) と engine/system の SSOT projection (Ssys001) と OIDC Provider (S822961) を直接拡張する。S8a756d より前に入れる根拠: pending ロールが入ると engine/user の Role 型と session middleware が変わるので、monitoring の event 配線より前に固めたほうが回帰検出しやすい"
     }
   },
   "backlog": [

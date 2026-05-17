@@ -470,6 +470,10 @@ func (m *Manager) redirectTarget(ctx context.Context, userID, returnTo, adminFal
 			return returnTo
 		}
 		return adminFallback
+	case "pending":
+		// pending users are not yet approved — always land on the
+		// approval-pending page regardless of any return_to they supplied.
+		return "/ui/pending-approval"
 	default:
 		// user role (or unknown). Explicit return_to is honoured iff
 		// it isn't /ui/admin/* — otherwise we'd just hand them a 403.
