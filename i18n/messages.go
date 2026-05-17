@@ -81,9 +81,18 @@ const (
 	MsgNavLogout             MessageID = "nav.logout"
 
 	// Federation buttons on /login (added in Sfix002-2).
+	// Value updated in S413bd5-2: "Google でログイン" → "Google で続行"
+	// since the button now means both sign-in AND first-time registration.
 	MsgLoginDividerOr      MessageID = "page.login.divider_or"
 	MsgLoginSignInGoogle   MessageID = "page.login.signin_with_google"
 	MsgLoginGoogleLogoAlt  MessageID = "page.login.google_logo_alt"
+)
+
+// Pending-approval page (added in S413bd5-2).
+const (
+	MsgPendingApprovalTitle   MessageID = "page.pending_approval.title"
+	MsgPendingApprovalBody    MessageID = "page.pending_approval.body"
+	MsgPendingApprovalLogout  MessageID = "page.pending_approval.logout_button"
 )
 
 // Federation error pages (added in Sfix002-3).

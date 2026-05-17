@@ -50,7 +50,7 @@
   "page.login.generic_error": "ログインに失敗しました。時間を置いてもう一度お試しください。",
   "page.login.logout_success": "ログアウトしました",
   "page.login.divider_or": "または",
-  "page.login.signin_with_google": "Google でログイン",
+  "page.login.signin_with_google": "Google で続行",
   "page.login.google_logo_alt": "Google ロゴ",
 
   "page.federation.error_title": "外部サインインに失敗しました",
@@ -490,5 +490,9 @@
   "page.shares.acl.picker.kind.group": "グループ",
   "page.shares.acl.picker.empty": "アクセス権の設定がありません。このままだと誰もアクセスできません。「+ ユーザー / グループを追加」で自分自身を必ず追加してください。",
   "page.shares.acl.mode.rw": "読み書き (rw)",
-  "page.shares.acl.mode.r": "読み取り (r)"
+  "page.shares.acl.mode.r": "読み取り (r)",
+
+  "page.pending_approval.title": "承認待ち",
+  "page.pending_approval.body": "登録申請を受け付けました。管理者の承認後、利用可能になります。",
+  "page.pending_approval.logout_button": "ログアウト"
 }

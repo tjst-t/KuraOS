@@ -78,6 +78,25 @@ func withPrincipal(r *http.Request, u user.User) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), principalKey{}, u))
 }
 
+// requireAnySession allows any authenticated session regardless of role, 302s
+// to /login when no valid session is present. Used exclusively for
+// /ui/pending-approval so pending users (who fail requireRole checks) can
+// still reach that page.
+func (a *authBundle) requireAnySession(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		u, ok, err := a.resolvePrincipal(r)
+		if err != nil {
+			http.Error(w, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			http.Redirect(w, r, "/login", http.StatusFound)
+			return
+		}
+		next.ServeHTTP(w, withPrincipal(r, u))
+	})
+}
+
 // requireAdminExists wraps a handler so that it 302s to /setup whenever zero
 // admin users exist in the DB. Used by the front-door redirect from "/" so
 // fresh installs land on the wizard.

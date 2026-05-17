@@ -35,8 +35,10 @@ test.describe("[AC-Sfix002-2-1] Google button visibility", () => {
     const logo = page.locator('[data-testid="login-google-logo"]');
     await expect(logo).toBeVisible();
     await expect(logo.locator("title")).toHaveText(/Google/);
+    // AC-S413bd5-2-1: button label updated to "Google で続行" (covers both
+    // sign-in and first-time registration).
     await expect(page.locator('[data-testid="login-google-btn"]')).toContainText(
-      "Google でログイン",
+      "Google で続行",
     );
   });
 });

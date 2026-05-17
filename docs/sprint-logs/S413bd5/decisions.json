@@ -51,6 +51,36 @@
       "decision": "Pending user still gets uid_alloc row in Reconcile even though they are not projected to /etc/passwd",
       "rationale": "AC-S413bd5-1-2 explicitly requires this so PromoteFromPending can reuse the same uid without a gap. The Reconcile loop was restructured: AllocateUID runs for all non-disabled users, then pending is skipped before the projected/usernames append.",
       "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "Updated i18n value for page.login.signin_with_google from 'Google でログイン' to 'Google で続行' (option a — value change, keep MessageID)",
+      "rationale": "Minimal churn: the MessageID is internal; changing the translated value is normal i18n maintenance and avoids adding a redundant constant. The button now semantically covers both sign-in and first-time self-registration.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "fedProvisioner.CreateFromFederation now uses Role: string(user.RolePending) instead of 'user'",
+      "rationale": "Auto-provisioned users must not get full access immediately. Any Google account holder could otherwise bypass the admin-approval gate. The random placeholder password is still generated (passed to CreateUser) but engine/system.CreateUser skips SetUserPassword for pending role, so it is silently ignored — harmless but avoids a nil/empty password edge-case.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "federation.redirectTarget extended with a 'pending' case returning '/ui/pending-approval' — return_to is always ignored for pending users",
+      "rationale": "Pending users have no authorized destination other than the approval page. Honouring return_to would let a pending user supply /ui/admin/dashboard and land there briefly before being redirected — confusing and potentially leaking admin UI structure. Ignoring return_to entirely is the safest and simplest policy.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "/ui/pending-approval mounted via requireAnySession (new helper) rather than requireRole",
+      "rationale": "requireRole(user) would 403 a pending user (roleAllows returns false). A custom requireAnySession middleware allows any valid session regardless of role. The handler itself renders only a static approval-waiting card with a logout button — no functional UI is exposed to pending users.",
+      "ts": "2026-05-17T06:00:00Z"
+    },
+    {
+      "story": "S413bd5-2",
+      "decision": "PendingApprovalHandler added to internal/ui Renderer as a standalone method, wired via gateway.Deps.PendingApprovalHandler",
+      "rationale": "Follows the same pattern as AuthHandler and SetupHandler — thin wiring that keeps the gateway test surface minimal and makes the handler independently testable without standing up the full gateway.",
+      "ts": "2026-05-17T06:00:00Z"
     }
   ],
   "review": []

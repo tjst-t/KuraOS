@@ -300,6 +300,7 @@ func run() error {
 	if federationHandler != nil {
 		depsBuild.FederationHandler = federationHandler
 	}
+	depsBuild.PendingApprovalHandler = uiRenderer.PendingApprovalHandler()
 	handler := gateway.New(depsBuild)
 
 	srv := &http.Server{
