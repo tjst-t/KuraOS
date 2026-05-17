@@ -83,7 +83,26 @@
       "ts": "2026-05-17T06:00:00Z"
     }
   ],
-  "review": [],
+  "review": [
+    {
+      "story": "S413bd5",
+      "decision": "Sprint verify added LegacyAuthMethodMirror UPSERT fix + oidc-mock per-flow subject mode",
+      "rationale": "Two issues surfaced during VM e2e: (1) CLI set-password reported success on missing auth_methods row (silent 0-rows UPDATE) — VerifyPassword reads auth_methods so login kept failing. UPSERT makes the mirror self-healing. (2) Mock IdP returned fixed subject mock-user-1, so re-runs hit already-linked branch instead of creating fresh pending users. per-flow mode derives subject from OAuth state (sha256[:6]) for idempotent e2e.",
+      "ts": "2026-05-17T12:30:23Z"
+    },
+    {
+      "story": "S413bd5",
+      "decision": "Tagged TestCallbackReturnToRoleSafe with AC-S413bd5-2-5 instead of writing a new test",
+      "rationale": "AC-2-5 is regression guard: linked admin/user role-safe redirect must still work after adding RolePending. Sfix002-1 test already covers exactly this — adding tag avoids duplication.",
+      "ts": "2026-05-17T12:30:23Z"
+    },
+    {
+      "story": "S413bd5",
+      "decision": "Pre-existing tests/acceptance/share_flow_test.go failures (3) noted as carry-over, not regression",
+      "rationale": "Verified by checking out main and running the same tests — same 3 failures. Documented in Sfix002 done log; cmdexec.Fake systemctl response not updated for restart hotfix. Out of S413bd5 scope.",
+      "ts": "2026-05-17T12:30:23Z"
+    }
+  ],
   "story3_implementation": [
     {
       "story": "S413bd5-3",
@@ -115,5 +134,13 @@
       "rationale": "The admin password on this VM is not 'password' (the E2E default). All admin-login E2E tests on this VM have the same failure. This is a VM configuration issue not caused by Story 3 changes. The tests are correctly written and will pass when run with KURA_E2E_ADMIN_PW set to the actual VM admin password.",
       "ts": "2026-05-17T06:20:00Z"
     }
-  ]
+  ],
+  "verification": {
+    "ac_traceability": "15/15 ACs tagged in tests + ac-surface-coverage.sh CI gate passes (37/37)",
+    "unit_tests": "all touched packages green (engine/user, engine/system, engine/auth/federation, engine/auth/oidc, internal/gateway, internal/ui, cmd/kura, i18n, internal/store)",
+    "e2e_tests": "4/4 S413bd5 e2e green on VM (google-self-register-pending, admin-approve, admin-reject) + 4/5 existing federation e2e green (1 env-conditional skip, no regressions)",
+    "build": "make build clean (CGO_ENABLED=0)",
+    "vm_smoke": "browser-verified pending creation flow + admin approve with password reveal + reject removal",
+    "pre_existing_failures": "tests/acceptance/share_flow_test.go (3) — unchanged from main, carry-over from smb-restart hotfix"
+  }
 }
