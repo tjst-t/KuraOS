@@ -22,6 +22,12 @@ type AuthDeps struct {
 	Users         AuthUserStore
 	Sessions      AuthSessionStore
 	SecureCookies bool
+	// Providers lets the login page render "Google でログイン" / etc.
+	// buttons next to the password form (Sfix002-2). When nil or
+	// empty, no federation buttons render — that matches a
+	// federation-disabled deployment (the dominant Phase-1 home
+	// install).
+	Providers ProviderLister
 }
 
 // AuthUserStore is the slice of engine/user the auth handler needs. Defined
@@ -45,7 +51,7 @@ func (r *Renderer) AuthHandler(d AuthDeps) http.Handler {
 	mux.HandleFunc("/login", func(w http.ResponseWriter, req *http.Request) {
 		switch req.Method {
 		case http.MethodGet:
-			r.renderLoginPage(w, req, loginPageData{})
+			r.renderLoginPage(w, req, loginPageData{Providers: listProvidersSafe(req.Context(), d.Providers)})
 		case http.MethodPost:
 			r.handleLoginPost(w, req, d)
 		default:
@@ -76,6 +82,29 @@ type loginPageData struct {
 	ErrorMessage string
 	InfoMessage  string
 	Username     string
+	Providers    []UsersProvider
+	ReturnTo     string
+}
+
+// listProvidersSafe collects enabled federation providers for the login
+// page. Failures and nil listers are silently treated as "no providers"
+// because federation buttons are a nice-to-have on the login screen —
+// surfacing a DB error here would lock out password login too.
+func listProvidersSafe(ctx context.Context, l ProviderLister) []UsersProvider {
+	if l == nil {
+		return nil
+	}
+	out, err := l.ListProviders(ctx)
+	if err != nil {
+		return nil
+	}
+	enabled := make([]UsersProvider, 0, len(out))
+	for _, p := range out {
+		if p.Enabled {
+			enabled = append(enabled, p)
+		}
+	}
+	return enabled
 }
 
 func (r *Renderer) renderLoginPage(w http.ResponseWriter, req *http.Request, extra loginPageData) {
@@ -93,8 +122,12 @@ func (r *Renderer) renderLoginPage(w http.ResponseWriter, req *http.Request, ext
 }
 
 func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d AuthDeps) {
+	providers := listProvidersSafe(req.Context(), d.Providers)
 	if err := req.ParseForm(); err != nil {
-		r.renderLoginPage(w, req, loginPageData{ErrorMessage: r.tr.T(i18n.MsgLoginGenericError)})
+		r.renderLoginPage(w, req, loginPageData{
+			ErrorMessage: r.tr.T(i18n.MsgLoginGenericError),
+			Providers:    providers,
+		})
 		return
 	}
 	username := req.PostForm.Get("username")
@@ -104,6 +137,7 @@ func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d A
 		r.renderLoginPage(w, req, loginPageData{
 			ErrorMessage: r.tr.T(i18n.MsgLoginUsernameRequired),
 			Username:     username,
+			Providers:    providers,
 		})
 		return
 	}
@@ -112,6 +146,7 @@ func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d A
 		r.renderLoginPage(w, req, loginPageData{
 			ErrorMessage: r.tr.T(i18n.MsgLoginPasswordRequired),
 			Username:     username,
+			Providers:    providers,
 		})
 		return
 	}
@@ -123,6 +158,7 @@ func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d A
 		r.renderLoginPage(w, req, loginPageData{
 			ErrorMessage: r.tr.T(i18n.MsgLoginGenericError),
 			Username:     username,
+			Providers:    providers,
 		})
 		return
 	}
@@ -131,6 +167,7 @@ func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d A
 		r.renderLoginPage(w, req, loginPageData{
 			ErrorMessage: r.tr.T(i18n.MsgLoginInvalidCreds),
 			Username:     username,
+			Providers:    providers,
 		})
 		return
 	}
@@ -140,6 +177,7 @@ func (r *Renderer) handleLoginPost(w http.ResponseWriter, req *http.Request, d A
 		r.renderLoginPage(w, req, loginPageData{
 			ErrorMessage: r.tr.T(i18n.MsgLoginGenericError),
 			Username:     username,
+			Providers:    providers,
 		})
 		return
 	}
@@ -184,3 +222,26 @@ func clearSessionCookie(w http.ResponseWriter, secure bool) {
 var errLogin = errors.New("ui: login error")
 
 var _ = errLogin // keep for future use without "declared and not used"
+
+// federationErrorData is the view model for templates/pages/federation_error.tmpl.
+// MessageID is an i18n key looked up via the {{ T }} template func so the
+// caller never has to pre-translate.
+type federationErrorData struct {
+	MessageID string
+}
+
+// RenderFederationError satisfies engine/auth/federation.ErrorRenderer:
+// renders a Fog-palette error page with an i18n message and a "ログインに戻る"
+// button. Used when an unbound Google user hits the callback with
+// auto_provision disabled or when the provisioner fails (Sfix002-3).
+func (r *Renderer) RenderFederationError(w http.ResponseWriter, _ *http.Request, msgID string, status int) {
+	data := PageData{
+		Locale:      r.tr.Locale(),
+		Version:     r.version,
+		PageTitle:   r.tr.T(i18n.MsgFederationErrorTitle),
+		PageTitleID: string(i18n.MsgFederationErrorTitle),
+		Extra:       federationErrorData{MessageID: msgID},
+	}
+	w.WriteHeader(status)
+	r.renderWithLayout(w, "templates/layouts/auth.tmpl", "templates/pages/federation_error.tmpl", data)
+}
