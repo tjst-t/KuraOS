@@ -27,6 +27,13 @@ type UserInfoLookup interface {
 	GetClaims(ctx context.Context, userID string) (map[string]any, error)
 }
 
+// UserRoleLookup resolves the role string ("admin", "user", "pending", …) for
+// a userID. Used at /authorize to gate pending users before an auth-code is
+// issued. Optional — if nil, no role check is performed.
+type UserRoleLookup interface {
+	LookupRole(ctx context.Context, userID string) (string, error)
+}
+
 // SessionCookieName is the cookie key the OP reads to identify the
 // operator. Matches engine/auth/session.CookieName but redeclared here so
 // engine/auth/oidc does not import engine/auth/session (avoids a cycle
@@ -41,6 +48,10 @@ type Provider struct {
 	SigningKey *SigningKey
 	Sessions   SessionResolver
 	Users      UserInfoLookup
+	// RoleLookup is optional. When set, /authorize rejects users whose role
+	// is "pending" — they must be promoted by an admin before they may
+	// obtain OIDC tokens.
+	RoleLookup UserRoleLookup
 	// SecretLookup translates a client_id into the vault-stored secret.
 	// MUST be set in production: nil makes /token reject every confidential
 	// client with invalid_client. Tests with public-only clients can leave
@@ -162,6 +173,16 @@ func (p *Provider) handleAuthorize(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		redirectToLogin(w, r)
 		return
+	}
+
+	// Pending users must not obtain OIDC tokens — they are inert until an
+	// admin promotes them. Redirect to /login with error=access_denied.
+	if p.RoleLookup != nil {
+		role, roleErr := p.RoleLookup.LookupRole(r.Context(), userID)
+		if roleErr == nil && role == "pending" {
+			http.Redirect(w, r, "/login?error=access_denied", http.StatusFound)
+			return
+		}
 	}
 
 	// Auto-approve consent for trusted clients (auth.mode=oidc apps the

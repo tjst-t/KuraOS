@@ -42,6 +42,7 @@ func buildOIDCProvider(ctx context.Context, db *sql.DB, sysEng system.Engine, se
 		&sessionResolverAdapter{sessions: sessions, users: users},
 		&userInfoAdapter{users: users},
 	)
+	p.RoleLookup = &oidcRoleLookupAdapter{users: users}
 	p.SecretLookup = func(ctx context.Context, clientID string) (string, error) {
 		cred, err := sysEng.LookupCredential(ctx,
 			system.CredentialOIDCClientSecret, system.OwnerApp, clientID)
@@ -129,6 +130,21 @@ func (a *userInfoAdapter) GetClaims(ctx context.Context, userID string) (map[str
 		claims["name"] = u.Username
 	}
 	return claims, nil
+}
+
+// oidcRoleLookupAdapter implements oidc.UserRoleLookup so the OIDC OP can
+// reject pending users before issuing an auth-code.
+type oidcRoleLookupAdapter struct{ users *user.Store }
+
+func (a *oidcRoleLookupAdapter) LookupRole(ctx context.Context, userID string) (string, error) {
+	if a.users == nil {
+		return "", nil
+	}
+	u, err := a.users.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return string(u.Role), nil
 }
 
 // appOIDCRegistrar implements app.OIDCRegistrar by delegating to the

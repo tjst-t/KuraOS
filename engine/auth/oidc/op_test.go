@@ -342,6 +342,64 @@ func TestJWKS(t *testing.T) {
 	}
 }
 
+// [AC-S413bd5-1-5] /authorize rejects a pending user with 302 to
+// /login?error=access_denied when RoleLookup is wired.
+func TestAuthorize_PendingUserRejected(t *testing.T) {
+	op, _, cleanup := newTestProvider(t)
+	defer cleanup()
+
+	// Override the sessions so the pending user's cookie resolves.
+	op.Sessions = fixedSession{cookie: "sess-pending", userID: "pending-user-1", ok: true}
+
+	// Wire a RoleLookup that returns "pending" for our test user.
+	op.RoleLookup = &staticRoleLookup{roles: map[string]string{
+		"pending-user-1": "pending",
+	}}
+
+	srv := httptest.NewServer(op.Routes())
+	defer srv.Close()
+
+	authURL := srv.URL + "/oidc/authorize?" + url.Values{
+		"client_id":     {"rp-1"},
+		"redirect_uri":  {"https://rp.test/callback"},
+		"response_type": {"code"},
+		"scope":         {"openid"},
+	}.Encode()
+	req, _ := http.NewRequest("GET", authURL, nil)
+	req.AddCookie(&http.Cookie{Name: SessionCookieName, Value: "sess-pending"})
+
+	noRedirect := &http.Client{
+		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	res, err := noRedirect.Do(req)
+	if err != nil {
+		t.Fatalf("GET /authorize: %v", err)
+	}
+	res.Body.Close()
+
+	if res.StatusCode != http.StatusFound {
+		t.Fatalf("status = %d, want 302 for pending user", res.StatusCode)
+	}
+	loc := res.Header.Get("Location")
+	if !strings.Contains(loc, "error=access_denied") {
+		t.Fatalf("Location = %q, want error=access_denied", loc)
+	}
+}
+
+// staticRoleLookup is a test stub for oidc.UserRoleLookup.
+type staticRoleLookup struct {
+	roles map[string]string
+}
+
+func (s *staticRoleLookup) LookupRole(_ context.Context, userID string) (string, error) {
+	if r, ok := s.roles[userID]; ok {
+		return r, nil
+	}
+	return "user", nil
+}
+
 // Auth code expiry: a code older than AuthCodeTTL must fail with
 // invalid_grant.
 func TestAuthCode_Expired(t *testing.T) {

@@ -49,12 +49,20 @@ func (s *Store) CreateLocalUser(ctx context.Context, username, displayName, pass
 	if username == "" {
 		return User{}, errors.New("user: username is empty")
 	}
-	if password == "" {
+	// Pending users have no password until promoted — they cannot
+	// authenticate via password, so we skip the hash but still insert an
+	// empty auth_method row to satisfy the FK.
+	isPending := role == RolePending
+	if !isPending && password == "" {
 		return User{}, errors.New("user: password is empty")
 	}
-	hash, err := s.hasher.Hash(password)
-	if err != nil {
-		return User{}, fmt.Errorf("user: hash password: %w", err)
+	var hash string
+	if !isPending {
+		var err error
+		hash, err = s.hasher.Hash(password)
+		if err != nil {
+			return User{}, fmt.Errorf("user: hash password: %w", err)
+		}
 	}
 	now := s.now().UTC().Format(time.RFC3339Nano)
 	uid := newID()

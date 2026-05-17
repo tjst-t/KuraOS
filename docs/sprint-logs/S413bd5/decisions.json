@@ -27,6 +27,31 @@
       "rationale": "CLAUDE.md test discipline rule 4『GUI E2E はすべて Playwright』 + Sfix002 で確立した oidc-mock 経由パターンを踏襲。"
     }
   ],
-  "implementation": [],
+  "implementation": [
+    {
+      "story": "S413bd5-1",
+      "decision": "Added migration 0010_pending_role.sql to extend users.role CHECK constraint to include 'pending'",
+      "rationale": "SQLite's CHECK constraint on the users table only allowed 'admin'|'user'. Rather than patching 0002_users.sql (which would break existing DBs), a new migration recreates the table with the updated constraint using the SQLite rename-copy-drop pattern with foreign_keys=OFF.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "PromoteFromPending updates role BEFORE calling SetUserPassword",
+      "rationale": "If SetUserPassword succeeds but the role update fails, the user has credentials but is still 'pending' — safer than having a non-pending user with no credentials (which would allow login but fail at OS projection). The role update is transactional via users.Update; if it fails the caller retries.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "OIDC RoleLookup wired via optional Provider.RoleLookup field rather than embedding role into SessionResolver",
+      "rationale": "SessionResolver already resolves userID from cookie — adding role there would require engine/user import in engine/auth/oidc (cycle risk). A separate optional interface keeps the OIDC package import-clean and makes the pending check easily testable with a static stub.",
+      "ts": "2026-05-17T05:40:00Z"
+    },
+    {
+      "story": "S413bd5-1",
+      "decision": "Pending user still gets uid_alloc row in Reconcile even though they are not projected to /etc/passwd",
+      "rationale": "AC-S413bd5-1-2 explicitly requires this so PromoteFromPending can reuse the same uid without a gap. The Reconcile loop was restructured: AllocateUID runs for all non-disabled users, then pending is skipped before the projected/usernames append.",
+      "ts": "2026-05-17T05:40:00Z"
+    }
+  ],
   "review": []
 }

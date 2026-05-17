@@ -18,11 +18,12 @@ import "time"
 type Role string
 
 const (
-	RoleAdmin Role = "admin"
-	RoleUser  Role = "user"
+	RoleAdmin   Role = "admin"
+	RoleUser    Role = "user"
+	RolePending Role = "pending"
 )
 
-func (r Role) Valid() bool { return r == RoleAdmin || r == RoleUser }
+func (r Role) Valid() bool { return r == RoleAdmin || r == RoleUser || r == RolePending }
 
 // User is the persisted identity. Created / mutated through Store. The
 // password verifier is kept off this struct on purpose — see AuthMethod.

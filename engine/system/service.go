@@ -2,7 +2,9 @@ package system
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"os"
@@ -305,6 +307,12 @@ func (s *service) Reconcile(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("system: allocate uid for %s: %w", u.Username, err)
 		}
+		// Pending users get a stable uid_alloc row so re-promotion lands
+		// on the same uid, but they must not appear in /etc/passwd or
+		// tdbsam — they are inert at the OS level until an admin promotes.
+		if u.Role == "pending" {
+			continue
+		}
 		projected = append(projected, ProjectedUser{
 			UserID:      u.ID,
 			Username:    u.Username,
@@ -598,16 +606,20 @@ func (s *service) CreateUser(ctx context.Context, in CreateUserInput) (string, e
 		return "", err
 	}
 
-	// uid_alloc + password projection in that order — uid must exist
-	// before SmbPasswdLine can render the smbpasswd-format row.
+	// uid_alloc must happen for all users (including pending) so a later
+	// PromoteFromPending call reuses the same uid stably.
 	if _, err := s.AllocateUID(ctx, created.ID); err != nil {
 		_ = s.users.Delete(ctx, created.ID)
 		return "", fmt.Errorf("system: allocate uid: %w", err)
 	}
-	pw := NewPlaintextPassword(in.Password)
-	if err := s.SetUserPassword(ctx, created.ID, pw); err != nil {
-		_ = s.users.Delete(ctx, created.ID)
-		return "", fmt.Errorf("system: set password: %w", err)
+	// Pending users have no password yet — they are inert at the OS layer
+	// until an admin calls PromoteFromPending.
+	if in.Role != "pending" {
+		pw := NewPlaintextPassword(in.Password)
+		if err := s.SetUserPassword(ctx, created.ID, pw); err != nil {
+			_ = s.users.Delete(ctx, created.ID)
+			return "", fmt.Errorf("system: set password: %w", err)
+		}
 	}
 
 	// Reconcile is best-effort — pdbedit / file write under non-root
@@ -719,4 +731,60 @@ func (s *service) SetGroupMembers(ctx context.Context, groupID string, userIDs [
 		_ = err
 	}
 	return nil
+}
+
+// PromoteFromPending assigns a real role to a pending (unapproved) user,
+// generates a random one-time password, writes both credentials (argon2id +
+// NT-hash) into the vault, then calls Reconcile so /etc/passwd and tdbsam
+// pick up the now-active user. Returns the plaintext password once — the
+// caller (admin UI) shows it to the operator and discards it.
+func (s *service) PromoteFromPending(ctx context.Context, userID, newRole string) (string, error) {
+	if s.users == nil {
+		return "", errors.New("system: user source not wired")
+	}
+	// Fetch the user to confirm they exist and are currently pending.
+	users, err := s.users.List(ctx)
+	if err != nil {
+		return "", fmt.Errorf("system: list users: %w", err)
+	}
+	var found bool
+	for _, u := range users {
+		if u.ID == userID {
+			if u.Role != "pending" {
+				return "", fmt.Errorf("system: user %s is not pending (role=%s)", userID, u.Role)
+			}
+			found = true
+			break
+		}
+	}
+	if !found {
+		return "", ErrUserNotFound
+	}
+
+	// Generate a 24-byte random password encoded as base64url (no padding).
+	raw := make([]byte, 24)
+	if _, err := rand.Read(raw); err != nil {
+		return "", fmt.Errorf("system: generate password: %w", err)
+	}
+	plaintext := base64.RawURLEncoding.EncodeToString(raw)
+
+	// Update the role first. If subsequent steps fail the user is now
+	// non-pending but has no /etc/passwd row — Reconcile on next startup
+	// will fix that. This ordering avoids a window where the user has an
+	// /etc/passwd row but is still "pending" at the auth layer.
+	if err := s.users.Update(ctx, userID, "", newRole); err != nil {
+		return "", fmt.Errorf("system: update role: %w", err)
+	}
+
+	pw := NewPlaintextPassword(plaintext)
+	if err := s.SetUserPassword(ctx, userID, pw); err != nil {
+		return "", fmt.Errorf("system: set password for promoted user: %w", err)
+	}
+
+	if err := s.Reconcile(ctx); err != nil {
+		// Soft-fail: credentials are set; Reconcile re-projects on next
+		// startup.
+		_ = err
+	}
+	return plaintext, nil
 }
