@@ -1,5 +1,6 @@
 # Build output
 /bin/
+/oidc-mock
 *.exe
 *.test
 *.out

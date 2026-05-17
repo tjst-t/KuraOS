@@ -195,6 +195,12 @@ func run() error {
 		Users:         users,
 		Sessions:      sessions,
 		SecureCookies: secureCookies,
+		// Federation providers live next to the password form on
+		// /login so a linked Google user can sign in without a
+		// KuraOS password (Sfix002-2). The lister mirrors the
+		// env-var config the Users page already shows; nil-safe
+		// when federation isn't configured.
+		Providers: &providersListAdapter{db: st.DB()},
 	})
 	setupH := uiRenderer.SetupHandler(ui.SetupDeps{
 		Users:         users,
@@ -235,7 +241,10 @@ func run() error {
 		lifecycle.OIDC = registrar
 	}
 	// Federation provider — Google / future external IdPs. Optional in dev.
-	federationHandler := buildFederationHandler(ctx, st.DB(), sysEng, sessions)
+	// uiRenderer doubles as the federation error renderer so the
+	// callback can show an i18n page on unbound subject / provision
+	// failure instead of plain http.Error (Sfix002-3).
+	federationHandler := buildFederationHandler(ctx, st.DB(), sysEng, users, sessions, uiRenderer)
 
 	// Wire the Users page (S822961 + Sfix001). View carries Users +
 	// Groups + Federations + OIDC clients + provider toggles. The
