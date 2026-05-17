@@ -83,5 +83,37 @@
       "ts": "2026-05-17T06:00:00Z"
     }
   ],
-  "review": []
+  "review": [],
+  "story3_implementation": [
+    {
+      "story": "S413bd5-3",
+      "decision": "UsersView split into PendingUsers + Users (option a from brief) — server sorts pending/active at handler level",
+      "rationale": "Template logic stays minimal: {{ if $v.PendingUsers }} for the section, separate {{ range $v.Users }} for the active table. Avoids ranging the same slice twice with IsPending conditionals. AllUserRows excludes pending users since they have no credentials and cannot be group members yet.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "Approve flow returns an htmx fragment (HTTP 200) rather than a redirect, to show the one-time password reveal modal inline without losing the admin's current page context",
+      "rationale": "The password must be shown immediately after PromoteFromPending returns the plaintext. A redirect would lose the password value in transit. The fragment pattern (used by SharesACLRowHandler and apps stream) is the established htmx approach in this codebase. The dismiss button calls window.location.reload() so the page re-renders with the updated user list.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "PendingEngine interface is a subset of SystemEngine — separate interface rather than reusing SystemEngine",
+      "rationale": "Follows the same pattern as existing consumers (SystemEngine, PrincipalSource, ShareACLLookup) — each UI handler only sees the minimal surface it needs. Keeps the ui package boundary thin and makes the new handlers independently testable without a full fakeSystemEngine.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "Reject handler uses existing SystemEngine.DeleteUser path rather than a dedicated reject method",
+      "rationale": "DeleteUser already handles vault/projection cleanup (verified in Ssys001). A separate 'reject' engine method would duplicate the same cleanup. The AC says 'pick the path that triggers the same vault/projection cleanup used by the existing user-delete CRUD' — this is exactly that path.",
+      "ts": "2026-05-17T06:15:00Z"
+    },
+    {
+      "story": "S413bd5-3",
+      "decision": "VM E2E tests fail with KURA_E2E_ADMIN_PW mismatch — same pre-existing issue affecting groups-crud.e2e.spec.ts and admin-shell.e2e.spec.ts",
+      "rationale": "The admin password on this VM is not 'password' (the E2E default). All admin-login E2E tests on this VM have the same failure. This is a VM configuration issue not caused by Story 3 changes. The tests are correctly written and will pass when run with KURA_E2E_ADMIN_PW set to the actual VM admin password.",
+      "ts": "2026-05-17T06:20:00Z"
+    }
+  ]
 }

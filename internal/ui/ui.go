@@ -79,6 +79,11 @@ type Renderer struct {
 	groupsCreateHandler  http.Handler
 	groupsDeleteHandler  http.Handler
 	groupsMembersHandler http.Handler
+
+	// Pending-user approval handlers (added in S413bd5-3). Wired via
+	// SetPendingHandlers; nil until engine/system is available.
+	pendingApproveHandler http.Handler
+	pendingRejectHandler  http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -351,6 +356,15 @@ func (r *Renderer) Routes() http.Handler {
 	}
 	if r.groupsMembersHandler != nil {
 		mux.Handle("/ui/admin/groups/members", r.groupsMembersHandler)
+	}
+	// Pending-user approval / rejection. Go 1.22 mux matches the most specific
+	// path first, so these /approve and /reject sub-paths win over the flat
+	// /ui/admin/users handler. The {id} wildcard captures any URL segment.
+	if r.pendingApproveHandler != nil {
+		mux.Handle("/ui/admin/users/{id}/approve", r.pendingApproveHandler)
+	}
+	if r.pendingRejectHandler != nil {
+		mux.Handle("/ui/admin/users/{id}/reject", r.pendingRejectHandler)
 	}
 	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
 	if r.appsListHandler != nil {

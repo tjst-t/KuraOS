@@ -93,6 +93,10 @@ type UsersProvider struct {
 type UsersView struct {
 	Tab          string
 	UsersHeading string
+	// PendingUsers are accounts with role=pending awaiting admin approval.
+	// The template hides the pending section when this is empty.
+	PendingUsers []UsersViewUser
+	// Users are active (non-pending) accounts.
 	Users        []UsersViewUser
 	Groups       []UsersViewGroup
 	Providers    []UsersProvider
@@ -168,6 +172,7 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 		if d.Users != nil {
 			users, _ := d.Users.List(ctx)
 			view.Users = make([]UsersViewUser, 0, len(users))
+			view.PendingUsers = make([]UsersViewUser, 0)
 			for _, u := range users {
 				row := UsersViewUser{
 					UserID:      u.UserID,
@@ -189,11 +194,20 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 						}
 					}
 				}
-				view.Users = append(view.Users, row)
+				if u.Role == "pending" {
+					view.PendingUsers = append(view.PendingUsers, row)
+				} else {
+					view.Users = append(view.Users, row)
+				}
 			}
 			sort.Slice(view.Users, func(i, j int) bool {
 				return view.Users[i].Username < view.Users[j].Username
 			})
+			sort.Slice(view.PendingUsers, func(i, j int) bool {
+				return view.PendingUsers[i].Username < view.PendingUsers[j].Username
+			})
+			// AllUserRows excludes pending users — pending users have no credentials
+			// yet and cannot be assigned to groups.
 			view.AllUserRows = view.Users
 		}
 		if d.Providers != nil {

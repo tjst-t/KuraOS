@@ -509,6 +509,29 @@ const (
 	MsgUsersErrDeleteFailed      MessageID = "page.users.err.delete_failed"
 )
 
+// Pending user approval flow (S413bd5-3).
+const (
+	MsgUsersPendingSectionTitle    MessageID = "page.users.pending_section_title"
+	MsgUsersApproveBtn             MessageID = "page.users.approve_button"
+	MsgUsersRejectBtn              MessageID = "page.users.reject_button"
+	MsgUsersApproveModalTitle      MessageID = "page.users.approve_modal_title"
+	MsgUsersApproveModalBody       MessageID = "page.users.approve_modal_body"
+	MsgUsersApproveModalRoleUser   MessageID = "page.users.approve_modal_role_user"
+	MsgUsersApproveModalRoleAdmin  MessageID = "page.users.approve_modal_role_admin"
+	MsgUsersApproveModalSubmit     MessageID = "page.users.approve_modal_submit"
+	MsgUsersRejectModalTitle       MessageID = "page.users.reject_modal_title"
+	MsgUsersRejectModalBody        MessageID = "page.users.reject_modal_body"
+	MsgUsersRejectModalSubmit      MessageID = "page.users.reject_modal_submit"
+	MsgUsersApproveSuccessTitle    MessageID = "page.users.approve_success_title"
+	MsgUsersApproveSuccessPWLabel  MessageID = "page.users.approve_success_password_label"
+	MsgUsersApproveSuccessWarning  MessageID = "page.users.approve_success_warning"
+	MsgUsersApproveSuccessCopy     MessageID = "page.users.approve_success_copy"
+	MsgUsersApproveSuccessDismiss  MessageID = "page.users.approve_success_dismiss"
+	MsgUsersErrApproveFailed       MessageID = "page.users.err.approve_failed"
+	MsgUsersErrRejectFailed        MessageID = "page.users.err.reject_failed"
+	MsgUsersErrNotPending          MessageID = "page.users.err.not_pending"
+)
+
 // Groups CRUD (Sfix001-2).
 const (
 	MsgGroupsAddBtn              MessageID = "page.groups.add_btn"

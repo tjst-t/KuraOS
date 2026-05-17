@@ -494,5 +494,25 @@
 
   "page.pending_approval.title": "承認待ち",
   "page.pending_approval.body": "登録申請を受け付けました。管理者の承認後、利用可能になります。",
-  "page.pending_approval.logout_button": "ログアウト"
+  "page.pending_approval.logout_button": "ログアウト",
+
+  "page.users.pending_section_title": "承認待ちユーザー",
+  "page.users.approve_button": "承認",
+  "page.users.reject_button": "却下",
+  "page.users.approve_modal_title": "ユーザーを承認",
+  "page.users.approve_modal_body": "{0} を承認します。付与するロールを選んでください。",
+  "page.users.approve_modal_role_user": "ユーザー",
+  "page.users.approve_modal_role_admin": "管理者",
+  "page.users.approve_modal_submit": "承認する",
+  "page.users.reject_modal_title": "ユーザーを却下",
+  "page.users.reject_modal_body": "{0} を却下し、アカウントを削除します。この操作は取り消せません。",
+  "page.users.reject_modal_submit": "却下する",
+  "page.users.approve_success_title": "承認しました",
+  "page.users.approve_success_password_label": "発行されたパスワード",
+  "page.users.approve_success_warning": "このパスワードはここでしか確認できません。コピーしてユーザーに伝えてください。",
+  "page.users.approve_success_copy": "コピー",
+  "page.users.approve_success_dismiss": "閉じる",
+  "page.users.err.approve_failed": "承認に失敗しました: {0}",
+  "page.users.err.reject_failed": "却下に失敗しました: {0}",
+  "page.users.err.not_pending": "対象ユーザーは承認待ち状態ではありません"
 }

@@ -128,6 +128,10 @@ func (a *systemEngineAdapter) SetGroupMembers(ctx context.Context, groupID strin
 	return a.eng.SetGroupMembers(ctx, groupID, userIDs)
 }
 
+func (a *systemEngineAdapter) PromoteFromPending(ctx context.Context, userID, newRole string) (string, error) {
+	return a.eng.PromoteFromPending(ctx, userID, newRole)
+}
+
 // principalSourceAdapter exposes engine/user usernames + group names
 // for the Shares ACL row picker (Sfix001-3).
 type principalSourceAdapter struct {
