@@ -9,25 +9,36 @@
 // Lives at cmd/oidc-mock/ so a kura test fixture can build it via
 // `go build ./cmd/oidc-mock`. Configurable via env:
 //
-//   OIDC_MOCK_PORT       (default 9998)
-//   OIDC_MOCK_ISSUER     (default http://127.0.0.1:<port>)
-//   OIDC_MOCK_SUBJECT    (default mock-user-1)
-//   OIDC_MOCK_EMAIL      (default mock-user-1@oidc-mock.example.com)
-//   OIDC_MOCK_NAME       (default Mock User)
+//   OIDC_MOCK_PORT          (default 9998)
+//   OIDC_MOCK_ISSUER        (default http://127.0.0.1:<port>)
+//   OIDC_MOCK_SUBJECT       (default mock-user-1) — used when SUBJECT_MODE=fixed
+//   OIDC_MOCK_EMAIL         (default <subject>@oidc-mock.example.com when fixed)
+//   OIDC_MOCK_NAME          (default Mock User)
+//   OIDC_MOCK_SUBJECT_MODE  fixed | per-flow (default fixed)
 //
-// Used by tests/e2e/google-federation-flow.e2e.spec.ts. Lives as a
+// per-flow mode derives a unique subject from the OAuth state parameter on
+// every /authorize call, so each federation flow produces a fresh
+// (subject, email) pair. Used by the S413bd5 pending-user e2e tests so
+// re-runs don't trip the "already linked" branch. fixed mode preserves
+// the original behavior for tests that depend on subject stability
+// (e.g. link / role-redirect specs).
+//
+// Used by tests/e2e/google-federation-*.e2e.spec.ts. Lives as a
 // systemd service `dev-oidc-mock.service` on the dev VM so kura's
 // federation Manager can call into it via 127.0.0.1.
 package main
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 )
 
@@ -38,16 +49,32 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+// identity is the (sub, email, name) tuple a single flow resolves to.
+// Stored keyed by the authorization code at /authorize, looked up by code
+// at /token (which then derives a per-flow access_token so /userinfo can
+// recover the same identity).
+type identity struct {
+	Sub   string
+	Email string
+	Name  string
+}
+
 func main() {
 	port := envOr("OIDC_MOCK_PORT", "9998")
 	issuer := envOr("OIDC_MOCK_ISSUER", "http://127.0.0.1:"+port)
-	subject := envOr("OIDC_MOCK_SUBJECT", "mock-user-1")
-	email := envOr("OIDC_MOCK_EMAIL", subject+"@oidc-mock.example.com")
+	fixedSubject := envOr("OIDC_MOCK_SUBJECT", "mock-user-1")
+	fixedEmail := envOr("OIDC_MOCK_EMAIL", fixedSubject+"@oidc-mock.example.com")
 	name := envOr("OIDC_MOCK_NAME", "Mock User")
+	mode := envOr("OIDC_MOCK_SUBJECT_MODE", "fixed")
 
+	// codeIdents and tokenIdents bridge the three OIDC endpoints: /authorize
+	// stores the identity by code, /token swaps it onto an access_token, and
+	// /userinfo reads back via access_token. A real OP would do this with a
+	// signed JWT access_token; we keep it as an in-memory map.
 	var (
-		mu       sync.Mutex
-		lastCode string
+		mu           sync.Mutex
+		codeIdents   = map[string]identity{}
+		tokenIdents  = map[string]identity{}
 	)
 
 	mux := http.NewServeMux()
@@ -74,10 +101,26 @@ func main() {
 			http.Error(w, "redirect_uri required", http.StatusBadRequest)
 			return
 		}
+
+		id := identity{Name: name}
+		if mode == "per-flow" {
+			// Derive a stable-per-flow subject from state. State is opaque
+			// random per /federation/<p>/start invocation, so each flow
+			// resolves to a different mock user — no cross-run contamination.
+			h := sha256.Sum256([]byte(state))
+			suffix := hex.EncodeToString(h[:6])
+			id.Sub = "mock-eph-" + suffix
+			id.Email = id.Sub + "@oidc-mock.example.com"
+		} else {
+			id.Sub = fixedSubject
+			id.Email = fixedEmail
+		}
+
+		code := "mock-code-" + state
 		mu.Lock()
-		lastCode = "mock-code-" + state
-		code := lastCode
+		codeIdents[code] = id
 		mu.Unlock()
+
 		u, err := url.Parse(redir)
 		if err != nil {
 			http.Error(w, "invalid redirect_uri: "+err.Error(), http.StatusBadRequest)
@@ -91,25 +134,53 @@ func main() {
 	})
 
 	mux.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
-		// No code validation — tests don't need it. Issue tokens.
+		// Look up the identity that /authorize parked under this code, then
+		// move it onto a fresh access_token so /userinfo can recover it.
+		if err := r.ParseForm(); err != nil {
+			http.Error(w, "bad form", http.StatusBadRequest)
+			return
+		}
+		code := r.PostForm.Get("code")
+		mu.Lock()
+		id, ok := codeIdents[code]
+		if !ok {
+			// Backward compat: tests that hit /token without going through
+			// /authorize (rare; the federation Manager always calls /authorize
+			// first) get the env-configured fixed identity.
+			id = identity{Sub: fixedSubject, Email: fixedEmail, Name: name}
+		}
+		delete(codeIdents, code)
+		accessToken := "mock-at-" + code
+		tokenIdents[accessToken] = id
+		mu.Unlock()
 		writeJSON(w, map[string]any{
-			"access_token": "mock-access-token",
+			"access_token": accessToken,
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-			"id_token":     makeUnsignedIDToken(subject, email, issuer),
+			"id_token":     makeUnsignedIDToken(id.Sub, id.Email, issuer),
 		})
 	})
 
 	mux.HandleFunc("/userinfo", func(w http.ResponseWriter, r *http.Request) {
+		auth := r.Header.Get("Authorization")
+		token := strings.TrimPrefix(auth, "Bearer ")
+		mu.Lock()
+		id, ok := tokenIdents[token]
+		mu.Unlock()
+		if !ok {
+			// Fall back to fixed identity — older tests pass a static
+			// access_token without going through /token.
+			id = identity{Sub: fixedSubject, Email: fixedEmail, Name: name}
+		}
 		writeJSON(w, map[string]any{
-			"sub":            subject,
-			"email":          email,
+			"sub":            id.Sub,
+			"email":          id.Email,
 			"email_verified": true,
-			"name":           name,
+			"name":           id.Name,
 		})
 	})
 
-	log.Printf("oidc-mock: listening on :%s (issuer=%s, subject=%s, email=%s)", port, issuer, subject, email)
+	log.Printf("oidc-mock: listening on :%s (issuer=%s, mode=%s, fixedSubject=%s)", port, issuer, mode, fixedSubject)
 	if err := http.ListenAndServe(":"+port, mux); err != nil {
 		log.Fatalf("oidc-mock: listen: %v", err)
 	}

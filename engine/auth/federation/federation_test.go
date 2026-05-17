@@ -391,10 +391,12 @@ func (f roleLookupFn) LookupRole(_ context.Context, userID string) (string, erro
 	return f(userID), nil
 }
 
-// [AC-Sfix002-1-1] TestCallbackReturnToRoleSafe verifies the federation
-// callback never redirects a user to a URL their role can't reach. A
-// user role landing on /ui/admin/* would 403 immediately and look like
-// a broken login (Sfix002 rationale).
+// [AC-Sfix002-1-1] [AC-S413bd5-2-5] TestCallbackReturnToRoleSafe verifies the
+// federation callback never redirects a user to a URL their role can't reach.
+// A user role landing on /ui/admin/* would 403 immediately and look like a
+// broken login (Sfix002 rationale). S413bd5-2-5 reuses this test as the
+// regression guard that adding RolePending didn't break the linked-user
+// admin/user redirect.
 func TestCallbackReturnToRoleSafe(t *testing.T) {
 	cases := []struct {
 		name     string

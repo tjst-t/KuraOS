@@ -566,15 +566,38 @@ func AllCredentials(ctx context.Context, db *sql.DB) ([]Credential, error) {
 // working while engine/system also writes to the vault. Once auth/session
 // reads from the vault directly (a later refactor), this hook becomes
 // unnecessary.
+//
+// Why upsert rather than plain UPDATE: a user who lost their auth_methods
+// row (e.g. admin recovered from a backup that predates auth_methods, or
+// a future migration that wipes the table) would silently get a 0-rows
+// UPDATE here and the CLI would report success, but the next login attempt
+// would still fail because VerifyPassword reads auth_methods. The INSERT
+// branch makes the mirror self-healing.
 func LegacyAuthMethodMirror(db *sql.DB) func(context.Context, string, string) error {
 	return func(ctx context.Context, userID, encoded string) error {
-		_, err := db.ExecContext(ctx, `
+		res, err := db.ExecContext(ctx, `
 			UPDATE auth_methods
 			SET secret = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ','now')
 			WHERE user_id = ? AND method = 'password'
 		`, encoded, userID)
 		if err != nil {
 			return fmt.Errorf("system: mirror auth_methods: %w", err)
+		}
+		n, err := res.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("system: mirror auth_methods rows: %w", err)
+		}
+		if n > 0 {
+			return nil
+		}
+		_, err = db.ExecContext(ctx, `
+			INSERT INTO auth_methods (id, user_id, method, secret, subject, created_at, updated_at)
+			VALUES (lower(hex(randomblob(16))), ?, 'password', ?, '',
+			        strftime('%Y-%m-%dT%H:%M:%fZ','now'),
+			        strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+		`, userID, encoded)
+		if err != nil {
+			return fmt.Errorf("system: insert missing auth_method: %w", err)
 		}
 		return nil
 	}
