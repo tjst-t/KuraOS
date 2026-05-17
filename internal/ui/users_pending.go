@@ -122,8 +122,12 @@ func (r *Renderer) pendingReject(d PendingDeps) http.Handler {
 }
 
 // renderApproveSuccess renders the one-time password reveal fragment.
-// The fragment is a self-contained modal overlay that closes on dismiss and
-// triggers a page reload so the user moves from 承認待ち to the active list.
+// Returned into #users-modal-target via hx-swap=innerHTML from the approve
+// form. Wrapping in .modal (style=display:flex inlined so the kura.js modal
+// toggle doesn't have to know about us) makes the existing .modal > .card
+// CSS apply — gives the fragment the same centered card + backdrop styling
+// the static modals get. Dismiss empties the target so the next approve in
+// the same session starts from a clean state.
 func (r *Renderer) renderApproveSuccess(plaintext string) ([]byte, error) {
 	data := struct {
 		Title     string
@@ -140,17 +144,15 @@ func (r *Renderer) renderApproveSuccess(plaintext string) ([]byte, error) {
 		Dismiss:   r.tr.T(i18n.MsgUsersApproveSuccessDismiss),
 		Password:  plaintext,
 	}
-	const tpl = `<div id="approve-success-overlay"
-  style="position:fixed;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:1000;"
-  data-testid="approve-success-overlay">
-  <div class="card" style="width:420px;max-width:90vw;" data-testid="approve-success-modal">
+	const tpl = `<div class="modal" style="display:flex" data-testid="approve-success-overlay">
+  <div class="card" data-testid="approve-success-modal">
     <div class="card-head"><h3 class="card-title" data-testid="approve-success-title">{{.Title}}</h3></div>
     <div class="card-body" style="display:flex;flex-direction:column;gap:14px;">
-      <p class="muted" style="margin:0;font-size:13px;color:#d97706;font-weight:500;" data-testid="approve-success-warning">{{.Warning}}</p>
+      <p style="margin:0;font-size:13px;color:#d97706;font-weight:500;" data-testid="approve-success-warning">{{.Warning}}</p>
       <div class="field">
         <label>{{.PWLabel}}</label>
         <div style="display:flex;gap:8px;align-items:center;">
-          <code id="approve-pw" style="flex:1;padding:8px;background:var(--surface-2);border-radius:6px;font-size:14px;word-break:break-all;" data-testid="approve-success-password">{{.Password}}</code>
+          <code id="approve-pw" class="mono" style="flex:1;padding:8px 10px;background:var(--surface-2);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;word-break:break-all;" data-testid="approve-success-password">{{.Password}}</code>
           <button type="button" class="btn btn-sm" data-testid="approve-success-copy-btn"
             onclick="navigator.clipboard.writeText(document.getElementById('approve-pw').textContent).catch(()=>{})">{{.CopyLabel}}</button>
         </div>
@@ -158,7 +160,7 @@ func (r *Renderer) renderApproveSuccess(plaintext string) ([]byte, error) {
     </div>
     <div class="card-foot" style="justify-content:flex-end;">
       <button type="button" class="btn btn-primary" data-testid="approve-success-dismiss-btn"
-        onclick="document.getElementById('approve-success-overlay').remove();window.location.reload();">{{.Dismiss}}</button>
+        onclick="document.getElementById('users-modal-target').innerHTML='';window.location.reload();">{{.Dismiss}}</button>
     </div>
   </div>
 </div>`

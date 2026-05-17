@@ -29,16 +29,23 @@ Usage from a page template:
         "ctx"     $someContextValue }}
 
 Dict keys (all values strings unless noted):
-  id      — DOM id for the outer .modal element (required)
-  title   — header text (required)
-  testid  — data-testid override (optional, defaults to id)
-  action  — form action URL. When set, body+foot are wrapped in a
-            <form>; data-modal-close + data-validate-submit work as
-            buttons inside it. Omit for non-form modals.
-  method  — form method (default "post"; only applies if action is set)
-  bodyTpl — name of a {{ define ... }} template to render inside .card-body
-  footTpl — name of a {{ define ... }} template to render inside .card-foot
-  ctx     — value passed as the data pipeline to bodyTpl / footTpl
+  id       — DOM id for the outer .modal element (required)
+  title    — header text (required)
+  testid   — data-testid override (optional, defaults to id)
+  action   — form action URL for a regular browser submit. When set,
+             body+foot are wrapped in a <form>. Omit for non-form modals.
+             Mutually exclusive with hxPost.
+  method   — form method (default "post"; only applies if action is set)
+  hxPost   — form action URL for htmx-driven submit. Like action but the
+             form posts via hx-post and swaps the response into hxTarget.
+             Used when the response is a fragment that must inherit page
+             styles (kura.css, modal CSS, etc.) — a regular submit
+             navigates away and renders the fragment as a bare page.
+  hxTarget — htmx target selector (default "body"); only applies if hxPost
+  hxSwap   — htmx swap mode (default "beforeend"); only applies if hxPost
+  bodyTpl  — name of a {{ define ... }} template to render inside .card-body
+  footTpl  — name of a {{ define ... }} template to render inside .card-foot
+  ctx      — value passed as the data pipeline to bodyTpl / footTpl
 
 The body/foot templates receive ctx as `.` so they can use whatever
 shape the caller passed in (struct / map / view-model).
@@ -46,8 +53,12 @@ shape the caller passed in (struct / map / view-model).
 {{ define "modal" }}
 {{- $id := .id -}}
 {{- $testid := .id -}}{{ if .testid }}{{ $testid = .testid }}{{ end -}}
+{{- $hxTarget := "body" -}}{{ if .hxTarget }}{{ $hxTarget = .hxTarget }}{{ end -}}
+{{- $hxSwap := "beforeend" -}}{{ if .hxSwap }}{{ $hxSwap = .hxSwap }}{{ end -}}
 <div id="{{ $id }}" class="modal" data-testid="{{ $testid }}" style="display:none">
-  {{- if .action }}
+  {{- if .hxPost }}
+  <form class="card" hx-post="{{ .hxPost }}" hx-target="{{ $hxTarget }}" hx-swap="{{ $hxSwap }}">
+  {{- else if .action }}
   <form method="{{ if .method }}{{ .method }}{{ else }}post{{ end }}" action="{{ .action }}" class="card">
   {{- else }}
   <div class="card">
@@ -57,7 +68,7 @@ shape the caller passed in (struct / map / view-model).
     </div>
     <div class="card-body">{{ tpl .bodyTpl .ctx }}</div>
     <div class="card-foot" style="justify-content:flex-end;gap:8px">{{ tpl .footTpl .ctx }}</div>
-  {{- if .action }}
+  {{- if or .hxPost .action }}
   </form>
   {{- else }}
   </div>

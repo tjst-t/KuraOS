@@ -336,13 +336,15 @@ PageData.Extra is *ui.UsersView.
 {{- /* ===== 承認待ちユーザーの承認 / 却下モーダル ===== */ -}}
 {{ range $v.PendingUsers }}
 {{ template "modal" dict
-    "id"      (printf "pending-approve-modal-%s" .UserID)
-    "testid"  (printf "pending-approve-modal-%s" .UserID)
-    "title"   (T "page.users.approve_modal_title")
-    "action"  (printf "/ui/admin/users/%s/approve" .UserID)
-    "bodyTpl" "pending-approve-body"
-    "footTpl" "pending-approve-foot"
-    "ctx"     . }}
+    "id"       (printf "pending-approve-modal-%s" .UserID)
+    "testid"   (printf "pending-approve-modal-%s" .UserID)
+    "title"    (T "page.users.approve_modal_title")
+    "hxPost"   (printf "/ui/admin/users/%s/approve" .UserID)
+    "hxTarget" "#users-modal-target"
+    "hxSwap"   "innerHTML"
+    "bodyTpl"  "pending-approve-body"
+    "footTpl"  "pending-approve-foot"
+    "ctx"      . }}
 {{ template "modal" dict
     "id"      (printf "pending-reject-modal-%s" .UserID)
     "testid"  (printf "pending-reject-modal-%s" .UserID)
@@ -353,6 +355,11 @@ PageData.Extra is *ui.UsersView.
     "ctx"     . }}
 {{ end }}
 {{ end }}
+
+{{- /* htmx target for the approve-success fragment (one-time password
+        reveal). Empty until POST /ui/admin/users/{id}/approve swaps the
+        fragment in. The fragment owns its own .modal wrapper. */ -}}
+<div id="users-modal-target" data-testid="users-modal-target"></div>
 
 {{ if eq $v.Tab "groups" }}
 {{ template "modal" dict
