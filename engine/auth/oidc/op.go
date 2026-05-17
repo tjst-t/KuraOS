@@ -450,4 +450,3 @@ func verifyPKCE(challenge, method, verifier string) error {
 		return fmt.Errorf("oidc: unsupported PKCE method %q", method)
 	}
 }
-

@@ -151,9 +151,9 @@ func (a *oidcRoleLookupAdapter) LookupRole(ctx context.Context, userID string) (
 // OIDC storage + the credential vault. Constructed once at startup and
 // passed into AppLifecycle.OIDC.
 type appOIDCRegistrar struct {
-	op       *oidc.Provider
-	sysEng   system.Engine
-	gateway  string // public origin used to build absolute redirect URIs
+	op      *oidc.Provider
+	sysEng  system.Engine
+	gateway string // public origin used to build absolute redirect URIs
 }
 
 func newAppOIDCRegistrar(op *oidc.Provider, sysEng system.Engine, gateway string) *appOIDCRegistrar {

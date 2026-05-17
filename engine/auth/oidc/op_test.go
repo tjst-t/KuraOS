@@ -19,8 +19,8 @@ import (
 // the signer can exercise its persist + reload path without booting the
 // full engine/system stack.
 type memCredStore struct {
-	mu  sync.Mutex
-	kv  map[string]string
+	mu sync.Mutex
+	kv map[string]string
 }
 
 func newMemCreds() *memCredStore { return &memCredStore{kv: map[string]string{}} }
