@@ -59,6 +59,72 @@ func newAuthServer(t *testing.T, users AuthUserStore, sessions AuthSessionStore)
 	return srv, r
 }
 
+// fakeProviderLister is a tiny stub for AuthDeps.Providers so the
+// /login render path can be tested with and without federation
+// configured.
+type fakeProviderLister struct{ rows []UsersProvider }
+
+func (f *fakeProviderLister) ListProviders(_ context.Context) ([]UsersProvider, error) {
+	return f.rows, nil
+}
+
+// [AC-Sfix002-2-1] Google button visible iff google provider enabled.
+func TestLogin_GETShowsGoogleButtonWhenEnabled(t *testing.T) {
+	users := &fakeAuthUserStore{verify: func(_ context.Context, _, _ string) (user.User, bool, error) {
+		return user.User{}, false, nil
+	}}
+	r := newTestRenderer(t)
+	srv := httptest.NewServer(r.AuthHandler(AuthDeps{
+		Users:    users,
+		Sessions: &fakeAuthSessionStore{},
+		Providers: &fakeProviderLister{rows: []UsersProvider{
+			{Name: "google", Enabled: true},
+		}},
+	}))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/login")
+	if err != nil {
+		t.Fatalf("GET /login: %v", err)
+	}
+	defer resp.Body.Close()
+	body := readBody(t, resp)
+	for _, want := range []string{
+		`data-testid="login-google-btn"`,
+		`href="/federation/google/start"`,
+		`Google でログイン`,
+		`data-testid="login-fed-divider"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q", want)
+		}
+	}
+}
+
+// [AC-Sfix002-2-1] No Google button when no provider is configured.
+func TestLogin_GETHidesGoogleButtonWhenDisabled(t *testing.T) {
+	users := &fakeAuthUserStore{verify: func(_ context.Context, _, _ string) (user.User, bool, error) {
+		return user.User{}, false, nil
+	}}
+	r := newTestRenderer(t)
+	srv := httptest.NewServer(r.AuthHandler(AuthDeps{
+		Users:    users,
+		Sessions: &fakeAuthSessionStore{},
+		// No Providers wired — federation off.
+	}))
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/login")
+	if err != nil {
+		t.Fatalf("GET /login: %v", err)
+	}
+	defer resp.Body.Close()
+	body := readBody(t, resp)
+	if strings.Contains(body, `data-testid="login-google-btn"`) {
+		t.Fatalf("Google button rendered with no providers configured")
+	}
+}
+
 func TestLogin_GETReturnsForm(t *testing.T) {
 	users := &fakeAuthUserStore{verify: func(_ context.Context, _, _ string) (user.User, bool, error) {
 		return user.User{}, false, nil

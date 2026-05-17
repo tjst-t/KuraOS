@@ -7,6 +7,7 @@ import (
 	"context"
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"net/http"
@@ -16,6 +17,7 @@ import (
 	"github.com/kuraos-org/kura/engine/auth/oidc"
 	"github.com/kuraos-org/kura/engine/auth/session"
 	"github.com/kuraos-org/kura/engine/system"
+	"github.com/kuraos-org/kura/engine/user"
 )
 
 // randomRead is rand.Read aliased so federation_wiring tests can swap it
@@ -29,10 +31,14 @@ var hexEncode = hex.EncodeToString
 // in v1; config.json migration is separate work) and returns the
 // /federation/* HTTP handler. Returns nil if no providers are configured —
 // the gateway then leaves the path unmounted so /federation/* 404s.
-func buildFederationHandler(ctx context.Context, db *sql.DB, sysEng system.Engine, sessions *session.Store) http.Handler {
+func buildFederationHandler(ctx context.Context, db *sql.DB, sysEng system.Engine, users *user.Store, sessions *session.Store, errRenderer federation.ErrorRenderer) http.Handler {
 	storage := oidc.NewStorage(db)
 	mgr := federation.New(storage, sessions, &credentialAdapter{eng: sysEng})
-	mgr.SetProvisioner(&fedProvisioner{db: db, sys: sysEng})
+	mgr.SetProvisioner(&fedProvisioner{db: db, sys: sysEng, users: users})
+	mgr.SetRoleLookup(&fedRoleLookup{users: users})
+	if errRenderer != nil {
+		mgr.SetErrorRenderer(errRenderer)
+	}
 
 	// Discover providers from the env. Each provider's config is read from
 	// KURA_FED_<NAME>_CLIENT_ID, with the secret looked up from the vault
@@ -109,36 +115,73 @@ func envName(s string) string {
 	return string(out)
 }
 
-// fedProvisioner implements federation.UserProvisioner by inserting a
-// new user row into the users table and triggering AllocateUID via
-// engine/system. Lives here so engine/auth/federation never imports
-// engine/user / engine/system directly.
+// fedProvisioner implements federation.UserProvisioner by routing the
+// new-user creation through engine/system.Engine.CreateUser so the full
+// projection chain runs (uid_alloc + argon2id + NT-hash + /etc/passwd
+// reconcile). priority #10: no engine may call useradd / chown / smbpasswd
+// directly; everything goes through engine/system.
+//
+// Federated users have no operator-known password, so we mint a strong
+// random one and stash it in the vault. The user can sign in via Google
+// without ever knowing it; if they want to enable SMB later, the admin
+// (or the user themselves, when a self-service screen lands in v1.x)
+// resets it from the UI.
 type fedProvisioner struct {
-	db  *sql.DB
-	sys system.Engine
+	db    *sql.DB
+	sys   system.Engine
+	users *user.Store
 }
 
 func (p *fedProvisioner) CreateFromFederation(ctx context.Context, username, displayName, email string) (string, error) {
-	// User row insertion: minimal columns. The existing engine/user
-	// schema has more fields, but for a federated user we don't need a
-	// password hash row at all. The sub becomes the unique identifier;
-	// the username is just a friendly label.
-	id := newUserID()
-	_, err := p.db.ExecContext(ctx, `
-		INSERT INTO users (id, username, display_name, role, created_at, updated_at, disabled)
-		VALUES (?, ?, ?, 'user', strftime('%Y-%m-%dT%H:%M:%fZ','now'),
-		        strftime('%Y-%m-%dT%H:%M:%fZ','now'), 0)
-		ON CONFLICT(username) DO UPDATE SET display_name = excluded.display_name
-	`, id, username, displayName)
+	// De-dup: if a user with this username already exists (admin
+	// pre-created them and chose the same name), return that ID and let
+	// federation_links bind to it instead of creating a duplicate. This
+	// matches the previous handler's ON CONFLICT semantics.
+	if existing, err := p.users.GetByUsername(ctx, username); err == nil {
+		return existing.ID, nil
+	}
+	pw, err := randomPassword(24)
 	if err != nil {
 		return "", err
 	}
-	if _, err := p.sys.AllocateUID(ctx, id); err != nil {
-		// non-fatal — the user can still log in even if uid allocation
-		// fails (uid only matters for SMB / NFS / Docker).
-		_ = err
+	id, err := p.sys.CreateUser(ctx, system.CreateUserInput{
+		Username:    username,
+		DisplayName: displayName,
+		Password:    pw,
+		Role:        "user",
+	})
+	if err != nil {
+		return "", err
 	}
 	return id, nil
+}
+
+// randomPassword returns a base64url-encoded, n-byte random string.
+// Used as the placeholder credential for auto-provisioned federated
+// users (Sfix002-3). The bytes never leave engine/system after Hash;
+// only the argon2id verifier + NT-hash are persisted.
+func randomPassword(n int) (string, error) {
+	b := make([]byte, n)
+	if _, err := randomRead(b); err != nil {
+		return "", err
+	}
+	return base64.RawURLEncoding.EncodeToString(b), nil
+}
+
+// fedRoleLookup satisfies federation.RoleLookup so the callback can pick
+// /ui/admin/dashboard vs /ui after issuing a session for the federated
+// user (Sfix002-1).
+type fedRoleLookup struct{ users *user.Store }
+
+func (r *fedRoleLookup) LookupRole(ctx context.Context, userID string) (string, error) {
+	if r.users == nil {
+		return "", nil
+	}
+	u, err := r.users.GetByID(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return string(u.Role), nil
 }
 
 // newUserID returns a 12-byte random hex string suitable as engine/user.User.ID.

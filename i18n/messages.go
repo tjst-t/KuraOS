@@ -79,6 +79,20 @@ const (
 	MsgLoginGenericError     MessageID = "page.login.generic_error"
 	MsgLoginLogoutSuccess    MessageID = "page.login.logout_success"
 	MsgNavLogout             MessageID = "nav.logout"
+
+	// Federation buttons on /login (added in Sfix002-2).
+	MsgLoginDividerOr      MessageID = "page.login.divider_or"
+	MsgLoginSignInGoogle   MessageID = "page.login.signin_with_google"
+	MsgLoginGoogleLogoAlt  MessageID = "page.login.google_logo_alt"
+)
+
+// Federation error pages (added in Sfix002-3).
+const (
+	MsgFederationErrorTitle        MessageID = "page.federation.error_title"
+	MsgFederationUnboundError      MessageID = "page.federation.unbound_error"
+	MsgFederationProvisionFailed   MessageID = "page.federation.provision_failed"
+	MsgFederationProvisionUnavail  MessageID = "page.federation.provision_unavailable"
+	MsgFederationBackToLogin       MessageID = "page.federation.back_to_login"
 )
 
 // Storage page (added in Se3b190 — read-only views).

@@ -59,6 +59,34 @@ the server re-renders this same page with .ErrorMessage set.
           {{ T "page.login.submit" }}
         </button>
       </form>
+
+      {{ if .Extra.Providers }}
+      <div class="fed-divider" data-testid="login-fed-divider"
+           style="display:flex;align-items:center;gap:12px;margin:20px 0 14px;color:var(--text-3);font-size:12px;">
+        <hr style="flex:1;border:none;border-top:1px solid var(--border);" />
+        <span>{{ T "page.login.divider_or" }}</span>
+        <hr style="flex:1;border:none;border-top:1px solid var(--border);" />
+      </div>
+      <div class="fed-buttons" style="display:flex;flex-direction:column;gap:10px;">
+        {{ range .Extra.Providers }}
+          {{ if eq .Name "google" }}
+          <a class="btn" data-testid="login-google-btn"
+             href="/federation/google/start"
+             style="justify-content:center;gap:10px;padding:9px 16px;text-decoration:none;">
+            <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true" focusable="false"
+                 role="img" data-testid="login-google-logo">
+              <title>{{ T "page.login.google_logo_alt" }}</title>
+              <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844a4.14 4.14 0 0 1-1.796 2.716v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z"/>
+              <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.184l-2.908-2.258c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+              <path fill="#FBBC05" d="M3.964 10.707A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.707V4.961H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.039l3.007-2.332z"/>
+              <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.166 6.656 3.58 9 3.58z"/>
+            </svg>
+            <span>{{ T "page.login.signin_with_google" }}</span>
+          </a>
+          {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
     </div>
   </div>
 </div>

@@ -74,10 +74,10 @@ func (f *fakeProvisioner) CreateFromFederation(_ context.Context, username, _, _
 // for an id_token + access_token whose claims hard-code the supplied
 // subject + email.
 type mockIdP struct {
-	mu        sync.Mutex
-	server    *httptest.Server
-	subject   string
-	email     string
+	mu         sync.Mutex
+	server     *httptest.Server
+	subject    string
+	email      string
 	codeIssued string
 }
 
@@ -326,6 +326,13 @@ func TestFederation_UnboundUserRejected_AC_S822961_3_2(t *testing.T) {
 	}
 }
 
+// [AC-Sfix002-3-1] TestAutoProvisionCreatesUser — alias for
+// TestFederation_AutoProvision_CreatesUser keeping the legacy
+// S822961 coverage while explicitly tagging the Sfix002-3 AC the
+// roadmap names. Sfix002 promoted "auto_provision works end-to-end"
+// from a code-only feature to a verified AC.
+func TestAutoProvisionCreatesUser(t *testing.T) { TestFederation_AutoProvision_CreatesUser(t) }
+
 // AC-S822961-3-2 (positive variant): auto_provision=true creates the
 // user on first login.
 func TestFederation_AutoProvision_CreatesUser(t *testing.T) {
@@ -345,7 +352,7 @@ func TestFederation_AutoProvision_CreatesUser(t *testing.T) {
 
 	_ = mgr.Register(context.Background(), Provider{
 		Name: "google", Issuer: idp.server.URL, ClientID: "c",
-		RedirectURI: gateway.URL + "/federation/google/callback",
+		RedirectURI:   gateway.URL + "/federation/google/callback",
 		AutoProvision: true,
 	})
 
@@ -373,6 +380,174 @@ func TestFederation_AutoProvision_CreatesUser(t *testing.T) {
 	}
 	if link.UserID != prov.created[0] {
 		t.Fatalf("link UserID = %q, want %q", link.UserID, prov.created[0])
+	}
+}
+
+// roleLookupFn lets tests inject a per-userID role table without
+// pulling in engine/user. mirrors RoleLookup.
+type roleLookupFn func(string) string
+
+func (f roleLookupFn) LookupRole(_ context.Context, userID string) (string, error) {
+	return f(userID), nil
+}
+
+// [AC-Sfix002-1-1] TestCallbackReturnToRoleSafe verifies the federation
+// callback never redirects a user to a URL their role can't reach. A
+// user role landing on /ui/admin/* would 403 immediately and look like
+// a broken login (Sfix002 rationale).
+func TestCallbackReturnToRoleSafe(t *testing.T) {
+	cases := []struct {
+		name     string
+		role     string
+		returnTo string
+		want     string
+	}{
+		// admin lands on the admin dashboard by default and may
+		// override with any safe path including /ui/admin/*.
+		{"admin no return_to -> admin dashboard", "admin", "", "/ui/admin/dashboard"},
+		{"admin -> explicit /ui/admin/users honoured", "admin", "/ui/admin/users", "/ui/admin/users"},
+		{"admin -> explicit /ui honoured", "admin", "/ui", "/ui"},
+		// user lands on /ui by default and is forced off any
+		// admin-only path that would 403.
+		{"user no return_to -> /ui", "user", "", "/ui"},
+		{"user explicit /ui/admin -> fallback to /ui", "user", "/ui/admin/dashboard", "/ui"},
+		{"user explicit /ui/portal honoured", "user", "/ui/portal", "/ui/portal"},
+		{"user explicit /setup blocked", "user", "/setup", "/ui"},
+		// Unknown role behaves like user (under-grant per priority #5).
+		{"unknown role -> /ui", "", "", "/ui"},
+		// Open-redirect attempts are rejected for both roles.
+		{"admin scheme-relative dropped", "admin", "//evil.example/", "/ui/admin/dashboard"},
+		{"user external URL dropped", "user", "https://attacker", "/ui"},
+	}
+
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			db := newTestDB(t)
+			sessions := session.NewStore(db)
+			mgr := New(oidc.NewStorage(db), sessions, newMemCreds())
+			mgr.SetRoleLookup(roleLookupFn(func(uid string) string {
+				if uid == "u-test" {
+					return c.role
+				}
+				return ""
+			}))
+			got := mgr.redirectTarget(context.Background(), "u-test", c.returnTo, "/ui/admin/dashboard")
+			if got != c.want {
+				t.Fatalf("redirect = %q, want %q", got, c.want)
+			}
+		})
+	}
+}
+
+// TestCallbackRedirectsRoleSafe drives the entire callback flow end-to-end
+// against the mock IdP and asserts the Location header reflects the user's
+// role rather than the legacy /ui/admin/dashboard default.
+func TestCallbackRedirectsRoleSafe(t *testing.T) {
+	db := newTestDB(t)
+	idp := newMockIdP(t, "google-bob-001", "bob@example.com")
+	defer idp.server.Close()
+
+	storage := oidc.NewStorage(db)
+	sessions := session.NewStore(db)
+	mgr := New(storage, sessions, newMemCreds())
+	mgr.SetHTTPClient(idp.server.Client())
+	mgr.SetRoleLookup(roleLookupFn(func(uid string) string {
+		if uid == "user-bob" {
+			return "user"
+		}
+		return ""
+	}))
+
+	const userID = "user-bob"
+	if err := storage.LinkFederation(context.Background(), oidc.FederationLink{
+		Provider: "google", Subject: "google-bob-001", UserID: userID, Email: "bob@example.com",
+	}); err != nil {
+		t.Fatalf("seed link: %v", err)
+	}
+
+	gateway := httptest.NewServer(mgr.Routes())
+	defer gateway.Close()
+
+	_ = mgr.Register(context.Background(), Provider{
+		Name: "google", Issuer: idp.server.URL, ClientID: "c",
+		RedirectURI: gateway.URL + "/federation/google/callback",
+	})
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+
+	res, _ := client.Get(gateway.URL + "/federation/google/start")
+	res.Body.Close()
+	loc, _ := url.Parse(res.Header.Get("Location"))
+	res2, _ := client.Get(loc.String())
+	res2.Body.Close()
+	cb, _ := url.Parse(res2.Header.Get("Location"))
+	res3, _ := client.Get(cb.String())
+	res3.Body.Close()
+	if res3.StatusCode != http.StatusFound {
+		t.Fatalf("callback status = %d, want 302", res3.StatusCode)
+	}
+	if got := res3.Header.Get("Location"); got != "/ui" {
+		t.Fatalf("Location = %q, want %q (user role default)", got, "/ui")
+	}
+}
+
+// fakeErrorRenderer records the message ID used in the last error
+// call so tests can assert the friendly i18n page was triggered
+// instead of the legacy http.Error.
+type fakeErrorRenderer struct {
+	lastMsgID  string
+	lastStatus int
+}
+
+func (f *fakeErrorRenderer) RenderFederationError(w http.ResponseWriter, _ *http.Request, msgID string, status int) {
+	f.lastMsgID = msgID
+	f.lastStatus = status
+	w.WriteHeader(status)
+	_, _ = w.Write([]byte("rendered:" + msgID))
+}
+
+// [AC-Sfix002-3-2] Unbound subject with auto_provision=false renders
+// the i18n error page, not http.Error plain text.
+func TestCallbackUnboundRendersErrorPage(t *testing.T) {
+	db := newTestDB(t)
+	idp := newMockIdP(t, "google-stranger-xyz", "stranger@example.com")
+	defer idp.server.Close()
+
+	mgr := New(oidc.NewStorage(db), session.NewStore(db), newMemCreds())
+	mgr.SetHTTPClient(idp.server.Client())
+	er := &fakeErrorRenderer{}
+	mgr.SetErrorRenderer(er)
+
+	gateway := httptest.NewServer(mgr.Routes())
+	defer gateway.Close()
+
+	_ = mgr.Register(context.Background(), Provider{
+		Name: "google", Issuer: idp.server.URL, ClientID: "c",
+		RedirectURI:   gateway.URL + "/federation/google/callback",
+		AutoProvision: false,
+	})
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar, CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
+		return http.ErrUseLastResponse
+	}}
+	res, _ := client.Get(gateway.URL + "/federation/google/start")
+	res.Body.Close()
+	loc, _ := url.Parse(res.Header.Get("Location"))
+	res2, _ := client.Get(loc.String())
+	res2.Body.Close()
+	cb, _ := url.Parse(res2.Header.Get("Location"))
+	res3, _ := client.Get(cb.String())
+	res3.Body.Close()
+
+	if res3.StatusCode != http.StatusForbidden {
+		t.Fatalf("status = %d, want 403", res3.StatusCode)
+	}
+	if er.lastMsgID != "page.federation.unbound_error" {
+		t.Fatalf("error msgID = %q, want page.federation.unbound_error", er.lastMsgID)
 	}
 }
 

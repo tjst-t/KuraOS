@@ -1,0 +1,33 @@
+{{- /*
+federation_error.tmpl — friendly i18n error page rendered when a
+federation callback can't complete (unbound subject + auto_provision=0,
+provision failure, etc.). Replaces the old http.Error plain text so a
+family member who tried Google login doesn't see a 403 stack trace
+(Sfix002-3).
+*/ -}}
+{{ define "content" }}
+<div class="center-shell">
+  <div class="card" style="max-width:420px;width:100%;">
+    <div class="card-body" style="padding:32px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px;">
+        <div class="brand-mark">{{ template "brand-mark" . }}</div>
+        <div>
+          <div class="brand-name">{{ T "brand.name" }}</div>
+          <div class="brand-sub">v{{ .Version }}</div>
+        </div>
+      </div>
+      <h1 class="page-title" style="font-size:22px;margin:4px 0 6px;" data-testid="federation-error-title">
+        {{ T "page.federation.error_title" }}
+      </h1>
+      <div class="banner crit" data-testid="federation-error-message" style="margin:16px 0;">
+        <div>{{ T .Extra.MessageID }}</div>
+      </div>
+      <a class="btn btn-accent" data-testid="federation-back-to-login"
+         href="/login"
+         style="justify-content:center;padding:9px 16px;text-decoration:none;width:100%;">
+        {{ T "page.federation.back_to_login" }}
+      </a>
+    </div>
+  </div>
+</div>
+{{ end }}

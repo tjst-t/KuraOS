@@ -49,6 +49,15 @@
   "page.login.password_required": "パスワードを入力してください",
   "page.login.generic_error": "ログインに失敗しました。時間を置いてもう一度お試しください。",
   "page.login.logout_success": "ログアウトしました",
+  "page.login.divider_or": "または",
+  "page.login.signin_with_google": "Google でログイン",
+  "page.login.google_logo_alt": "Google ロゴ",
+
+  "page.federation.error_title": "外部サインインに失敗しました",
+  "page.federation.unbound_error": "このアカウントは KuraOS に紐付いていません。管理者に連絡してアカウントを作成してもらうか、既存のアカウントから Google を紐付けてください。",
+  "page.federation.provision_failed": "新しいアカウントの作成に失敗しました。管理者に連絡してください。",
+  "page.federation.provision_unavailable": "新規アカウントの自動作成が無効になっています。管理者に連絡してください。",
+  "page.federation.back_to_login": "ログインに戻る",
 
   "page.setup.title": "初期セットアップ",
   "page.setup.subtitle": "KuraOS をご利用いただくための最初の設定を行います。",
