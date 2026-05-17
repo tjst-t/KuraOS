@@ -1,0 +1,32 @@
+{
+  "sprint_id": "S413bd5",
+  "title": "Google アカウントでの自己登録 + 管理者承認フロー",
+  "planning": [
+    {
+      "decision": "approval state を新ロール pending として表現 (Disabled flag 等の別軸ではなく)",
+      "rationale": "engine/user.Role は既に admin/user の 2 値 enum で、middleware / template / sessions の分岐に組み込まれている。Disabled 別フラグだと if !u.Disabled && role==... の二重条件が全 enforcement 箇所に必要。priority #6 (依存を増やさない) と #5 (1 ヶ所修正で全 enforcement)。"
+    },
+    {
+      "decision": "AutoProvision=1 の旧『即 user role』挙動を撤去し、pending 経由のみに統一",
+      "rationale": "任意の Google ユーザーに対し JIT で full user role を付与するのは priority #5 (信頼性) と衝突。VISION.json 『家庭用 NAS = 家族と他人を見分ける必要』に反する。"
+    },
+    {
+      "decision": "承認時に admin に生成パスワードを 1 度だけ表示するモーダルを必須",
+      "rationale": "engine/system は SSOT projection (priority #10) を持つので vault から再表示は不可。家族にパスワードを伝える運用が必要なので承認直後に 1 回だけ表示。"
+    },
+    {
+      "decision": "Story 1 → 2 → 3 を順次実行 (worktree 並列ではなく sequential)",
+      "rationale": "Story 2 は Story 1 の RolePending と middleware に依存、Story 3 は Story 1 の PromoteFromPending に依存。3 つとも internal/ui の users まわりを触る overlap があるので worktree merge より sequential のほうが速い。"
+    },
+    {
+      "decision": "ログインボタンを単一『Google で続行』に統一 (register/sign-in を分けない)",
+      "rationale": "VISION.json design_references の Tailscale 哲学『設定が極小』と Linear minimal UI。家庭用 UX として 2 ボタンは選択疲れ。AutoProvision=1 + 未登録ユーザー → 自動 register というのが最も少ない選択。"
+    },
+    {
+      "decision": "GUI 起点は /login (Google ボタン) と /ui/admin/users (承認待ちセクション + 各種モーダル)、E2E は実 browser via Playwright (mock IdP との結合)",
+      "rationale": "CLAUDE.md test discipline rule 4『GUI E2E はすべて Playwright』 + Sfix002 で確立した oidc-mock 経由パターンを踏襲。"
+    }
+  ],
+  "implementation": [],
+  "review": []
+}
