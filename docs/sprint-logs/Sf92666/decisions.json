@@ -1,0 +1,85 @@
+{
+  "sprint_id": "Sf92666",
+  "decisions": [
+    {
+      "id": "D01",
+      "story_id": "Sf92666-1",
+      "title": "TLS certificate generation: ECDSA P-256 + 10yr CA / 1yr leaf",
+      "decision": "Generate ECDSA P-256 CA (10yr) and leaf cert (1yr) with proper SANs. Idempotent: skip if cert has >30 days remaining.",
+      "rationale": "ECDSA P-256 is the browser-compatible modern choice. 10yr CA avoids frequent re-trust. 30-day threshold matches Let's Encrypt renewal convention.",
+      "references": ["DESIGN_PRINCIPLES priority #3 (least-surface security)"]
+    },
+    {
+      "id": "D02",
+      "story_id": "Sf92666-1",
+      "title": "cosign keyless NOT used — ed25519 in-house verification",
+      "decision": "Use ed25519 in-house signature verification instead of cosign keyless infrastructure.",
+      "rationale": "Per v1 drift decision in project MEMORY: VISION明文のcosign keyless / zitadel/oidcは使わずin-house実装で出荷確定。The interface boundary allows v1.x substitution.",
+      "references": ["MEMORY: project_drift_decisions_v1.md", "VISION.json out-of-scope list"]
+    },
+    {
+      "id": "D03",
+      "story_id": "Sf92666-1",
+      "title": "ACME provider registry uses init() auto-registration pattern",
+      "decision": "DNSProvider registry is populated via init() in provider packages. Main imports blank `_ .../acme/providers` to trigger all registrations.",
+      "rationale": "Consistent with existing DNS provider pattern in the codebase (acme.Register). Avoids manual wiring per provider. New providers added by creating a new file with init().",
+      "references": ["DESIGN_PRINCIPLES: no external plugin loading", "CLAUDE.md: DNSProvider registry"]
+    },
+    {
+      "id": "D04",
+      "story_id": "Sf92666-1",
+      "title": "KURA_ACME_STAGING=1 short-circuits real Cloudflare API in CI",
+      "decision": "Cloudflare provider checks KURA_ACME_STAGING env and returns nil without making network calls when set.",
+      "rationale": "Prevents CI from consuming Cloudflare API quota. Test gate allows unit tests to verify registration and token-loading logic without live network.",
+      "references": ["DESIGN_PRINCIPLES: interface for side-effectful deps"]
+    },
+    {
+      "id": "D05",
+      "story_id": "Sf92666-2",
+      "title": "KURA_NETWORK_APPLY=1 gate: GenerateNetplan is always testable",
+      "decision": "ApplyConfig always generates YAML (can be tested in dry-run). netplan apply + hostnamectl only execute when KURA_NETWORK_APPLY=1 is set.",
+      "rationale": "Allows full YAML generation testing in local CI without a real netplan system. VM smoke test sets the gate. Matches pattern from existing code (KURA_NETWORK_APPLY described in E2E test comments).",
+      "references": ["DESIGN_PRINCIPLES: interface for side-effectful deps", "CLAUDE.md: cmdexec.Executor"]
+    },
+    {
+      "id": "D06",
+      "story_id": "Sf92666-2",
+      "title": "Netplan SSOT: only engine/network writes /etc/netplan/99-kura.yaml",
+      "decision": "A single netplan file (99-kura.yaml) is owned exclusively by the kura engine. Other files in /etc/netplan are untouched.",
+      "rationale": "Avoids conflict with cloud-init and OS-managed netplan files. 99- prefix gives highest numeric priority in netplan merge order.",
+      "references": ["CLAUDE.md: config.json SSOT principle"]
+    },
+    {
+      "id": "D07",
+      "story_id": "Sf92666-3",
+      "title": "JSONL daily-rotated log files with configurable retention",
+      "decision": "Each day gets its own .jsonl file (kura-YYYY-MM-DD.jsonl). Retention pruning removes oldest files when count exceeds LoggingConfig.RetentionDays.",
+      "rationale": "JSONL is streamable and grep-friendly. Daily rotation keeps files manageable. File-count-based retention is simpler than byte-size and matches common log rotation tools.",
+      "references": ["VISION: operational simplicity"]
+    },
+    {
+      "id": "D08",
+      "story_id": "Sf92666-3",
+      "title": "SSE log stream uses Go 1.22 mux path specificity for routing",
+      "decision": "Register /ui/admin/settings/logs/stream as a separate explicit route, not a sub-path of the settings wildcard.",
+      "rationale": "Go 1.22 net/http mux selects most-specific path. Avoids intercepting SSE handshake with the general settings handler which sets wrong content-type headers.",
+      "references": ["CLAUDE.md: Go 1.22 net/http mux behavior"]
+    },
+    {
+      "id": "D09",
+      "story_id": "Sf92666-4",
+      "title": "Self-update Apply goroutine: returns 'applying' immediately, no blocking",
+      "decision": "handleApply launches Updater.Apply in a goroutine and returns an HTMX partial with 'applying...' status. The update proceeds asynchronously.",
+      "rationale": "HTTP request would time out during a multi-second binary download + restart + health poll. Non-blocking response with SSE-friendly pattern fits htmx usage.",
+      "references": ["DESIGN_PRINCIPLES: single-binary simplicity"]
+    },
+    {
+      "id": "D10",
+      "story_id": "Sf92666-4",
+      "title": "Rollback path: kura.bak → kura on health-poll failure",
+      "decision": "After atomic replace (kura.bak, kura.new→kura), poll /healthz for up to 5s. On failure: rm kura, mv kura.bak→kura. No systemctl restart needed — supervisor (nohup/systemd) will restart.",
+      "rationale": "Minimal rollback surface. kura.bak preserved until next successful update. Health poll 5s matches typical Go binary startup time on slow hardware.",
+      "references": ["MEMORY: feedback_pre_demo_smoke.md — reliability requirement for Sf92666-4"]
+    }
+  ]
+}

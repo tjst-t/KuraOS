@@ -1,0 +1,129 @@
+{{- /*
+network.tmpl — Network configuration page (Sf92666-2).
+Visual SSOT: prototype/claude_design/Network.html.
+Displays current hostname / IPs / DNS and provides an edit form.
+KURA_NETWORK_APPLY=1 gate: form post always succeeds; success message
+tells the user whether changes were actually applied or just validated.
+*/ -}}
+{{ define "content" }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.network.title" }}</h1>
+    <p class="page-sub">{{ T "page.network.subtitle" }}</p>
+  </div>
+</div>
+
+{{ if .Extra }}{{ with .Extra }}
+
+{{ if .SuccessMsg }}
+<div class="banner ok" data-testid="network-success" style="margin-bottom:16px">
+  <span>{{ .SuccessMsg }}</span>
+</div>
+{{ end }}
+{{ if .ErrorMsg }}
+<div class="banner crit" data-testid="network-error" style="margin-bottom:16px">
+  <span>{{ .ErrorMsg }}</span>
+</div>
+{{ end }}
+
+{{/* ── Current state card ──────────────────────────────────────── */}}
+{{ if .Info }}
+<div class="card" style="margin-bottom:16px" data-testid="network-info-card">
+  <div class="card-head">
+    <h3 class="card-title">{{ T "page.network.interfaces.heading" }}</h3>
+  </div>
+  <div class="card-body" style="padding:0">
+    <table class="tbl">
+      <thead>
+        <tr>
+          <th>{{ T "page.network.interface.label" }}</th>
+          <th>{{ T "page.network.address.label" }}</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr data-testid="hostname-row">
+          <td class="td-mono">{{ T "page.network.hostname.label" }}</td>
+          <td class="td-mono" data-testid="current-hostname">{{ .Info.Hostname }}</td>
+        </tr>
+        {{ range .Info.Interfaces }}
+        <tr data-testid="iface-row-{{ .Name }}">
+          <td class="td-mono">{{ .Name }}</td>
+          <td>
+            {{ range .Addresses }}
+            <span class="badge td-mono">{{ . }}</span>
+            {{ end }}
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}
+
+{{/* ── Edit form ───────────────────────────────────────────────── */}}
+<div class="card" data-testid="network-form-card">
+  <div class="card-head">
+    <h3 class="card-title">{{ T "page.network.title" }}</h3>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="/ui/admin/network/apply"
+          hx-post="/ui/admin/network/apply"
+          hx-target="body"
+          hx-swap="innerHTML"
+          data-testid="network-form">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <label class="label" for="hostname">{{ T "page.network.hostname.label" }}</label>
+          <input id="hostname" name="hostname" class="input" type="text"
+                 placeholder="{{ T "page.network.hostname.hint" }}"
+                 value="{{ if .Info }}{{ .Info.Hostname }}{{ end }}"
+                 data-testid="hostname-input" />
+        </div>
+        <div>
+          <label class="label" for="dns_servers">{{ T "page.network.dns.label" }}</label>
+          <input id="dns_servers" name="dns_servers" class="input" type="text"
+                 placeholder="{{ T "page.network.dns.hint" }}"
+                 data-testid="dns-input" />
+        </div>
+      </div>
+
+      {{ if .Info }}{{ with .Info }}
+      <h4 style="margin-bottom:8px;font-size:13px;font-weight:600;color:var(--text-2)">
+        {{ T "page.network.interfaces.heading" }}
+      </h4>
+      {{ range .Interfaces }}
+      <div style="border:1px solid var(--border);border-radius:8px;padding:12px 16px;margin-bottom:8px">
+        <p style="font-weight:600;font-size:13px;margin:0 0 8px">{{ .Name }}</p>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+          <div>
+            <label class="label">{{ T "page.network.address.label" }}</label>
+            <input name="iface_{{ .Name }}_address" class="input" type="text"
+                   placeholder="{{ T "page.network.address.hint" }}"
+                   value="{{ if .Addresses }}{{ index .Addresses 0 }}{{ end }}"
+                   data-testid="iface-address-{{ .Name }}" />
+          </div>
+          <div>
+            <label class="label">{{ T "page.network.gateway.label" }}</label>
+            <input name="iface_{{ .Name }}_gateway" class="input" type="text"
+                   placeholder="{{ T "page.network.gateway.hint" }}"
+                   value="{{ .Gateway }}"
+                   data-testid="iface-gateway-{{ .Name }}" />
+          </div>
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}{{ end }}
+
+      <div style="margin-top:16px;text-align:right">
+        <button type="submit" class="btn btn-primary" data-testid="network-apply-btn">
+          {{ T "page.network.apply_btn" }}
+        </button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{ end }}{{ end }}
+{{ end }}

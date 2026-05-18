@@ -99,6 +99,30 @@ func (h *settingsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
+	// Delegate TLS sub-routes to the TLS handler.
+	if strings.HasPrefix(path, "/ui/admin/settings/tls/") {
+		if h.r.tlsHandler != nil {
+			h.r.tlsHandler.ServeHTTP(w, req)
+			return
+		}
+	}
+
+	// Delegate log viewer sub-routes.
+	if strings.HasPrefix(path, "/ui/admin/settings/logs/") {
+		if h.r.logViewerHandler != nil {
+			h.r.logViewerHandler.ServeHTTP(w, req)
+			return
+		}
+	}
+
+	// Delegate self-update sub-routes.
+	if strings.HasPrefix(path, "/ui/admin/settings/self-update/") {
+		if h.r.selfUpdateHandler != nil {
+			h.r.selfUpdateHandler.ServeHTTP(w, req)
+			return
+		}
+	}
+
 	switch {
 	case path == "/ui/admin/settings" && req.Method == http.MethodGet:
 		h.handleGet(w, req)
@@ -131,6 +155,39 @@ func (h *settingsHandler) handleGet(w http.ResponseWriter, req *http.Request) {
 	if tab == "backup" && h.r.backupHandler != nil {
 		if bh, ok := h.r.backupHandler.(*backupSettingsHandler); ok {
 			extra := bh.buildBackupExtra(req)
+			data := h.r.buildPageData("settings", i18n.MsgNavSettings)
+			data.Extra = extra
+			h.r.render(w, "templates/pages/settings.tmpl", data)
+			return
+		}
+	}
+
+	// TLS tab.
+	if tab == "tls" && h.r.tlsHandler != nil {
+		if th, ok := h.r.tlsHandler.(*tlsSettingsHandler); ok {
+			extra := th.buildTLSExtra(req)
+			data := h.r.buildPageData("settings", i18n.MsgNavSettings)
+			data.Extra = extra
+			h.r.render(w, "templates/pages/settings.tmpl", data)
+			return
+		}
+	}
+
+	// Logs tab.
+	if tab == "logs" && h.r.logViewerHandler != nil {
+		if lh, ok := h.r.logViewerHandler.(*logViewerHandler); ok {
+			extra := lh.buildLogsExtra(req)
+			data := h.r.buildPageData("settings", i18n.MsgNavSettings)
+			data.Extra = extra
+			h.r.render(w, "templates/pages/settings.tmpl", data)
+			return
+		}
+	}
+
+	// Self-update tab.
+	if tab == "self_update" && h.r.selfUpdateHandler != nil {
+		if sh, ok := h.r.selfUpdateHandler.(*selfUpdatePageHandler); ok {
+			extra := sh.buildSelfUpdateExtra(req)
 			data := h.r.buildPageData("settings", i18n.MsgNavSettings)
 			data.Extra = extra
 			h.r.render(w, "templates/pages/settings.tmpl", data)
