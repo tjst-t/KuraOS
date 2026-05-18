@@ -278,7 +278,7 @@ test.describe("[AC-S0eedaa-2-2] Share ACL filtering — user only sees permitted
     // Create a test user with role=user.
     const testUser = `e2e-user-${Date.now()}`;
     const testPw = "TestPass123!";
-    await request.post(`${BASE_URL}/ui/admin/users`, {
+    await request.post(`${BASE_URL}/ui/admin/users/create`, {
       form: {
         username: testUser,
         display_name: "E2E File User",
@@ -305,8 +305,23 @@ test.describe("[AC-S0eedaa-2-2] Share ACL filtering — user only sees permitted
     ).not.toBeVisible({ timeout: 3000 });
 
     // Cleanup: delete test user (best-effort via admin API).
-    await request.post(`${BASE_URL}/ui/admin/users/${testUser}/delete`, {
-      headers: { Cookie: `kura_session=${adminSession}` },
-    }).catch(() => {});
+    // Resolve username → user_id since /ui/admin/users/delete takes id in form.
+    try {
+      const listResp = await request.get(`${BASE_URL}/ui/admin/users`, {
+        headers: { Cookie: `kura_session=${adminSession}` },
+      });
+      const html = await listResp.text();
+      const idMatch = html.match(
+        new RegExp(`data-user-id="([a-f0-9]{32})"[^>]*>[^<]*<[^>]*>\\s*${testUser}`, "i"),
+      );
+      if (idMatch) {
+        await request.post(`${BASE_URL}/ui/admin/users/delete`, {
+          form: { id: idMatch[1] },
+          headers: { Cookie: `kura_session=${adminSession}` },
+        });
+      }
+    } catch (_) {
+      // best-effort cleanup; ignore errors
+    }
   });
 });

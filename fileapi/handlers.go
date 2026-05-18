@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -581,6 +582,12 @@ func (h *userFilesHandler) handleDownload(w http.ResponseWriter, r *http.Request
 		return
 	}
 	defer rsc.Close()
+	// Tell the browser to download rather than render inline. Without this,
+	// text/* files open in a new tab and the [AC-S0eedaa-2-1] download e2e
+	// never fires a download event. attachment + URL-encoded filename keeps
+	// non-ASCII filenames intact (RFC 5987).
+	w.Header().Set("Content-Disposition",
+		`attachment; filename*=UTF-8''`+url.PathEscape(info.Name))
 	// Use ServeContent for Range support (AC-S0eedaa-1-3).
 	http.ServeContent(w, r, info.Name, info.ModTime, rsc)
 }
