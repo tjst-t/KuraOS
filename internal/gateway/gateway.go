@@ -59,6 +59,11 @@ type Deps struct {
 	// MetricsHandler serves GET /metrics in OpenMetrics format (S8a756d-1).
 	// When nil the route is not mounted. Admin-only in production.
 	MetricsHandler http.Handler
+
+	// FileAPIHandler serves /api/files/* for native apps (S0eedaa-1).
+	// Authenticated by X-Kura-Token HMAC header (no session cookie required).
+	// When nil the File API is not exposed.
+	FileAPIHandler http.Handler
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
@@ -110,6 +115,17 @@ func New(d Deps) http.Handler {
 			ui = auth.requireRoleHandler(roleUser, userHandler)
 		}
 		mux.Handle("/ui", ui)
+
+		// /ui/files — built-in filebrowser (S0eedaa-2). User-role session auth.
+		// Served by the same UIHandler (which registers /ui/files and /ui/files/*
+		// via Renderer.Routes()). A separate mux entry is required because the
+		// /ui exact-match above does NOT cover sub-paths in Go 1.22.
+		var filesUIHandler http.Handler = d.UIHandler
+		if hasAuth {
+			filesUIHandler = auth.requireRoleHandler(roleUser, d.UIHandler)
+		}
+		mux.Handle("/ui/files", filesUIHandler)
+		mux.Handle("/ui/files/", filesUIHandler)
 
 		// /ui/pending-approval — only accessible to authenticated users
 		// (any role). The gateway intercepts it before the /ui/admin/*
@@ -166,6 +182,13 @@ func New(d Deps) http.Handler {
 			mh = auth.requireRoleHandler(roleAdmin, d.MetricsHandler)
 		}
 		mux.Handle("/metrics", mh)
+	}
+
+	// /api/files/* — File API for native apps (S0eedaa-1).
+	// X-Kura-Token validates inside the handler; no gateway-level session check.
+	if d.FileAPIHandler != nil {
+		mux.Handle("/api/files/", d.FileAPIHandler)
+		mux.Handle("/api/files", d.FileAPIHandler)
 	}
 	return mux
 }

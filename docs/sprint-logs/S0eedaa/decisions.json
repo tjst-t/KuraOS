@@ -1,0 +1,58 @@
+{
+  "sprint_id": "S0eedaa",
+  "title": "File API と native filebrowser アプリ",
+  "autonomous": true,
+  "planning_decisions": [
+    {
+      "id": "D-01",
+      "title": "FileBackend interface (io/fs ベース)",
+      "decision": "fileapi パッケージに FileBackend interface を定義し、OS 実装 (osBackend) と memfs 実装 (MemBackend) を両立。テストは MemBackend で完結させる。",
+      "rationale": "DESIGN_PRINCIPLES priority #9: 副作用を持つ依存は interface 越しに使い、テストでモック化。os.File 直接利用は避ける。"
+    },
+    {
+      "id": "D-02",
+      "title": "X-Kura-Token: HMAC-SHA256 署名キーは vault 経由",
+      "decision": "Gateway が発行する X-Kura-Token は HMAC-SHA256 (key=vault に保存)。Validator interface で本番は vault から読み、テストは固定秘密鍵を注入する。SSOT は config.json に signing_key_ref のみ記録、平文キーを含めない。",
+      "rationale": "DESIGN_PRINCIPLES priority #1: アプリの内部秘密を config.json export 時に平文で含めない。CLAUDE.md hard rule #6 citation."
+    },
+    {
+      "id": "D-03",
+      "title": "アプリスコープ: manifest の scopes ブロックを追加",
+      "decision": "engine/app/manifest.go に Scopes struct (Shares []string, PathDeny []string) を追加。インストール時に SQLite app_scopes テーブルへ保存し、File API が毎リクエスト照合する。",
+      "rationale": "DESIGN_PRINCIPLES priority #1: SSOT (config.json / SQLite) からスコープを照合。"
+    },
+    {
+      "id": "D-04",
+      "title": "Range request: http.ServeContent を使用",
+      "decision": "ダウンロード (GET /api/files/{share}/{path}) は http.ServeContent を利用し、Range/ETag/Last-Modified を自動処理。AC-S0eedaa-1-3 を満たす最小の実装。",
+      "rationale": "CLAUDE.md hard rule #9: Range request support via http.ServeContent or equivalent."
+    },
+    {
+      "id": "D-05",
+      "title": "アップロード: multipart/form-data + PUT raw body の両対応",
+      "decision": "PUT /api/files/{share}/{path} は Content-Type: multipart/form-data と application/octet-stream の両方を受け付ける。ブラウザ UI は multipart、curl ユーザーは raw PUT。",
+      "rationale": "CLAUDE.md hard rule #10: pick what makes the AC pass."
+    },
+    {
+      "id": "D-06",
+      "title": "パストラバーサル強化: filepath.Clean + prefix 確認 + symlink 拒否",
+      "decision": "fileapi.safeJoin() がすべてのパスを filepath.Clean し、解決済み share root の配下に留まることを strings.HasPrefix で確認。シンボリックリンクは os.Lstat で検出し 403 を返す。",
+      "rationale": "CLAUDE.md hard rule #7: priority #5 reliability — path traversal hardening."
+    },
+    {
+      "id": "D-07",
+      "title": "Files UI: /ui/files に独立ページとして実装",
+      "decision": "/ui/files をユーザーポータルの Files ページとして実装。認証は既存の requireRole(user) を使用。管理 UI (/ui/admin/*) とは分離したシェル (portal_layout) を使用。",
+      "rationale": "VISION.json visual_spec_source — Portal.html がユーザーポータルの SSOT。"
+    },
+    {
+      "id": "D-08",
+      "title": "afero 不使用: 自前 MemBackend",
+      "decision": "外部依存 afero は go.mod に含まれていないため追加しない。代わりに fileapi 内に小さな MemBackend を実装 (map ベースのバイト列ストア)。テストには十分。",
+      "rationale": "VISION.json tech_constraints: 外部依存最小化。DESIGN_PRINCIPLES: 既存ライブラリ > 自作 だが go.mod の簡潔さを優先。"
+    }
+  ],
+  "implementation_decisions": [],
+  "review_decisions": [],
+  "done_judgment": []
+}

@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S0eedaa",
+    "current_sprint": "S99702c",
     "total": 18,
-    "done": 16,
+    "done": 17,
     "in_progress": 0,
-    "remaining": 2,
-    "percentage": 88,
+    "remaining": 1,
+    "percentage": 94,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -24,9 +24,10 @@
       "Sfix002",
       "S413bd5",
       "S8a756d",
-      "Se1e7a6"
+      "Se1e7a6",
+      "S0eedaa"
     ],
-    "updated_at": "2026-05-18T15:40:00Z"
+    "updated_at": "2026-05-18T17:09:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -1357,85 +1358,85 @@
     },
     "S0eedaa": {
       "title": "File API と native filebrowser アプリ",
-      "status": "pending",
+      "status": "done",
       "description": "File API (Range / メタデータ / ディレクトリ一覧 / アップロード / コピー / 移動)、アプリスコープ評価、内部ヘッダ X-Kura-User の HMAC、native アプリ用 SDK 雛形、ビルトインの filebrowser 兼ファイルマネージャ。",
       "milestone": false,
       "stories": {
         "S0eedaa-1": {
           "title": "File API エンドポイントとアプリスコープ評価",
-          "status": "pending",
+          "status": "done",
           "user_story": "native アプリ作者として、File API 経由で安全にユーザーのファイルにアクセスしたい。なぜなら、bind mount より細かい権限制御 + 監査ログが必要なケースがあるから。",
           "acceptance_criteria": [
             {
               "id": "AC-S0eedaa-1-1",
               "description": "GET / PUT / DELETE / list / mkdir / copy / move の各 API が仕様通りに動作する",
               "test": "[AC-S0eedaa-1-1] in fileapi/handlers_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S0eedaa-1-2",
               "description": "アプリスコープの share allowlist と path_deny に違反するアクセスは 403",
               "test": "[AC-S0eedaa-1-2] in fileapi/scope_test.go",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S0eedaa-1-3",
               "description": "Range request でメディアのシークと部分読み取りが行える",
               "test": "[AC-S0eedaa-1-3] in tests/e2e/file-api-range.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S0eedaa-1-1": {
               "title": "endpoints 実装",
               "description": "全 8 エンドポイント (design.md §6.4)",
-              "status": "pending"
+              "status": "done"
             },
             "S0eedaa-1-2": {
               "title": "X-Kura-Token HMAC 検証",
               "description": "Gateway 発行のトークンを検証",
-              "status": "pending"
+              "status": "done"
             },
             "S0eedaa-1-3": {
               "title": "アプリスコープ評価",
               "description": "scopes 構造に基づく allow/deny",
-              "status": "pending"
+              "status": "done"
             },
             "S0eedaa-1-4": {
               "title": "Range / streaming サポート",
               "description": "io.Copy + sendfile が効く実装",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "S0eedaa-2": {
           "title": "ビルトイン filebrowser (native アプリ)",
-          "status": "pending",
+          "status": "done",
           "user_story": "ユーザーとして、ポータルの『Files』からブラウザでファイルを操作したい。なぜなら、SMB をマウントできない端末でも自分のファイルにアクセスしたいから。",
           "acceptance_criteria": [
             {
               "id": "AC-S0eedaa-2-1",
               "description": "/ui/files でディレクトリ一覧 / ダウンロード / アップロード / 削除 / 名前変更ができる",
               "test": "[AC-S0eedaa-2-1] in tests/e2e/files-ui.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             },
             {
               "id": "AC-S0eedaa-2-2",
               "description": "アクセス権のない Share は表示されない",
               "test": "[AC-S0eedaa-2-2] in tests/e2e/files-ui.e2e.spec.ts",
-              "status": "pending"
+              "status": "pass"
             }
           ],
           "tasks": {
             "S0eedaa-2-1": {
               "title": "Files UI",
               "description": "htmx でリスト + 操作",
-              "status": "pending"
+              "status": "done"
             },
             "S0eedaa-2-2": {
               "title": "アップロード進捗",
               "description": "fetch + Progress イベント",
-              "status": "pending"
+              "status": "done"
             }
           }
         }

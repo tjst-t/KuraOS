@@ -1,0 +1,79 @@
+{{- /*
+portal.tmpl — user portal layout for /ui/files (S0eedaa-2).
+Visual SSOT: prototype/claude_design/Portal.html — simplified header with
+brand mark, username, logout. No sidebar (portal is one-page per section).
+*/ -}}
+<!doctype html>
+<html lang="{{ .Locale }}" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>{{ .PageTitle }} — {{ T "brand.name" }}</title>
+<link rel="stylesheet" href="/ui/static/kura.css" />
+<script src="/ui/static/htmx.min.js" defer></script>
+<script>
+  (function () {
+    try {
+      var theme = localStorage.getItem('kura-theme') || 'light';
+      document.documentElement.setAttribute('data-theme', theme);
+    } catch (e) {}
+  })();
+</script>
+<style>
+  .portal-shell { min-height: 100vh; background: var(--bg); display: flex; flex-direction: column; }
+  .portal-head {
+    height: 60px; background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; padding: 0 32px; gap: 16px;
+    position: sticky; top: 0; z-index: 10;
+  }
+  .portal-content { max-width: 1080px; margin: 0 auto; padding: 32px 32px 80px; width: 100%; }
+  .portal-brand { font-weight: 700; font-size: 17px; letter-spacing: -0.01em; color: var(--text-1); text-decoration: none; }
+  .portal-brand-sub { font-size: 11px; color: var(--text-3); }
+</style>
+</head>
+<body>
+<div class="portal-shell">
+  <header class="portal-head" data-testid="portal-header">
+    <a href="/ui" class="portal-brand" style="display:flex;flex-direction:column;line-height:1.2;text-decoration:none">
+      <span>{{ T "brand.name" }}</span>
+      <span class="portal-brand-sub">{{ T "brand.tagline" }}</span>
+    </a>
+    <nav style="display:flex;gap:4px;margin-left:24px">
+      <a href="/ui/files" class="btn btn-ghost btn-sm" style="text-decoration:none" data-testid="nav-files">{{ T "nav.files" }}</a>
+    </nav>
+    <div style="flex:1"></div>
+    <button class="btn btn-icon btn-ghost" id="btn-toggle-theme" title="{{ T "header.toggle_theme" }}" aria-label="{{ T "header.toggle_theme" }}">
+      <svg id="theme-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><circle cx="8" cy="8" r="4"/></svg>
+    </button>
+    {{ if .User.Name }}
+    <div style="display:flex;align-items:center;gap:10px">
+      <div class="avatar" style="width:30px;height:30px;font-size:12px">{{ .User.Initials }}</div>
+      <div>
+        <div style="font-size:13px;font-weight:550">{{ .User.Name }}</div>
+        <div style="font-size:11px;color:var(--text-3)">{{ T .User.RoleID }}</div>
+      </div>
+    </div>
+    <form action="/logout" method="post" style="margin:0">
+      <button type="submit" class="btn btn-ghost btn-sm">{{ T "nav.logout" }}</button>
+    </form>
+    {{ end }}
+  </header>
+  <div class="portal-content">
+    {{ block "content" . }}{{ end }}
+  </div>
+</div>
+<script>
+  (function () {
+    function toggleTheme() {
+      var html = document.documentElement;
+      var next = html.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      html.setAttribute('data-theme', next);
+      try { localStorage.setItem('kura-theme', next); } catch (e) {}
+    }
+    var t = document.getElementById('btn-toggle-theme');
+    if (t) t.addEventListener('click', toggleTheme);
+  })();
+</script>
+</body>
+</html>
