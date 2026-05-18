@@ -131,6 +131,12 @@ type UsersViewUser struct {
 	Groups      []string
 	LastLogin   string
 	Federations []UsersFederationRow
+	// HasGoogleLink is true iff a federation_link binds this user's row to
+	// the google provider. Used by the template to hide the "Google を紐付け"
+	// button on the current user's own row once they've already linked —
+	// otherwise the button is at best a no-op and at worst confusing
+	// ("link again?" / overwriting an existing binding).
+	HasGoogleLink bool
 }
 
 // UsersViewGroup is the per-group row.
@@ -191,6 +197,9 @@ func (r *Renderer) usersPage(d UsersDeps) http.Handler {
 					for _, l := range links {
 						if !contains(row.Methods, l.Provider) {
 							row.Methods = append(row.Methods, l.Provider)
+						}
+						if l.Provider == "google" {
+							row.HasGoogleLink = true
 						}
 					}
 				}

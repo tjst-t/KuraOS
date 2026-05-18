@@ -147,16 +147,22 @@ PageData.Extra is *ui.UsersView.
         <td>
           <div class="row gap-sm" style="display:flex;gap:6px;align-items:center">
             {{- /*
-             "Google を紐付け" は本人のみ表示。/federation/google/link は
-             セッションの user_id に紐付くため、他人の行に出すと「押した
-             相手にリンクされるはず」という UX 誤認の罠になる
-             (2026-05-12 incident — admin がログイン中に takumi の行を
-             押したら admin にリンクされた)。本人 (= CurrentUserID
-             一致) の行にだけボタンを出し、他は「—」とする。
+             "Google を紐付け" は (a) 本人の行で、かつ (b) まだ Google
+             連携が無いときだけ表示。/federation/google/link はセッション
+             の user_id に紐付くため、他人の行に出すと「押した相手にリ
+             ンクされるはず」という UX 誤認の罠になる (2026-05-12
+             incident — admin がログイン中に takumi の行を押したら
+             admin にリンクされた)。さらに、本人が既にリンク済なら
+             ボタンは no-op に近く混乱を招くので非表示にし、Methods
+             列の google バッジで連携済を示す (2026-05-18 incident —
+             rinkiting 行に重ねて「Google を紐付け」が出ていた)。
             */ -}}
-            {{ if eq .UserID $v.CurrentUserID }}
+            {{ if and (eq .UserID $v.CurrentUserID) (not .HasGoogleLink) }}
             <a class="btn btn-sm" data-testid="users-link-google-btn"
                href="/federation/google/link?return_to=/ui/admin/users">{{ T "page.users.auth.link_google_btn" }}</a>
+            {{ else if eq .UserID $v.CurrentUserID }}
+            <span class="muted" data-testid="users-link-google-done"
+                  title="{{ T "page.users.auth.link_google_already_linked" }}">—</span>
             {{ else }}
             <span class="muted" data-testid="users-link-google-na"
                   title="{{ T "page.users.auth.link_google_self_only" }}">—</span>
