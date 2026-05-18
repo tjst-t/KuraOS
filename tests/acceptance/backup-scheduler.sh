@@ -24,11 +24,21 @@ COOKIE_JAR=$(mktemp)
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
 # ── Login ─────────────────────────────────────────────────────────────────────
-login_status=$(curl -s -o /dev/null -w "%{http_code}" -c "$COOKIE_JAR" \
+# POST /login → 302 → GET /ui/admin/dashboard. Use -D to capture headers and
+# manually follow the redirect with GET to avoid curl's POST-on-redirect issue.
+login_resp=$(curl -s -D - -c "$COOKIE_JAR" \
   -X POST "${BASE}/login" \
-  -d "username=${USER}&password=${PASS}" -L)
-if [[ "$login_status" != "200" ]]; then
-  echo "FATAL: login failed (status $login_status). Is kura running at $BASE?"
+  -d "username=${USER}&password=${PASS}")
+login_code=$(echo "$login_resp" | head -1 | awk '{print $2}')
+if [[ "$login_code" != "302" ]] && [[ "$login_code" != "200" ]]; then
+  echo "FATAL: login failed (status $login_code). Is kura running at $BASE?"
+  exit 2
+fi
+# Follow the redirect manually with GET to land on dashboard.
+dashboard_status=$(curl -s -o /dev/null -w "%{http_code}" -b "$COOKIE_JAR" \
+  "${BASE}/ui/admin/dashboard")
+if [[ "$dashboard_status" != "200" ]]; then
+  echo "FATAL: dashboard after login returned $dashboard_status"
   exit 2
 fi
 pass "login"

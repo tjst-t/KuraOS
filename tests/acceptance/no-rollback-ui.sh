@@ -15,13 +15,16 @@ PASS="${KURA_TEST_ADMIN_PASSWORD:-password}"
 COOKIE_JAR=$(mktemp)
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
-login_status=$(curl -s -o /dev/null -w "%{http_code}" -c "$COOKIE_JAR" \
+login_resp=$(curl -s -D - -c "$COOKIE_JAR" \
   -X POST "${BASE}/login" \
-  -d "username=${USER}&password=${PASS}" -L)
-if [[ "$login_status" != "200" ]]; then
-  echo "FATAL: login failed (status $login_status)"
+  -d "username=${USER}&password=${PASS}")
+login_code=$(echo "$login_resp" | head -1 | awk '{print $2}')
+if [[ "$login_code" != "302" ]] && [[ "$login_code" != "200" ]]; then
+  echo "FATAL: login failed (status $login_code)"
   exit 2
 fi
+# Manually follow redirect to seed the cookie.
+curl -s -o /dev/null -b "$COOKIE_JAR" "${BASE}/ui/admin/dashboard" >/dev/null
 
 # The rollback endpoint must NOT exist (404 or 405 expected, never 200).
 rollback_status=$(curl -s -o /dev/null -w "%{http_code}" -b "$COOKIE_JAR" \

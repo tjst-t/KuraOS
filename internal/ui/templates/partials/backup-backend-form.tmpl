@@ -33,20 +33,21 @@ Loaded via hx-get; on success the backends-card is refreshed.
         </select>
       </div>
 
-      <div class="field" id="field-host" {{ if ne .Kind "zfs_send" }}style="display:none"{{ end }}>
-        <label>{{ T "page.settings.backend.form.host" }}</label>
+      {{/* All kind-specific fields are always shown; the server ignores irrelevant ones. */}}
+      <div class="field" id="field-host">
+        <label>{{ T "page.settings.backend.form.host" }} <span style="font-size:11px;color:var(--text-3)">(zfs_send)</span></label>
         <input class="input mono" name="host" value="{{ .Host }}"
                placeholder="user@192.168.1.10" data-testid="backend-host-input" />
       </div>
 
-      <div class="field" id="field-repo" {{ if ne .Kind "restic" }}style="display:none"{{ end }}>
-        <label>{{ T "page.settings.backend.form.repo" }}</label>
+      <div class="field" id="field-repo">
+        <label>{{ T "page.settings.backend.form.repo" }} <span style="font-size:11px;color:var(--text-3)">(restic)</span></label>
         <input class="input mono" name="repo" value="{{ .Repo }}"
                placeholder="s3:s3.amazonaws.com/my-bucket/kura" data-testid="backend-repo-input" />
       </div>
 
-      <div class="field" id="field-remote" {{ if ne .Kind "rclone" }}style="display:none"{{ end }}>
-        <label>{{ T "page.settings.backend.form.remote" }}</label>
+      <div class="field" id="field-remote">
+        <label>{{ T "page.settings.backend.form.remote" }} <span style="font-size:11px;color:var(--text-3)">(rclone)</span></label>
         <input class="input mono" name="remote" value="{{ .Remote }}"
                placeholder="myremote:backups/kura" data-testid="backend-remote-input" />
       </div>

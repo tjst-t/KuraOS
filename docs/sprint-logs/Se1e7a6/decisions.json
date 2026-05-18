@@ -1,0 +1,88 @@
+{
+  "$comment": "Sprint Se1e7a6 decisions log — VISION/PRINCIPLES citations for divergent choices.",
+  "sprint_id": "Se1e7a6",
+  "sprint_title": "バックアップ (ZFS スナップショット + zfs_send / restic / rclone)",
+  "completed_at": "2026-05-18",
+  "decisions": [
+    {
+      "id": "D1",
+      "title": "robfig/cron/v3 採用 (scheduler)",
+      "choice": "robfig/cron/v3 を使用してスナップショットスケジューラを実装",
+      "rationale": "DESIGN_PRINCIPLES priority #6「既存ライブラリ活用 > 自前実装」に従い、cron 解析・ジョブ管理の複雑さを著名ライブラリに委譲。robfig/cron/v3 は Go 製 NAS/バックアップツール界隈での実績があり、5-field cron 構文を支持する。自前スケジューラを実装すると DST 処理・reruns 等の edge case で信頼性が下がる。",
+      "vision_citation": "tech_constraints_phase_1: ZFS CLI ラッパー経由 (libzfs_core CGo は使わない)",
+      "principles_citation": "priority #6: 既存ライブラリ活用 > 自前実装"
+    },
+    {
+      "id": "D2",
+      "title": "BackupBackend は CLI ラッパー実装 (SDK なし)",
+      "choice": "restic / rclone / zfs_send はすべて cmdexec.Executor 経由の CLI シェルアウト",
+      "rationale": "VISION tech_constraints_phase_1「ZFS CLI ラッパー経由 (libzfs_core CGo は使わない)」と同様の判断。restic-go / rclone-go SDK は Go モジュールとして存在するが、CGo 依存や不安定な公開 API を持つ。CLI は常に安定した外部インターフェースであり、cmdexec.Fake でモック化できるためテスタビリティも担保される。DESIGN_PRINCIPLES priority #9 (テスタビリティ > 直接呼び出し)。",
+      "vision_citation": "tech_constraints_phase_1: ZFS CLI ラッパー経由",
+      "principles_citation": "priority #9: 副作用は interface の裏に隠す"
+    },
+    {
+      "id": "D3",
+      "title": "pre-upgrade スナップショット失敗時は upgrade 即中止",
+      "choice": "RunUpgrade でスナップショット失敗 → err return → apt-get 未実行",
+      "rationale": "DESIGN_PRINCIPLES priority #5「信頼性 > 機能 — データ破壊につながる操作は安全側に倒す」の最も直接的な適用。スナップショット無しの apt upgrade はロールバック手段を失った状態での OS 変更となり、最悪データ喪失につながる。VISION non_goals_until_phase_2 で明示された「アトミックな OS 更新」は Phase 2 で解決される予定のため、Phase 1 はベストエフォート + 失敗時の絶対的なセーフガードを提供する。",
+      "vision_citation": "non_goals_until_phase_2: アトミックな OS 更新 (Phase 2 で解決)",
+      "principles_citation": "priority #5: pre-upgrade スナップショット作成失敗時は upgrade 自体を中止"
+    },
+    {
+      "id": "D4",
+      "title": "ワンクリックロールバック UI は実装しない (v1 非対応)",
+      "choice": "docs/upgrade-rollback.md に CLI 手順のみ記載。UI ボタンは提供しない",
+      "rationale": "VISION non_goals_until_phase_2「ワンクリック OS ロールバック UI — Phase 1 では復旧は CLI 手動 (README に手順)。Phase 2 の A/B パーティション or イメージスワップで構造的に解決される」と明示的に除外されている。DESIGN_PRINCIPLES priority #3「Phase 1 で捨てない設計 > Phase 2 を見越したオーバーエンジニアリング」: Phase 2 で破棄される UI を Phase 1 で実装する価値がない。",
+      "vision_citation": "non_goals_until_phase_2: ワンクリック OS ロールバック UI",
+      "principles_citation": "priority #3: Phase 1 で捨てない設計, forbidden: ワンクリック OS ロールバック UI を v1 で実装しない"
+    },
+    {
+      "id": "D5",
+      "title": "KURA_UPGRADE_DRY_RUN=1 で apt-get を echo に差し替え",
+      "choice": "env フラグで apt-get の実行をスキップする dry-run モードを設ける",
+      "rationale": "CLAUDE.md「Don't actually run apt upgrade on the VM (you'd update the host system) — your upgrade test must use a fake executor or a KURA_UPGRADE_DRY_RUN=1 env-gated path」の指示に従う。CI/テスト環境でのホスト OS 汚染を防ぐための標準的なアプローチ。DESIGN_PRINCIPLES priority #9「テスタビリティ > 直接呼び出し」の精神でも一致する。",
+      "vision_citation": "tech_constraints_phase_1: apt ベース OS 更新管理",
+      "principles_citation": "priority #9: 副作用は interface の裏に隠す (dry-run でテスト可能化)"
+    }
+  ],
+  "ac_coverage": {
+    "AC-Se1e7a6-1-1": {
+      "status": "done",
+      "tests": [
+        "engine/backup/snapshot_test.go",
+        "tests/acceptance/backup-scheduler.sh"
+      ]
+    },
+    "AC-Se1e7a6-2-1": {
+      "status": "done",
+      "tests": [
+        "tests/e2e/backup-config.e2e.spec.ts (10/10 pass)"
+      ]
+    },
+    "AC-Se1e7a6-2-2": {
+      "status": "done",
+      "tests": [
+        "engine/backup/backend_test.go"
+      ]
+    },
+    "AC-Se1e7a6-3-1": {
+      "status": "done",
+      "tests": [
+        "tests/e2e/system-upgrade.e2e.spec.ts"
+      ]
+    },
+    "AC-Se1e7a6-3-2": {
+      "status": "done",
+      "tests": [
+        "tests/acceptance/no-rollback-ui.sh",
+        "tests/e2e/system-upgrade.e2e.spec.ts"
+      ]
+    }
+  },
+  "vm_smoke": {
+    "zfs_snapshot_create_destroy": "PASS — tank/new@autopilot-test-<ts> created and destroyed via ssh",
+    "backup_tab_crud": "PASS — schedule + backend CRUD via acceptance test (7/7 checks)",
+    "e2e_browser": "PASS — 10/10 Playwright tests pass in real Chromium",
+    "upgrade_button": "PASS — 今すぐ更新 button in browser triggers handler (dry-run mode on VM)"
+  }
+}
