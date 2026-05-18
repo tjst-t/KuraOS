@@ -126,7 +126,8 @@ func TestAcceptance_SetupWizard_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("POST /setup/admin: %v", err)
 	}
-	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/ui/admin/dashboard" {
+	// After admin creation the wizard continues at /setup/welcome (S99702c-2).
+	if resp.StatusCode != http.StatusFound || resp.Header.Get("Location") != "/setup/welcome" {
 		t.Fatalf("post status=%d loc=%q", resp.StatusCode, resp.Header.Get("Location"))
 	}
 	resp.Body.Close()

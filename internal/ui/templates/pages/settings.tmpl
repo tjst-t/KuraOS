@@ -50,6 +50,20 @@ Active tab is determined by Extra.ActiveTab ("notify" | "backup").
       hx-target="#settings-content"
       hx-swap="innerHTML"
       hx-push-url="true">{{ T "page.settings.tab.self_update" }}</button>
+    <button
+      data-testid="settings-tab-language"
+      {{ if eq $tab "language" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=language"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.language" }}</button>
+    <button
+      data-testid="settings-tab-config"
+      {{ if eq $tab "config" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=config"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.config" }}</button>
   </nav>
 
   <div class="col" style="min-width:0" id="settings-content">
@@ -554,6 +568,108 @@ Active tab is determined by Extra.ActiveTab ("notify" | "backup").
     </div>
   </div>
   {{ end }}{{/* end self-update tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── Language tab ─────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "language" }}
+  <div id="language-card" data-testid="language-card">
+    <h2 class="section-title">{{ T "page.settings.language.title" }}</h2>
+    <p class="section-sub">{{ T "page.settings.language.sub" }}</p>
+
+    {{ if .Extra }}{{ with .Extra }}{{ if .LangSaved }}
+    <div class="banner ok" style="margin-bottom:16px" data-testid="lang-saved-banner">
+      <span>{{ T "page.settings.language.saved" }}</span>
+    </div>
+    {{ end }}{{ end }}{{ end }}
+
+    <div class="card" style="margin-bottom:16px">
+      <form method="POST" action="/ui/admin/settings/language/save"
+            hx-post="/ui/admin/settings/language/save"
+            hx-target="#language-card"
+            hx-swap="outerHTML">
+        <div style="display:flex;flex-direction:column;gap:12px;padding:16px">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="radio" name="locale" value="ja" checked
+                   data-testid="locale-ja-radio">
+            <span>{{ T "page.settings.language.ja" }}</span>
+          </label>
+          <label style="display:flex;align-items:center;gap:8px;cursor:not-allowed;opacity:0.5">
+            <input type="radio" name="locale" value="en" disabled
+                   data-testid="locale-en-radio">
+            <span>{{ T "page.settings.language.en" }}
+              <span class="badge" style="font-size:10px;margin-left:4px">v1.x</span>
+            </span>
+          </label>
+          <p class="section-sub" style="margin:0">{{ T "page.settings.language.en_hint" }}</p>
+        </div>
+        <div style="padding:0 16px 16px">
+          <button type="submit" class="btn btn-primary" data-testid="save-language-btn">
+            {{ T "btn.save" }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{ end }}{{/* end language tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── Config tab ─────────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "config" }}
+  <div id="config-card" data-testid="config-card">
+    <h2 class="section-title">{{ T "page.settings.config.title" }}</h2>
+    <p class="section-sub">{{ T "page.settings.config.sub" }}</p>
+
+    {{ if .Extra }}{{ with .Extra }}{{ if .ConfigImportOK }}
+    <div class="banner ok" style="margin-bottom:16px" data-testid="config-import-ok-banner">
+      <span>{{ T "page.settings.config.import_ok" }}</span>
+    </div>
+    {{ end }}{{ if .ConfigImportErr }}
+    <div class="banner error" style="margin-bottom:16px" data-testid="config-import-err-banner">
+      <span>{{ .ConfigImportErr }}</span>
+    </div>
+    {{ end }}{{ end }}{{ end }}
+
+    {{/* Export section */}}
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.config.export_btn" }}</h3>
+      </div>
+      <div style="padding:16px">
+        <a href="/ui/admin/settings/config/export"
+           class="btn"
+           data-testid="config-export-btn"
+           download="config.json">{{ T "page.settings.config.export_btn" }}</a>
+      </div>
+    </div>
+
+    {{/* Import section */}}
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.config.import_btn" }}</h3>
+      </div>
+      <div style="padding:16px">
+        <p class="section-sub" style="margin-bottom:12px">{{ T "page.settings.config.import_hint" }}</p>
+        <form method="POST" action="/ui/admin/settings/config/import"
+              enctype="multipart/form-data"
+              hx-post="/ui/admin/settings/config/import"
+              hx-target="#config-card"
+              hx-swap="outerHTML"
+              hx-encoding="multipart/form-data">
+          <div style="display:flex;gap:8px;align-items:center">
+            <input type="file" name="config_file" accept=".json"
+                   data-testid="config-import-file-input"
+                   style="flex:1">
+            <button type="submit" class="btn btn-primary" data-testid="config-import-btn">
+              {{ T "page.settings.config.import_btn" }}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  {{ end }}{{/* end config tab */}}
 
   </div>
 </div>

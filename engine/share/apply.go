@@ -193,3 +193,45 @@ func errIs(err, target error) bool {
 	}
 	return false
 }
+
+// RegisterExportAdapter installs the share export adapter into the global
+// config export registry (S99702c-3). It snapshots live share state into
+// config.Shares so export → import restores share definitions.
+func RegisterExportAdapter(eng Engine) {
+	config.RegisterExporter(&shareExporter{eng: eng})
+}
+
+type shareExporter struct{ eng Engine }
+
+func (e *shareExporter) Snapshot(ctx context.Context, cfg *config.Config) error {
+	shares, err := e.eng.List(ctx)
+	if err != nil {
+		return nil // non-fatal: share engine may not be initialised
+	}
+	var entries []config.ShareEntry
+	for _, s := range shares {
+		entry := config.ShareEntry{
+			ID:          s.ID,
+			Name:        s.Name,
+			Path:        s.Path,
+			Protocol:    string(s.Protocol),
+			Preset:      string(s.Preset),
+			AccessMode:  string(s.AccessMode),
+			Description: s.Description,
+			Disabled:    s.Disabled,
+		}
+		for _, a := range s.ACL {
+			entry.ACL = append(entry.ACL, config.ShareACLEntry{
+				Kind: string(a.Kind),
+				Name: a.Name,
+				Mode: string(a.Mode),
+			})
+		}
+		entries = append(entries, entry)
+	}
+	if cfg.Shares == nil {
+		cfg.Shares = &config.SharesConfig{}
+	}
+	cfg.Shares.Shares = entries
+	return nil
+}

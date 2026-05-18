@@ -25,9 +25,14 @@ type Deps struct {
 	UIUserHandler http.Handler
 	// AuthHandler serves /login, /logout, and POST /login.
 	AuthHandler http.Handler
-	// SetupHandler serves /setup (first-admin wizard). Mounted under the
-	// requireNoAdmin middleware so it disappears once an admin exists.
+	// SetupHandler serves /setup and /setup/admin (first-admin wizard step 1).
+	// Mounted under requireNoAdmin middleware so it disappears once admin exists.
 	SetupHandler http.Handler
+	// SetupWizardHandler serves /setup/welcome, /setup/storage-config,
+	// /setup/share-config, /setup/next, /setup/done (wizard steps 2-5).
+	// Mounted under requireAnySession so the admin cookie from step 1 suffices.
+	// Added in S99702c-2.
+	SetupWizardHandler http.Handler
 
 	// Sessions / Users wire the auth middleware. When nil (e.g. in the
 	// /healthz-only test), authentication is bypassed and /ui/admin is open
@@ -88,7 +93,19 @@ func New(d Deps) http.Handler {
 			setup = auth.requireNoAdmin(d.SetupHandler)
 		}
 		mux.Handle("/setup", setup)
-		mux.Handle("/setup/", setup)
+		mux.Handle("/setup/admin", setup)
+	}
+	// Wizard steps 2-5 (S99702c-2) — require any authenticated session.
+	if d.SetupWizardHandler != nil {
+		var wizard http.Handler = d.SetupWizardHandler
+		if hasAuth {
+			wizard = auth.requireAnySession(d.SetupWizardHandler)
+		}
+		mux.Handle("/setup/welcome", wizard)
+		mux.Handle("/setup/next", wizard)
+		mux.Handle("/setup/storage-config", wizard)
+		mux.Handle("/setup/share-config", wizard)
+		mux.Handle("/setup/done", wizard)
 	}
 
 	if d.UIHandler != nil {
