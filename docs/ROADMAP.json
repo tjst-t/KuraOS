@@ -1106,7 +1106,7 @@
             {
               "id": "AC-Se1e7a6-1-1",
               "description": "config.json の snapshots.schedule に従い定期スナップショットが作成され、retention で古いものが削除される",
-              "test": "[AC-Se1e7a6-1-1] in engine/backup/snapshot_test.go",
+              "test": "[AC-Se1e7a6-1-1] in engine/backup/snapshot_test.go + tests/acceptance/backup-scheduler.sh",
               "status": "pending"
             }
           ],

@@ -1,5 +1,6 @@
 # Build output
 /bin/
+/kura
 /oidc-mock
 *.exe
 *.test

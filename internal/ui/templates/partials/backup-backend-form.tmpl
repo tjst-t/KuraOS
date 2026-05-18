@@ -1,0 +1,71 @@
+{{- /*
+backup-backend-form.tmpl — inline form for adding/editing an offsite backend.
+Loaded via hx-get; on success the backends-card is refreshed.
+*/ -}}
+{{ define "backup-backend-form" }}
+<div class="card" id="backend-form-card" style="margin-bottom:16px" data-testid="backend-form">
+  <div class="card-head">
+    <h3 class="card-title">
+      {{ if .IsNew }}オフサイトバックエンドを追加{{ else }}オフサイトバックエンドを編集{{ end }}
+    </h3>
+  </div>
+  <div class="card-body col">
+    <form hx-post="{{ if .IsNew }}/ui/admin/settings/backup/backends/create{{ else }}/ui/admin/settings/backup/backends/{{ .ID }}/update{{ end }}"
+          hx-target="#backends-card"
+          hx-swap="outerHTML">
+
+      {{ if .ErrorMsg }}
+      <div class="banner crit" style="margin-bottom:12px" data-testid="backend-form-error">{{ .ErrorMsg }}</div>
+      {{ end }}
+
+      <div class="field">
+        <label>{{ T "page.settings.backend.form.name" }}</label>
+        <input class="input" name="name" value="{{ .Name }}" required
+               placeholder="remote-nas" data-testid="backend-name-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.backend.form.kind" }}</label>
+        <select class="select" name="kind" data-testid="backend-kind-select">
+          {{ range $k := .Kinds }}
+          <option value="{{ $k }}" {{ if eq $k $.Kind }}selected{{ end }}>{{ $k }}</option>
+          {{ end }}
+        </select>
+      </div>
+
+      <div class="field" id="field-host" {{ if ne .Kind "zfs_send" }}style="display:none"{{ end }}>
+        <label>{{ T "page.settings.backend.form.host" }}</label>
+        <input class="input mono" name="host" value="{{ .Host }}"
+               placeholder="user@192.168.1.10" data-testid="backend-host-input" />
+      </div>
+
+      <div class="field" id="field-repo" {{ if ne .Kind "restic" }}style="display:none"{{ end }}>
+        <label>{{ T "page.settings.backend.form.repo" }}</label>
+        <input class="input mono" name="repo" value="{{ .Repo }}"
+               placeholder="s3:s3.amazonaws.com/my-bucket/kura" data-testid="backend-repo-input" />
+      </div>
+
+      <div class="field" id="field-remote" {{ if ne .Kind "rclone" }}style="display:none"{{ end }}>
+        <label>{{ T "page.settings.backend.form.remote" }}</label>
+        <input class="input mono" name="remote" value="{{ .Remote }}"
+               placeholder="myremote:backups/kura" data-testid="backend-remote-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.backend.form.token" }}</label>
+        <input class="input mono" name="token" type="password"
+               placeholder="(変更しない場合は空欄)" data-testid="backend-token-input" />
+      </div>
+
+      <div class="row" style="gap:8px;justify-content:flex-end;margin-top:8px">
+        <button type="button" class="btn btn-ghost btn-sm"
+                hx-get="/ui/admin/settings/backup/backends/dismiss-form"
+                hx-target="#backend-modal-container"
+                hx-swap="innerHTML"
+                data-testid="backend-form-cancel">{{ T "page.settings.backend.form.cancel" }}</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="backend-form-save">{{ T "page.settings.backend.form.save" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{ end }}

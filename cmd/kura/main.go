@@ -14,6 +14,7 @@ import (
 	"github.com/kuraos-org/kura/engine/app"
 	"github.com/kuraos-org/kura/engine/auth/oidc"
 	"github.com/kuraos-org/kura/engine/auth/session"
+	backupEngine "github.com/kuraos-org/kura/engine/backup"
 	"github.com/kuraos-org/kura/engine/monitor"
 	"github.com/kuraos-org/kura/engine/notify"
 	"github.com/kuraos-org/kura/engine/share"
@@ -338,6 +339,20 @@ func run() error {
 		dispatcher := notify.NewDispatcher(notifyStore, nil)
 		go dispatcher.Run(ctx, busRef)
 	}
+
+	// ── Backup wiring (Se1e7a6) ─────────────────────────────────────────────
+	backupStore := backupEngine.NewStore(st.DB())
+	backupExec := cmdexec.NewReal()
+	backupSnapper := backupEngine.NewZFSCLISnapshotter(backupExec)
+	upgradeRootDS := envOr("KURA_UPGRADE_ROOT_DATASET", "tank/rootfs")
+	uiRenderer.SetBackupHandler(ui.BackupDeps{
+		Store:       backupStore,
+		Exec:        backupExec,
+		AppStopper:  &lifecycleAppStopper{lc: lifecycle},
+		ZFSSnapper:  backupSnapper,
+		RootDataset: upgradeRootDS,
+	})
+	// ── End backup wiring ───────────────────────────────────────────────────
 
 	// /metrics OpenMetrics handler — admin-only via gateway auth middleware.
 	var metricsHandler http.Handler

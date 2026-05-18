@@ -226,7 +226,53 @@ type AppSettingState struct {
 	CredentialState string `json:"credential_state,omitempty"`
 }
 type AuthConfig struct{}
-type BackupConfig struct{}
+
+// BackupConfig is the declarative shape of "backup" in config.json (Se1e7a6).
+//
+// Credentials (restic password, rclone token, SSH private key) are stored in
+// the vault (DESIGN_PRINCIPLES priority #1). config.json carries only structural
+// settings + credential_state placeholders — never raw secrets.
+type BackupConfig struct {
+	// Schedules defines cron-driven snapshot schedules and their retention policies.
+	Schedules []SnapshotScheduleEntry `json:"schedules,omitempty"`
+	// Backends holds the configured offsite backup destinations.
+	Backends []BackupBackendEntry `json:"backends,omitempty"`
+	// UpgradeRootDataset is the ZFS dataset to snapshot before `apt upgrade`.
+	// Defaults to "tank/rootfs" when empty.
+	UpgradeRootDataset string `json:"upgrade_root_dataset,omitempty"`
+}
+
+// SnapshotScheduleEntry is one cron schedule + retention policy.
+type SnapshotScheduleEntry struct {
+	Name      string            `json:"name"`
+	Cron      string            `json:"cron"`
+	Datasets  []string          `json:"datasets"`
+	Retention RetentionEntry    `json:"retention"`
+}
+
+// RetentionEntry mirrors engine/backup.RetentionPolicy for config.json.
+type RetentionEntry struct {
+	Hourly  int `json:"hourly,omitempty"`
+	Daily   int `json:"daily,omitempty"`
+	Monthly int `json:"monthly,omitempty"`
+}
+
+// BackupBackendEntry is one configured offsite backend.
+// Kind is "zfs_send" | "restic" | "rclone".
+// Credentials live in the vault; config.json carries credential_state only.
+type BackupBackendEntry struct {
+	// ID uniquely identifies this backend (user-supplied name, e.g. "remote-nas").
+	ID string `json:"id"`
+	// Kind is the backend type: "zfs_send" | "restic" | "rclone".
+	Kind string `json:"kind"`
+	// CredentialState is "set"|"unset" — the actual credential lives in vault.
+	CredentialState string `json:"credential_state"`
+	// Config holds kind-specific non-secret settings:
+	//  zfs_send: host, remote_dataset, port
+	//  restic:   repo
+	//  rclone:   remote
+	Config map[string]any `json:"config,omitempty"`
+}
 
 // NotificationsConfig is the declarative shape of "notifications" in
 // config.json. Channels carry only structural config (URL, username,

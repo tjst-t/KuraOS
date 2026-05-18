@@ -1,0 +1,69 @@
+{{- /*
+backup-schedule-form.tmpl — inline form for adding/editing a snapshot schedule.
+Loaded via hx-get; on success the schedules-card is refreshed.
+*/ -}}
+{{ define "backup-schedule-form" }}
+<div class="card" id="schedule-form-card" style="margin-bottom:16px" data-testid="schedule-form">
+  <div class="card-head">
+    <h3 class="card-title">
+      {{ if .IsNew }}スナップショットスケジュールを追加{{ else }}スナップショットスケジュールを編集{{ end }}
+    </h3>
+  </div>
+  <div class="card-body col">
+    <form hx-post="{{ if .IsNew }}/ui/admin/settings/backup/schedules/create{{ else }}/ui/admin/settings/backup/schedules/{{ .ID }}/update{{ end }}"
+          hx-target="#schedules-card"
+          hx-swap="outerHTML">
+
+      {{ if .ErrorMsg }}
+      <div class="banner crit" style="margin-bottom:12px" data-testid="schedule-form-error">{{ .ErrorMsg }}</div>
+      {{ end }}
+
+      <div class="field">
+        <label>{{ T "page.settings.backup.form.name" }}</label>
+        <input class="input" name="name" value="{{ .Name }}" required
+               placeholder="hourly" data-testid="schedule-name-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.backup.form.cron" }}</label>
+        <input class="input mono" name="cron_expr" value="{{ .CronExpr }}" required
+               placeholder="0 * * * *" data-testid="schedule-cron-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.backup.form.datasets" }}</label>
+        <textarea class="input mono" name="datasets" rows="3"
+                  placeholder="tank/photos&#10;tank/documents"
+                  data-testid="schedule-datasets-input">{{ .DatasetsText }}</textarea>
+      </div>
+
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <div class="field" style="flex:1">
+          <label>{{ T "page.settings.backup.form.hourly" }}</label>
+          <input class="input" name="ret_hourly" type="number" min="0" value="{{ .RetHourly }}"
+                 data-testid="schedule-ret-hourly" />
+        </div>
+        <div class="field" style="flex:1">
+          <label>{{ T "page.settings.backup.form.daily" }}</label>
+          <input class="input" name="ret_daily" type="number" min="0" value="{{ .RetDaily }}"
+                 data-testid="schedule-ret-daily" />
+        </div>
+        <div class="field" style="flex:1">
+          <label>{{ T "page.settings.backup.form.monthly" }}</label>
+          <input class="input" name="ret_monthly" type="number" min="0" value="{{ .RetMonthly }}"
+                 data-testid="schedule-ret-monthly" />
+        </div>
+      </div>
+
+      <div class="row" style="gap:8px;justify-content:flex-end;margin-top:8px">
+        <button type="button" class="btn btn-ghost btn-sm"
+                hx-get="/ui/admin/settings/backup/schedules/dismiss-form"
+                hx-target="#schedule-modal-container"
+                hx-swap="innerHTML"
+                data-testid="schedule-form-cancel">{{ T "page.settings.backup.form.cancel" }}</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="schedule-form-save">{{ T "page.settings.backup.form.save" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{ end }}
