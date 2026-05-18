@@ -1,0 +1,134 @@
+{{- /*
+settings.tmpl — Settings page with notification channels CRUD (S8a756d-3).
+Visual SSOT: prototype/claude_design/Settings.html (通知タブ).
+htmx-driven: add/edit/delete/test channel are hx-post targets.
+*/ -}}
+{{ define "content" }}
+<div class="page-head">
+  <div>
+    <h1 class="page-title">{{ T "page.settings.title" }}</h1>
+    <p class="page-sub">{{ T "page.settings.subtitle" }}</p>
+  </div>
+</div>
+
+<div class="settings-layout">
+  <nav class="settings-nav" aria-label="設定セクション">
+    <button data-on="true" aria-current="page">{{ T "page.settings.tab.notify" }}</button>
+  </nav>
+
+  <div class="col" style="min-width:0">
+
+    {{/* ── Notification channels table ────────────────────────── */}}
+    <h2 class="section-title">{{ T "page.settings.notify.title" }}</h2>
+    <p class="section-sub">{{ T "page.settings.notify.sub" }}</p>
+
+    <div class="card" style="margin-bottom:16px" id="channels-card">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.channel.title" }}</h3>
+        <button class="btn btn-sm" data-testid="add-channel-btn"
+                hx-get="/ui/admin/settings/channels/add-form"
+                hx-target="#channel-modal-container"
+                hx-swap="innerHTML">{{ T "page.settings.channel.add_btn" }}</button>
+      </div>
+
+      {{ if .Extra }}{{ with .Extra }}{{ if .Channels }}
+      <table class="tbl" data-testid="channels-table">
+        <thead>
+          <tr>
+            <th>{{ T "page.settings.channel.col.name" }}</th>
+            <th>{{ T "page.settings.channel.col.kind" }}</th>
+            <th>{{ T "page.settings.channel.col.filter" }}</th>
+            <th>{{ T "page.settings.channel.col.status" }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="channels-tbody">
+          {{ range .Channels }}
+          <tr data-testid="channel-row-{{ .ID }}">
+            <td class="td-mono">{{ .Name }}</td>
+            <td><span class="badge">{{ .Kind }}</span></td>
+            <td>
+              <div style="display:flex;gap:4px;flex-wrap:wrap">
+                {{ range .SeverityBadges }}
+                <span class="badge {{ .Class }}"><span class="badge-dot"></span>{{ .Label }}</span>
+                {{ end }}
+              </div>
+            </td>
+            <td>
+              {{ if .Enabled }}
+              <span class="badge ok"><span class="badge-dot"></span>{{ T "page.settings.channel.status.active" }}</span>
+              {{ else }}
+              <span class="badge"><span class="badge-dot"></span>{{ T "page.settings.channel.status.paused" }}</span>
+              {{ end }}
+            </td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn btn-ghost btn-sm" data-testid="test-channel-{{ .ID }}"
+                      hx-post="/ui/admin/settings/channels/{{ .ID }}/test"
+                      hx-target="#test-result-{{ .ID }}"
+                      hx-swap="innerHTML">{{ T "page.settings.channel.test_btn" }}</button>
+              <span id="test-result-{{ .ID }}" style="font-size:12px;margin-left:4px"></span>
+              <button class="btn btn-ghost btn-sm" data-testid="edit-channel-{{ .ID }}"
+                      hx-get="/ui/admin/settings/channels/{{ .ID }}/edit-form"
+                      hx-target="#channel-modal-container"
+                      hx-swap="innerHTML">{{ T "page.settings.channel.edit_btn" }}</button>
+              <button class="btn btn-ghost btn-sm" data-testid="delete-channel-{{ .ID }}"
+                      hx-post="/ui/admin/settings/channels/{{ .ID }}/delete"
+                      hx-confirm="{{ T "page.settings.channel.delete.confirm" }}"
+                      hx-target="#channels-card"
+                      hx-swap="outerHTML">{{ T "page.settings.channel.delete_btn" }}</button>
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+      {{ else }}
+      <div class="card-body" data-testid="channels-empty">
+        <p class="muted" style="font-size:13px;margin:0">{{ T "page.settings.channel.empty" }}</p>
+      </div>
+      {{ end }}{{ end }}{{ end }}
+    </div>
+
+    {{/* Modal container — htmx swaps the form HTML here */}}
+    <div id="channel-modal-container"></div>
+
+    {{/* ── Event log table ────────────────────────────────────── */}}
+    <div class="card" id="event-log-card">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.events.title" }}</h3>
+        <form style="display:flex;gap:8px" hx-get="/ui/admin/settings" hx-target="#event-log-card" hx-swap="outerHTML" hx-push-url="false">
+          <div class="search" style="width:200px">
+            <input name="sev" placeholder="{{ T "page.settings.events.filter" }}"
+                   value="{{ if .Extra }}{{ .Extra.SeverityFilter }}{{ end }}" />
+          </div>
+          <button class="btn btn-sm" type="submit">{{ T "btn.apply" }}</button>
+        </form>
+      </div>
+      <table class="tbl" data-testid="events-table">
+        <thead>
+          <tr>
+            <th>{{ T "page.settings.events.col.time" }}</th>
+            <th>{{ T "page.settings.events.col.severity" }}</th>
+            <th>{{ T "page.settings.events.col.category" }}</th>
+            <th>{{ T "page.settings.events.col.message" }}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ if .Extra }}{{ with .Extra }}{{ if .Events }}
+          {{ range .Events }}
+          <tr data-testid="event-row">
+            <td class="td-mono">{{ .TimeFmt }}</td>
+            <td><span class="badge {{ .SeverityClass }}"><span class="badge-dot"></span>{{ .Severity }}</span></td>
+            <td><span class="badge">{{ .Category }}</span></td>
+            <td>{{ .Title }}</td>
+          </tr>
+          {{ end }}
+          {{ else }}
+          <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px" data-testid="events-empty">{{ T "page.settings.events.empty" }}</td></tr>
+          {{ end }}{{ end }}{{ end }}
+        </tbody>
+      </table>
+    </div>
+
+  </div>
+</div>
+{{ end }}

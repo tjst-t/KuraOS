@@ -592,3 +592,69 @@ const (
 	MsgSetupAdminUsernameRule  MessageID = "page.setup.admin.username_rule"
 	MsgSetupDeferredNote       MessageID = "page.setup.deferred_note"
 )
+
+// Dashboard metrics widgets (S8a756d-1).
+const (
+	MsgDashboardCPU          MessageID = "page.dashboard.cpu"
+	MsgDashboardMemory       MessageID = "page.dashboard.memory"
+	MsgDashboardDiskTemp     MessageID = "page.dashboard.disk_temp"
+	MsgDashboardPoolUsage    MessageID = "page.dashboard.pool_usage"
+	MsgDashboardEventsTitle  MessageID = "page.dashboard.events_title"
+	MsgDashboardEventsSub    MessageID = "page.dashboard.events_sub"
+	MsgDashboardEventsEmpty  MessageID = "page.dashboard.events_empty"
+	MsgDashboardEventsViewAll MessageID = "page.dashboard.events_view_all"
+	MsgDashboardLastUpdated  MessageID = "page.dashboard.last_updated"
+	MsgDashboardNeverUpdated MessageID = "page.dashboard.never_updated"
+)
+
+// Settings page — Notify tab (S8a756d-3).
+const (
+	MsgSettingsTitle             MessageID = "page.settings.title"
+	MsgSettingsSubtitle          MessageID = "page.settings.subtitle"
+	MsgSettingsTabNotify         MessageID = "page.settings.tab.notify"
+	MsgSettingsNotifyTitle       MessageID = "page.settings.notify.title"
+	MsgSettingsNotifySub         MessageID = "page.settings.notify.sub"
+	MsgSettingsChannelTitle      MessageID = "page.settings.channel.title"
+	MsgSettingsChannelAddBtn     MessageID = "page.settings.channel.add_btn"
+	MsgSettingsChannelColName    MessageID = "page.settings.channel.col.name"
+	MsgSettingsChannelColKind    MessageID = "page.settings.channel.col.kind"
+	MsgSettingsChannelColFilter  MessageID = "page.settings.channel.col.filter"
+	MsgSettingsChannelColStatus  MessageID = "page.settings.channel.col.status"
+	MsgSettingsChannelTestBtn    MessageID = "page.settings.channel.test_btn"
+	MsgSettingsChannelEditBtn    MessageID = "page.settings.channel.edit_btn"
+	MsgSettingsChannelDeleteBtn  MessageID = "page.settings.channel.delete_btn"
+	MsgSettingsChannelEmpty      MessageID = "page.settings.channel.empty"
+	MsgSettingsChannelStatusActive MessageID = "page.settings.channel.status.active"
+	MsgSettingsChannelStatusPaused MessageID = "page.settings.channel.status.paused"
+
+	MsgSettingsChannelAddTitle    MessageID = "page.settings.channel.add.title"
+	MsgSettingsChannelEditTitle   MessageID = "page.settings.channel.edit.title"
+	MsgSettingsChannelFormName    MessageID = "page.settings.channel.form.name"
+	MsgSettingsChannelFormKind    MessageID = "page.settings.channel.form.kind"
+	MsgSettingsChannelFormEnabled MessageID = "page.settings.channel.form.enabled"
+	MsgSettingsChannelFormSev     MessageID = "page.settings.channel.form.severity"
+	MsgSettingsChannelFormCat     MessageID = "page.settings.channel.form.category"
+	MsgSettingsChannelFormURL     MessageID = "page.settings.channel.form.url"
+	MsgSettingsChannelFormToken   MessageID = "page.settings.channel.form.token"
+	MsgSettingsChannelFormSave    MessageID = "page.settings.channel.form.save"
+	MsgSettingsChannelFormCancel  MessageID = "page.settings.channel.form.cancel"
+	MsgSettingsChannelDelConfirm  MessageID = "page.settings.channel.delete.confirm"
+
+	MsgSettingsChannelTestOK   MessageID = "page.settings.channel.test.ok"
+	MsgSettingsChannelTestFail MessageID = "page.settings.channel.test.fail"
+
+	MsgSettingsEventsTitle  MessageID = "page.settings.events.title"
+	MsgSettingsEventsFilter MessageID = "page.settings.events.filter"
+	MsgSettingsEventsColTime MessageID = "page.settings.events.col.time"
+	MsgSettingsEventsColSev  MessageID = "page.settings.events.col.severity"
+	MsgSettingsEventsColCat  MessageID = "page.settings.events.col.category"
+	MsgSettingsEventsColMsg  MessageID = "page.settings.events.col.message"
+	MsgSettingsEventsEmpty   MessageID = "page.settings.events.empty"
+
+	MsgSettingsChannelErrNameRequired MessageID = "page.settings.channel.err.name_required"
+	MsgSettingsChannelErrKindInvalid  MessageID = "page.settings.channel.err.kind_invalid"
+	MsgSettingsChannelErrURLRequired  MessageID = "page.settings.channel.err.url_required"
+	MsgSettingsChannelErrCreateFailed MessageID = "page.settings.channel.err.create_failed"
+	MsgSettingsChannelErrDeleteFailed MessageID = "page.settings.channel.err.delete_failed"
+	MsgSettingsChannelErrTestFailed   MessageID = "page.settings.channel.err.test_failed"
+)

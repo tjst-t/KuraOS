@@ -84,6 +84,14 @@ type Renderer struct {
 	// SetPendingHandlers; nil until engine/system is available.
 	pendingApproveHandler http.Handler
 	pendingRejectHandler  http.Handler
+
+	// dashboardDeps wires the ring buffer into the Dashboard page (S8a756d-1).
+	// nil until SetDashboardDeps is called.
+	dashboardDeps *DashboardDeps
+
+	// settingsHandler replaces the settings placeholder when the notify engine
+	// is wired (S8a756d-3). nil uses the placeholder.
+	settingsHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -384,7 +392,12 @@ func (r *Renderer) Routes() http.Handler {
 	if r.appsUninstallHandler != nil {
 		mux.Handle("/ui/admin/apps/uninstall", r.appsUninstallHandler)
 	}
-	mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
+	if r.settingsHandler != nil {
+		mux.Handle("/ui/admin/settings", r.settingsHandler)
+		mux.Handle("/ui/admin/settings/", r.settingsHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
+	}
 
 	// /ui — user-portal landing. The portal proper is built out in a later
 	// sprint; for S1e7eeb this is a tiny stub so role-user accounts have a
@@ -417,15 +430,7 @@ func (r *Renderer) redirectToDashboard(w http.ResponseWriter, req *http.Request)
 	http.Redirect(w, req, "/ui/admin/dashboard", http.StatusFound)
 }
 
-func (r *Renderer) handleDashboard(w http.ResponseWriter, req *http.Request) {
-	if req.Method != http.MethodGet {
-		w.Header().Set("Allow", "GET")
-		http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-		return
-	}
-	data := r.buildPageData("dashboard", i18n.MsgNavDashboard)
-	r.render(w, "templates/pages/dashboard.tmpl", data)
-}
+// handleDashboard is now in dashboard.go (S8a756d-1).
 
 func (r *Renderer) handlePlaceholder(activeID string, titleID i18n.MessageID) http.HandlerFunc {
 	return func(w http.ResponseWriter, req *http.Request) {
@@ -504,6 +509,22 @@ func (r *Renderer) renderToBuffer(layoutTemplate, pageTemplate string, data Page
 	var buf bytes.Buffer
 	if err := clone.ExecuteTemplate(&buf, layoutTemplate, data); err != nil {
 		return nil, fmt.Errorf("execute %q: %w", layoutTemplate, err)
+	}
+	return buf.Bytes(), nil
+}
+
+// renderPartialToBuffer executes a named partial template (not a full page
+// layout) and returns the rendered HTML. Used by inline htmx fragments like
+// the notify-channel-form that are injected into an existing page without
+// a full layout re-render.
+func (r *Renderer) renderPartialToBuffer(tmplName string, data any) ([]byte, error) {
+	clone, err := r.templates.Clone()
+	if err != nil {
+		return nil, fmt.Errorf("clone for partial %q: %w", tmplName, err)
+	}
+	var buf bytes.Buffer
+	if err := clone.ExecuteTemplate(&buf, tmplName, data); err != nil {
+		return nil, fmt.Errorf("execute partial %q: %w", tmplName, err)
 	}
 	return buf.Bytes(), nil
 }

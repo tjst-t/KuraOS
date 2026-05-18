@@ -14,6 +14,8 @@ import (
 	"github.com/kuraos-org/kura/engine/app"
 	"github.com/kuraos-org/kura/engine/auth/oidc"
 	"github.com/kuraos-org/kura/engine/auth/session"
+	"github.com/kuraos-org/kura/engine/monitor"
+	"github.com/kuraos-org/kura/engine/notify"
 	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
 	"github.com/kuraos-org/kura/engine/system"
@@ -287,17 +289,85 @@ func run() error {
 	}
 	uiRenderer.SetAppsHandler(appsDeps)
 
+	// ── Monitor + Notify wiring (S8a756d) ──────────────────────────────────
+	// Ring buffer path: /var/lib/kura/metrics/raw.bin (or KURA_METRICS_PATH).
+	rbPath := envOr("KURA_METRICS_PATH", "/var/lib/kura/metrics/raw.bin")
+	rb, rbErr := monitor.OpenRingBuffer(rbPath, monitor.DefaultCapacity)
+	if rbErr != nil {
+		// Non-fatal: a dev box may not have /var/lib/kura writable. The
+		// dashboard degrades to the empty-state banner.
+		log.Printf("monitor: open ring buffer (non-fatal): %v", rbErr)
+		rb = nil
+	}
+	eventStore := monitor.NewEventStore(st.DB())
+
+	var busRef *monitor.EventBus
+	if rb != nil {
+		// EventBus with SQLite persistence for every event.
+		busRef = monitor.NewEventBus(eventStore.Persist)
+
+		// AlertEvaluator — rules sourced from a later config.json sprint; for
+		// now we wire zero rules (alerting is opt-in via config.json `alerts[]`).
+		ae := monitor.NewAlertEvaluator(nil, busRef)
+
+		// Metrics collector — collects every 30s, evaluates alert rules.
+		probe := monitor.NewSysProbe()
+		coll := monitor.NewCollector(rb, &alertingProbe{probe: probe, ae: ae}, nil, 0)
+		go coll.Run(ctx, func(err error) {
+			log.Printf("monitor: collector: %v", err)
+		})
+
+		defer rb.Close()
+	}
+
+	// Dashboard deps — graceful degradation when rb == nil.
+	uiRenderer.SetDashboardDeps(ui.DashboardDeps{
+		RingBuffer: rb,
+		EventStore: eventStore,
+	})
+
+	// Notify store + settings page.
+	notifyStore := notify.NewStore(st.DB())
+	uiRenderer.SetSettingsHandler(ui.SettingsDeps{
+		NotifyStore: notifyStore,
+		EventStore:  eventStore,
+	})
+
+	// Notify dispatcher — wired only when EventBus is running.
+	if busRef != nil {
+		dispatcher := notify.NewDispatcher(notifyStore, nil)
+		go dispatcher.Run(ctx, busRef)
+	}
+
+	// /metrics OpenMetrics handler — admin-only via gateway auth middleware.
+	var metricsHandler http.Handler
+	if rb != nil {
+		metricsHandler = http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if req.Method != http.MethodGet {
+				w.Header().Set("Allow", "GET")
+				http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
+				return
+			}
+			w.Header().Set("Content-Type", "application/openmetrics-text; version=1.0.0; charset=utf-8")
+			if err := monitor.OpenMetricsWriter(rb, w); err != nil {
+				log.Printf("monitor: metrics endpoint: %v", err)
+			}
+		})
+	}
+	// ── End monitor wiring ──────────────────────────────────────────────────
+
 	startedAt := time.Now().UTC()
 	depsBuild := gateway.Deps{
-		Translator:   tr,
-		Version:      Version,
-		StartedAt:    startedAt,
-		UIHandler:    uiRenderer.Routes(),
-		AuthHandler:  authH,
-		SetupHandler: setupH,
-		Sessions:     sessions,
-		Users:        users,
-		AppRoutes:    routeRegistry,
+		Translator:     tr,
+		Version:        Version,
+		StartedAt:      startedAt,
+		UIHandler:      uiRenderer.Routes(),
+		AuthHandler:    authH,
+		SetupHandler:   setupH,
+		Sessions:       sessions,
+		Users:          users,
+		AppRoutes:      routeRegistry,
+		MetricsHandler: metricsHandler,
 	}
 	if oidcProvider != nil {
 		depsBuild.OIDCHandler = oidcProvider.Routes()

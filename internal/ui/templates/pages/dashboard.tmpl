@@ -1,23 +1,122 @@
 {{- /*
-dashboard.tmpl — placeholder dashboard. Engines are not yet wired in
-S464e47, so this page intentionally shows the page header chrome and an
-empty-state banner that explains the gap. Subsequent sprints replace the
-banner with stat cards / pool list / recent events from the prototype.
+dashboard.tmpl — live dashboard with Ring Buffer metrics (S8a756d-1).
+Layout mirrors prototype/claude_design/Dashboard.html:
+  - 4 stat cards (CPU / Memory / Disk Temp / Pool Usage)
+  - Pool list (left) + Recent Events (right)
+StatCards use hx-get for periodic refresh via SSE polling pattern.
 */ -}}
 {{ define "content" }}
 <div class="page-head">
   <div>
     <h1 class="page-title">{{ T "page.dashboard.title" }}</h1>
-    <p class="page-sub">{{ T "page.dashboard.subtitle" }}</p>
+    <p class="page-sub" id="dashboard-sub">
+      {{ if .Extra }}{{ with .Extra }}
+        {{ if .LastUpdated.IsZero }}{{ T "page.dashboard.never_updated" }}{{ else }}{{ T "page.dashboard.last_updated" .LastUpdatedFmt }}{{ end }}
+      {{ end }}{{ end }}
+    </p>
   </div>
   <div class="row gap-sm" style="display:flex;gap:8px;">
-    <button type="button" class="btn" disabled aria-disabled="true">{{ T "btn.refresh" }}</button>
+    <button type="button" class="btn"
+            hx-get="/ui/admin/dashboard"
+            hx-target="#content"
+            hx-swap="innerHTML"
+            hx-push-url="false">{{ T "btn.refresh" }}</button>
   </div>
 </div>
 
+{{ if .Extra }}{{ with .Extra }}
+
+{{ if not .HasMetrics }}
 <div class="banner" data-testid="dashboard-empty">
   <div style="flex:1">
     <div style="font-weight:550">{{ T "page.dashboard.empty" }}</div>
   </div>
 </div>
+{{ else }}
+
+{{/* ── Stat cards ─────────────────────────────────────────────── */}}
+<div class="grid grid-4" style="margin-bottom:16px">
+
+  {{/* CPU */}}
+  <div class="card" data-testid="stat-cpu">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.dashboard.cpu" }}</div>
+      <div class="stat-value">{{ printf "%.1f" .CPUPercent }}<span class="unit">%</span></div>
+    </div>
+  </div>
+
+  {{/* Memory */}}
+  <div class="card" data-testid="stat-memory">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.dashboard.memory" }}</div>
+      <div class="stat-value">{{ printf "%.1f" .MemUsedGB }}<span class="unit"> / {{ printf "%.0f" .MemTotalGB }} GB</span></div>
+    </div>
+  </div>
+
+  {{/* Disk Temp */}}
+  <div class="card" data-testid="stat-disk-temp">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.dashboard.disk_temp" }}</div>
+      {{ if gt .DiskTempCelsius 0.0 }}
+      <div class="stat-value">{{ printf "%.0f" .DiskTempCelsius }}<span class="unit">°C</span></div>
+      {{ else }}
+      <div class="stat-value" style="color:var(--text-3)">—</div>
+      {{ end }}
+    </div>
+  </div>
+
+  {{/* Pool Usage */}}
+  <div class="card" data-testid="stat-pool">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.dashboard.pool_usage" }}</div>
+      {{ if gt .PoolUsedPct 0.0 }}
+      <div class="stat-value">{{ printf "%.1f" .PoolUsedPct }}<span class="unit">%</span></div>
+      {{ else }}
+      <div class="stat-value" style="color:var(--text-3)">—</div>
+      {{ end }}
+    </div>
+  </div>
+
+</div>
+
+{{ end }}{{/* end HasMetrics */}}
+
+{{/* ── Recent Events ──────────────────────────────────────────── */}}
+<div class="card" data-testid="events-panel">
+  <div class="card-head">
+    <div>
+      <h3 class="card-title">{{ T "page.dashboard.events_title" }}</h3>
+      <p class="card-sub">{{ T "page.dashboard.events_sub" }}</p>
+    </div>
+    <a href="/ui/admin/settings" class="btn btn-ghost btn-sm">{{ T "page.dashboard.events_view_all" }}</a>
+  </div>
+  <div class="card-body tight">
+    {{ if .Events }}
+    {{ range .Events }}
+    <div class="row center" style="padding:10px 18px;border-bottom:1px solid var(--border);gap:12px" data-testid="event-row">
+      <span class="dot {{ .SeverityClass }}" style="flex:none;margin-top:2px"></span>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px">{{ .Title }}</div>
+        <div style="font-size:11px;color:var(--text-3);margin-top:2px">
+          <span class="mono">{{ .Source }}</span> · {{ .TimeAgo }}
+        </div>
+      </div>
+    </div>
+    {{ end }}
+    {{ else }}
+    <div style="padding:24px 18px;color:var(--text-3);font-size:13px" data-testid="events-empty">
+      {{ T "page.dashboard.events_empty" }}
+    </div>
+    {{ end }}
+  </div>
+</div>
+
+{{ end }}{{/* end .Extra */}}
+{{ else }}
+<div class="banner" data-testid="dashboard-empty">
+  <div style="flex:1">
+    <div style="font-weight:550">{{ T "page.dashboard.empty" }}</div>
+  </div>
+</div>
+{{ end }}
 {{ end }}

@@ -1,0 +1,75 @@
+{{- /*
+notify-channel-form.tmpl — inline form for adding/editing a notification
+channel. Loaded via hx-get; on success the channels-card is refreshed.
+*/ -}}
+{{ define "notify-channel-form" }}
+<div class="card" id="channel-form-card" style="margin-bottom:16px" data-testid="channel-form">
+  <div class="card-head">
+    <h3 class="card-title">
+      {{ if .IsNew }}{{ T "page.settings.channel.add.title" }}{{ else }}{{ T "page.settings.channel.edit.title" }}{{ end }}
+    </h3>
+  </div>
+  <div class="card-body col">
+    <form hx-post="{{ if .IsNew }}/ui/admin/settings/channels/create{{ else }}/ui/admin/settings/channels/{{ .ID }}/update{{ end }}"
+          hx-target="#channels-card"
+          hx-swap="outerHTML">
+
+      {{ if .ErrorMsg }}
+      <div class="banner crit" style="margin-bottom:12px" data-testid="channel-form-error">{{ .ErrorMsg }}</div>
+      {{ end }}
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.name" }}</label>
+        <input class="input" name="name" value="{{ .Name }}" required data-testid="channel-name-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.kind" }}</label>
+        <select class="select" name="kind" data-testid="channel-kind-select">
+          {{ range $k := .Kinds }}
+          <option value="{{ $k }}" {{ if eq $k $.Kind }}selected{{ end }}>{{ $k }}</option>
+          {{ end }}
+        </select>
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.url" }}</label>
+        <input class="input mono" name="url" value="{{ .URL }}" placeholder="https://..." data-testid="channel-url-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.token" }}</label>
+        <input class="input mono" name="token" type="password" placeholder="(変更しない場合は空欄)" data-testid="channel-token-input" />
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.severity" }}</label>
+        <div class="row" style="gap:12px;flex-wrap:wrap">
+          {{ range $s := .AllSeverities }}
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer">
+            <input type="checkbox" name="severity" value="{{ $s }}"
+                   {{ if $.HasSeverity $s }}checked{{ end }}
+                   data-testid="sev-{{ $s }}" />
+            {{ $s }}
+          </label>
+          {{ end }}
+        </div>
+      </div>
+
+      <div class="field">
+        <label>{{ T "page.settings.channel.form.enabled" }}</label>
+        <input type="checkbox" name="enabled" value="1" {{ if .Enabled }}checked{{ end }} data-testid="channel-enabled-check" />
+      </div>
+
+      <div class="row" style="gap:8px;justify-content:flex-end">
+        <button type="button" class="btn"
+                hx-get="/ui/admin/settings/channels/dismiss-form"
+                hx-target="#channel-modal-container"
+                hx-swap="innerHTML"
+                data-testid="channel-form-cancel">{{ T "page.settings.channel.form.cancel" }}</button>
+        <button type="submit" class="btn btn-primary" data-testid="channel-form-save">{{ T "page.settings.channel.form.save" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+{{ end }}
