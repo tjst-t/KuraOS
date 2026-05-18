@@ -1,0 +1,51 @@
+{
+  "sprint": "S8a756d",
+  "title": "Monitoring (Ring Buffer) と Notification",
+  "decisions": [
+    {
+      "id": "D-S8a756d-1",
+      "topic": "Ring Buffer: single aggregate slot per metric vs per-pool expansion",
+      "decision": "Ring buffer stores per-metric-type entries (8 types), not per-pool. Pool-level detail is available in /metrics OpenMetrics output where labels can expand pool names. Dashboard shows aggregate pool usage.",
+      "rationale": "DESIGN_PRINCIPLES #2 (賢いデフォルト > 設定項目を増やす): the ring buffer's purpose is trend visualisation, not per-pool forensics. Prometheus/Grafana handles the latter — VISION §phase_1 explicitly says 'monitoring-stack アプリ for full monitoring'. Keeping 8 fixed metric IDs bounds the ring buffer size without config.",
+      "alternatives_rejected": [
+        "Per-pool ring buffer entries: would require dynamic allocation or a variable-capacity ring buffer, adding complexity. DESIGN_PRINCIPLES #4 (シンプルなモジュラーモノリス) argues against it."
+      ]
+    },
+    {
+      "id": "D-S8a756d-2",
+      "topic": "AlertEvaluator cooldown: in-memory vs SQLite",
+      "decision": "Cooldown state is kept in-memory (map[string]time.Time in AlertEvaluator). On restart, all cooldowns reset — first collection after restart may fire alerts again.",
+      "rationale": "DESIGN_PRINCIPLES #2 (賢いデフォルト > 設定項目を増やす) and #5 (reliability > features): persisting cooldown to SQLite would complicate the schema and create another SSOT to keep in sync with config.json. Alert re-fire on restart is acceptable for a home NAS — the operator sees one extra alert, not alert storms.",
+      "alternatives_rejected": [
+        "SQLite cooldown table: over-engineering for v1 home NAS. Adds migration, query, and consistency concerns."
+      ]
+    },
+    {
+      "id": "D-S8a756d-3",
+      "topic": "Notification channel secrets: vault vs config_json field",
+      "decision": "Credentials (ntfy token, smtp password, line_notify token) are stored in notification_channels.config_json for v1 simplicity, with credential_state='set' reflecting presence. The vault integration (kv table key 'notify.<id>.secret') is architecture-ready but not wired in v1.",
+      "rationale": "DESIGN_PRINCIPLES #1 (SSOT config.json + vault): full vault isolation would require vault-read path in the dispatcher and UI. DESIGN_PRINCIPLES #7 (段階的実装 > 完璧な初期実装): the config_json column is root-only readable (state.db at 0600), providing adequate security for a home LAN device. The vault migration is a v1.x item.",
+      "alternatives_rejected": [
+        "Full vault isolation from day 1: adds dispatch latency and vault key-naming complexity. Deferred per DESIGN_PRINCIPLES #7."
+      ]
+    },
+    {
+      "id": "D-S8a756d-4",
+      "topic": "/metrics authentication: admin-gated vs unauthenticated",
+      "decision": "/metrics is mounted under the admin auth middleware in the gateway. Unauthenticated requests are redirected to /login.",
+      "rationale": "VISION mentions that Prometheus/Grafana can scrape the endpoint — Prometheus supports basic auth scrape configs. Admin-gating follows the principle of least privilege. An env flag to open /metrics publicly can be added in v1.x without schema changes.",
+      "alternatives_rejected": [
+        "Unauthenticated /metrics: exposes system resource info (pool sizes, CPU load) to anyone on the LAN — not appropriate for a shared NAS."
+      ]
+    },
+    {
+      "id": "D-S8a756d-5",
+      "topic": "Settings page: full page re-render vs partial htmx swap on channel CRUD",
+      "decision": "Channel CRUD operations (create/update/delete) return the full settings page HTML; htmx uses outerHTML swap on #channels-card. Test-send returns an inline span fragment.",
+      "rationale": "DESIGN_PRINCIPLES #8 (明示的 > 暗黙的): a full page re-render after mutation keeps the UI state consistent without complex htmx fragment management. The channels table is small (home NAS has ≤10 channels), so full re-render is imperceptibly fast. Test-send is a special case returning just the result span to avoid disrupting the table layout.",
+      "alternatives_rejected": [
+        "Fine-grained row swaps: increases template fragmentation and makes the HTML harder to debug. Not worth it for a list that rarely has more than 5 rows."
+      ]
+    }
+  ]
+}

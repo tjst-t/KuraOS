@@ -227,8 +227,54 @@ type AppSettingState struct {
 }
 type AuthConfig struct{}
 type BackupConfig struct{}
-type NotificationsConfig struct{}
-type MonitorConfig struct{}
+
+// NotificationsConfig is the declarative shape of "notifications" in
+// config.json. Channels carry only structural config (URL, username,
+// severity filter); credentials live in the vault (DESIGN_PRINCIPLES #1).
+type NotificationsConfig struct {
+	Channels []NotificationChannelEntry `json:"channels,omitempty"`
+}
+
+// NotificationChannelEntry mirrors one notification_channels row for
+// config.json export/import. CredentialState is "set"|"unset" (never the
+// secret itself — DESIGN_PRINCIPLES #1 / forbidden list).
+type NotificationChannelEntry struct {
+	ID              string   `json:"id"`
+	Name            string   `json:"name"`
+	Kind            string   `json:"kind"` // ntfy|webhook|smtp|line_notify|gotify
+	Enabled         bool     `json:"enabled"`
+	SeverityFilter  []string `json:"severity_filter,omitempty"`
+	CategoryFilter  []string `json:"category_filter,omitempty"`
+	CredentialState string   `json:"credential_state"` // "set"|"unset"
+	// Config carries kind-specific non-secret settings (e.g. ntfy URL,
+	// smtp host/port/username/from/to). Secrets are NOT here.
+	Config map[string]any `json:"config,omitempty"`
+}
+
+// MonitorConfig holds metric-collection and alert-rule knobs.
+type MonitorConfig struct {
+	// CollectIntervalSeconds overrides the default 30-second collection cadence.
+	CollectIntervalSeconds int `json:"collect_interval_seconds,omitempty"`
+	// RingBufferCapacity overrides the default 23040-entry ring buffer capacity.
+	RingBufferCapacity int `json:"ring_buffer_capacity,omitempty"`
+	// RingBufferPath is the path to the raw.bin ring buffer file.
+	// Default: /var/lib/kura/metrics/raw.bin
+	RingBufferPath string `json:"ring_buffer_path,omitempty"`
+	// Alerts is the set of alert rules evaluated after each metric collection.
+	Alerts []AlertRuleEntry `json:"alerts,omitempty"`
+}
+
+// AlertRuleEntry mirrors engine/monitor.AlertRule for config.json.
+type AlertRuleEntry struct {
+	Name            string  `json:"name"`
+	MetricPattern   string  `json:"metric_pattern"` // path.Match wildcard
+	Op              string  `json:"op"`             // gt|lt|gte|lte|eq
+	Threshold       float64 `json:"threshold"`
+	Severity        string  `json:"severity"` // info|warning|critical|ok
+	Category        string  `json:"category"`
+	CooldownMinutes int     `json:"cooldown_minutes,omitempty"`
+}
+
 type LoggingConfig struct{}
 
 // New returns an empty Config with SchemaVersion set. Always use New rather

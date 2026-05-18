@@ -55,6 +55,10 @@ type Deps struct {
 	// (including role=pending) — the handler itself bounces non-pending
 	// users back to /. Wired from cmd/kura when auth is enabled.
 	PendingApprovalHandler http.Handler
+
+	// MetricsHandler serves GET /metrics in OpenMetrics format (S8a756d-1).
+	// When nil the route is not mounted. Admin-only in production.
+	MetricsHandler http.Handler
 }
 
 // New returns the http.Handler that fronts every HTTP route the kura binary
@@ -154,6 +158,14 @@ func New(d Deps) http.Handler {
 	// /federation/* — external IdP (Google) callback URLs.
 	if d.FederationHandler != nil {
 		mux.Handle("/federation/", d.FederationHandler)
+	}
+	// /metrics — OpenMetrics endpoint (S8a756d-1). Admin-only when auth is wired.
+	if d.MetricsHandler != nil {
+		var mh http.Handler = d.MetricsHandler
+		if hasAuth {
+			mh = auth.requireRoleHandler(roleAdmin, d.MetricsHandler)
+		}
+		mux.Handle("/metrics", mh)
 	}
 	return mux
 }
