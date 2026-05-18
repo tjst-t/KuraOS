@@ -1,0 +1,86 @@
+{
+  "sprint_id": "Sf92666",
+  "verified_at": "2026-05-18",
+  "go_tests": {
+    "result": "pass",
+    "suites_run": 27,
+    "failures": 0
+  },
+  "e2e_tests": {
+    "result": "pass",
+    "sf92666_tests_run": 10,
+    "sf92666_failures": 0,
+    "pre_existing_failures": [
+      "tests/e2e/users-crud.e2e.spec.ts:50 — [AC-Sfix001-1-2]",
+      "tests/e2e/users-google-link-self-only.e2e.spec.ts:20 — prior sprint"
+    ],
+    "note": "2 failures are pre-existing from prior sprints (Sfix001, S413bd5). Not introduced by Sf92666."
+  },
+  "vm_smoke": {
+    "result": "pass",
+    "healthz": "200 OK — version=dev, started_at=2026-05-18T15:34:11Z",
+    "network_page": "200 — network page renders, form submission tested via E2E",
+    "logs_tab": "200 — logs tab renders, SSE stream confirmed via E2E (live button disables)",
+    "selfupdate_tab": "200 — self-update tab renders, check-update triggers check"
+  },
+  "acceptance_criteria_coverage": [
+    {"ac_id": "AC-Sf92666-1-1", "test": "engine/network/tls/tls_test.go", "status": "pass"},
+    {"ac_id": "AC-Sf92666-1-2", "test": "engine/network/acme/providers/cloudflare_test.go", "status": "pass"},
+    {"ac_id": "AC-Sf92666-1-3", "test": "engine/network/acme/providers/cloudflare_test.go", "status": "pass"},
+    {"ac_id": "AC-Sf92666-2-1", "test": "engine/network/network_test.go + tests/e2e/network-config.e2e.spec.ts", "status": "pass"},
+    {"ac_id": "AC-Sf92666-3-1", "test": "engine/logging/store_test.go", "status": "pass"},
+    {"ac_id": "AC-Sf92666-3-2", "test": "engine/logging/store_test.go + tests/e2e/log-viewer.e2e.spec.ts", "status": "pass"},
+    {"ac_id": "AC-Sf92666-4-1", "test": "engine/selfupdate/selfupdate_test.go + tests/e2e/kura-self-update.e2e.spec.ts", "status": "pass"},
+    {"ac_id": "AC-Sf92666-4-2", "test": "engine/selfupdate/selfupdate_test.go + tests/acceptance/kura-update-rollback.sh", "status": "pass"}
+  ],
+  "done_judgment": [
+    {
+      "story_id": "Sf92666-1",
+      "done_judgment": {
+        "guard1_user_review_required_not_done": "pass",
+        "guard2_nil_injection_mock": "pass",
+        "guard3_mock_mode_not_real_smoke": "pass",
+        "guard4_priority_rule_9_exception_valid": "n/a",
+        "guard5_call_path_grep": "pass",
+        "guard6_deferred_comment_clean": "pass",
+        "overall": "ok"
+      }
+    },
+    {
+      "story_id": "Sf92666-2",
+      "done_judgment": {
+        "guard1_user_review_required_not_done": "pass",
+        "guard2_nil_injection_mock": "pass",
+        "guard3_mock_mode_not_real_smoke": "pass",
+        "guard4_priority_rule_9_exception_valid": "n/a",
+        "guard5_call_path_grep": "pass",
+        "guard6_deferred_comment_clean": "pass",
+        "overall": "ok"
+      }
+    },
+    {
+      "story_id": "Sf92666-3",
+      "done_judgment": {
+        "guard1_user_review_required_not_done": "pass",
+        "guard2_nil_injection_mock": "pass",
+        "guard3_mock_mode_not_real_smoke": "pass",
+        "guard4_priority_rule_9_exception_valid": "n/a",
+        "guard5_call_path_grep": "pass",
+        "guard6_deferred_comment_clean": "pass",
+        "overall": "ok"
+      }
+    },
+    {
+      "story_id": "Sf92666-4",
+      "done_judgment": {
+        "guard1_user_review_required_not_done": "pass",
+        "guard2_nil_injection_mock": "pass",
+        "guard3_mock_mode_not_real_smoke": "pass",
+        "guard4_priority_rule_9_exception_valid": "n/a",
+        "guard5_call_path_grep": "pass",
+        "guard6_deferred_comment_clean": "pass",
+        "overall": "ok"
+      }
+    }
+  ]
+}

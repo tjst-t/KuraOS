@@ -96,6 +96,22 @@ type Renderer struct {
 	// backupHandler handles /ui/admin/settings/backup/* routes (Se1e7a6).
 	// nil until SetBackupHandler is called.
 	backupHandler http.Handler
+
+	// networkHandler handles /ui/admin/network routes (Sf92666-2).
+	// nil until SetNetworkHandler is called.
+	networkHandler http.Handler
+
+	// logViewerHandler handles /ui/admin/settings/logs/* routes (Sf92666-3).
+	// nil until SetLogViewerHandler is called.
+	logViewerHandler http.Handler
+
+	// selfUpdateHandler handles /ui/admin/settings/self-update/* routes (Sf92666-4).
+	// nil until SetSelfUpdateHandler is called.
+	selfUpdateHandler http.Handler
+
+	// tlsHandler handles /ui/admin/settings/tls/* routes (Sf92666-1).
+	// nil until SetTLSHandler is called.
+	tlsHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -378,7 +394,12 @@ func (r *Renderer) Routes() http.Handler {
 	if r.pendingRejectHandler != nil {
 		mux.Handle("/ui/admin/users/{id}/reject", r.pendingRejectHandler)
 	}
-	mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
+	if r.networkHandler != nil {
+		mux.Handle("/ui/admin/network", r.networkHandler)
+		mux.Handle("/ui/admin/network/apply", r.networkHandler)
+	} else {
+		mux.HandleFunc("/ui/admin/network", r.handlePlaceholder("network", i18n.MsgNavNetwork))
+	}
 	if r.appsListHandler != nil {
 		mux.Handle("/ui/admin/apps", r.appsListHandler)
 	} else {
@@ -401,6 +422,12 @@ func (r *Renderer) Routes() http.Handler {
 		mux.Handle("/ui/admin/settings/", r.settingsHandler)
 	} else {
 		mux.HandleFunc("/ui/admin/settings", r.handlePlaceholder("settings", i18n.MsgNavSettings))
+	}
+	// SSE log stream (Sf92666-3) — registered separately so it can be reached
+	// even when the settings handler catches all /settings/* sub-paths.
+	// Go 1.22 mux selects the most specific path, so this wins over /ui/admin/settings/.
+	if r.logViewerHandler != nil {
+		mux.Handle("/ui/admin/settings/logs/stream", r.logViewerHandler)
 	}
 
 	// /ui — user-portal landing. The portal proper is built out in a later

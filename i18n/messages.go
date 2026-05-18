@@ -723,3 +723,83 @@ const (
 	MsgSettingsUpgradeErrSnapshot MessageID = "page.settings.upgrade.err.snapshot"
 	MsgSettingsUpgradeErrApt      MessageID = "page.settings.upgrade.err.apt"
 )
+
+// Network page (Sf92666-2). Visual SSOT: prototype/claude_design/Network.html.
+const (
+	MsgNetworkTitle          MessageID = "page.network.title"
+	MsgNetworkSubtitle       MessageID = "page.network.subtitle"
+	MsgNetworkHostnameLabel  MessageID = "page.network.hostname.label"
+	MsgNetworkHostnameHint   MessageID = "page.network.hostname.hint"
+	MsgNetworkInterfacesHeading MessageID = "page.network.interfaces.heading"
+	MsgNetworkInterfaceLabel MessageID = "page.network.interface.label"
+	MsgNetworkAddressLabel   MessageID = "page.network.address.label"
+	MsgNetworkAddressHint    MessageID = "page.network.address.hint"
+	MsgNetworkGatewayLabel   MessageID = "page.network.gateway.label"
+	MsgNetworkGatewayHint    MessageID = "page.network.gateway.hint"
+	MsgNetworkDHCPLabel      MessageID = "page.network.dhcp.label"
+	MsgNetworkDNSLabel       MessageID = "page.network.dns.label"
+	MsgNetworkDNSHint        MessageID = "page.network.dns.hint"
+	MsgNetworkApplyBtn       MessageID = "page.network.apply_btn"
+	MsgNetworkApplySuccess   MessageID = "page.network.apply.success"
+	MsgNetworkApplyDryRun    MessageID = "page.network.apply.dry_run"
+	MsgNetworkErrApply       MessageID = "page.network.err.apply"
+	MsgNetworkErrHostname    MessageID = "page.network.err.hostname"
+)
+
+// Settings — TLS tab (Sf92666-1).
+const (
+	MsgSettingsTabTLS            MessageID = "page.settings.tab.tls"
+	MsgSettingsTLSTitle          MessageID = "page.settings.tls.title"
+	MsgSettingsTLSSub            MessageID = "page.settings.tls.sub"
+	MsgSettingsTLSModeLabel      MessageID = "page.settings.tls.mode.label"
+	MsgSettingsTLSModeNone       MessageID = "page.settings.tls.mode.none"
+	MsgSettingsTLSModeSelfSigned MessageID = "page.settings.tls.mode.self_signed"
+	MsgSettingsTLSModeACME       MessageID = "page.settings.tls.mode.acme"
+	MsgSettingsTLSPortLabel      MessageID = "page.settings.tls.port.label"
+	MsgSettingsTLSProviderLabel  MessageID = "page.settings.tls.provider.label"
+	MsgSettingsTLSDomainsLabel   MessageID = "page.settings.tls.domains.label"
+	MsgSettingsTLSDomainsHint    MessageID = "page.settings.tls.domains.hint"
+	MsgSettingsTLSApplyBtn       MessageID = "page.settings.tls.apply_btn"
+	MsgSettingsTLSApplySuccess   MessageID = "page.settings.tls.apply.success"
+	MsgSettingsTLSCAHint         MessageID = "page.settings.tls.ca.hint"
+	MsgSettingsTLSCADownload     MessageID = "page.settings.tls.ca.download"
+	MsgSettingsTLSErrApply       MessageID = "page.settings.tls.err.apply"
+)
+
+// Settings — Log viewer tab (Sf92666-3).
+const (
+	MsgSettingsTabLogs         MessageID = "page.settings.tab.logs"
+	MsgSettingsLogsTitle       MessageID = "page.settings.logs.title"
+	MsgSettingsLogsSub         MessageID = "page.settings.logs.sub"
+	MsgSettingsLogsSourceLabel MessageID = "page.settings.logs.source.label"
+	MsgSettingsLogsLevelLabel  MessageID = "page.settings.logs.level.label"
+	MsgSettingsLogsSearchLabel MessageID = "page.settings.logs.search.label"
+	MsgSettingsLogsSearchHint  MessageID = "page.settings.logs.search.hint"
+	MsgSettingsLogsLiveBtn     MessageID = "page.settings.logs.live_btn"
+	MsgSettingsLogsFilterBtn   MessageID = "page.settings.logs.filter_btn"
+	MsgSettingsLogsColTime     MessageID = "page.settings.logs.col.time"
+	MsgSettingsLogsColLevel    MessageID = "page.settings.logs.col.level"
+	MsgSettingsLogsColSource   MessageID = "page.settings.logs.col.source"
+	MsgSettingsLogsColMessage  MessageID = "page.settings.logs.col.message"
+	MsgSettingsLogsEmpty       MessageID = "page.settings.logs.empty"
+	MsgSettingsLogsLiveOff     MessageID = "page.settings.logs.live.off"
+)
+
+// Settings — Self-update tab (Sf92666-4).
+const (
+	MsgSettingsTabSelfUpdate       MessageID = "page.settings.tab.self_update"
+	MsgSettingsSelfUpdateTitle     MessageID = "page.settings.self_update.title"
+	MsgSettingsSelfUpdateSub       MessageID = "page.settings.self_update.sub"
+	MsgSettingsSelfUpdateCheckBtn  MessageID = "page.settings.self_update.check_btn"
+	MsgSettingsSelfUpdateApplyBtn  MessageID = "page.settings.self_update.apply_btn"
+	MsgSettingsSelfUpdateCurrent   MessageID = "page.settings.self_update.current"
+	MsgSettingsSelfUpdateLatest    MessageID = "page.settings.self_update.latest"
+	MsgSettingsSelfUpdateUpToDate  MessageID = "page.settings.self_update.up_to_date"
+	MsgSettingsSelfUpdateAvailable MessageID = "page.settings.self_update.available"
+	MsgSettingsSelfUpdateApplying  MessageID = "page.settings.self_update.applying"
+	MsgSettingsSelfUpdateDone      MessageID = "page.settings.self_update.done"
+	MsgSettingsSelfUpdateRolledBack MessageID = "page.settings.self_update.rolled_back"
+	MsgSettingsSelfUpdateErrCheck  MessageID = "page.settings.self_update.err.check"
+	MsgSettingsSelfUpdateErrApply  MessageID = "page.settings.self_update.err.apply"
+	MsgSettingsSelfUpdateConfirm   MessageID = "page.settings.self_update.confirm"
+)

@@ -29,6 +29,27 @@ Active tab is determined by Extra.ActiveTab ("notify" | "backup").
       hx-target="#settings-content"
       hx-swap="innerHTML"
       hx-push-url="true">{{ T "page.settings.tab.backup" }}</button>
+    <button
+      data-testid="settings-tab-tls"
+      {{ if eq $tab "tls" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=tls"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.tls" }}</button>
+    <button
+      data-testid="settings-tab-logs"
+      {{ if eq $tab "logs" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=logs"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.logs" }}</button>
+    <button
+      data-testid="settings-tab-self-update"
+      {{ if eq $tab "self_update" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=self_update"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.self_update" }}</button>
   </nav>
 
   <div class="col" style="min-width:0" id="settings-content">
@@ -298,6 +319,241 @@ Active tab is determined by Extra.ActiveTab ("notify" | "backup").
     </div>
 
   {{ end }}{{/* end backup tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── TLS tab ────────────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "tls" }}
+  <h2 class="section-title" data-testid="tls-section-title">{{ T "page.settings.tls.title" }}</h2>
+  <p class="section-sub">{{ T "page.settings.tls.sub" }}</p>
+
+  {{ if .Extra }}{{ with .Extra }}
+  {{ if .SuccessMsg }}
+  <div class="banner ok" data-testid="tls-success" style="margin-bottom:16px">
+    <span>{{ .SuccessMsg }}</span>
+  </div>
+  {{ end }}
+  {{ if .ErrorMsg }}
+  <div class="banner crit" data-testid="tls-error" style="margin-bottom:16px">
+    <span>{{ .ErrorMsg }}</span>
+  </div>
+  {{ end }}
+  {{ end }}{{ end }}
+
+  <div class="card" id="tls-card">
+    <div class="card-body">
+      <form method="POST" action="/ui/admin/settings/tls/apply"
+            hx-post="/ui/admin/settings/tls/apply"
+            hx-target="body"
+            hx-swap="innerHTML"
+            data-testid="tls-form">
+
+        <div style="margin-bottom:16px">
+          <label class="label" for="tls-mode">{{ T "page.settings.tls.mode.label" }}</label>
+          <select id="tls-mode" name="mode" class="input" data-testid="tls-mode-select">
+            <option value="none"{{ if .Extra }}{{ if eq .Extra.Mode "none" }} selected{{ end }}{{ end }}>{{ T "page.settings.tls.mode.none" }}</option>
+            <option value="self_signed"{{ if .Extra }}{{ if eq .Extra.Mode "self_signed" }} selected{{ end }}{{ end }}>{{ T "page.settings.tls.mode.self_signed" }}</option>
+            <option value="acme"{{ if .Extra }}{{ if eq .Extra.Mode "acme" }} selected{{ end }}{{ end }}>{{ T "page.settings.tls.mode.acme" }}</option>
+          </select>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="label" for="tls-port">{{ T "page.settings.tls.port.label" }}</label>
+          <input id="tls-port" name="port" class="input" type="number" min="1" max="65535"
+                 value="{{ if .Extra }}{{ .Extra.Port }}{{ else }}8443{{ end }}"
+                 data-testid="tls-port-input" />
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="label" for="tls-provider">{{ T "page.settings.tls.provider.label" }}</label>
+          <select id="tls-provider" name="provider" class="input" data-testid="tls-provider-select">
+            <option value="">—</option>
+            {{ if .Extra }}{{ range .Extra.AvailableProviders }}
+            <option value="{{ . }}"{{ if eq . $.Extra.Provider }} selected{{ end }}>{{ . }}</option>
+            {{ end }}{{ end }}
+          </select>
+        </div>
+
+        <div style="margin-bottom:16px">
+          <label class="label" for="tls-domains">{{ T "page.settings.tls.domains.label" }}</label>
+          <input id="tls-domains" name="domains" class="input" type="text"
+                 placeholder="{{ T "page.settings.tls.domains.hint" }}"
+                 value="{{ if .Extra }}{{ .Extra.Domains }}{{ end }}"
+                 data-testid="tls-domains-input" />
+        </div>
+
+        {{ if .Extra }}{{ with .Extra }}{{ if .CACertPath }}
+        <div class="banner ok" style="margin-bottom:16px" data-testid="tls-ca-hint">
+          <span>{{ T "page.settings.tls.ca.hint" }}</span>
+          <a href="/ui/admin/settings/tls/ca" download class="btn btn-ghost btn-sm" style="margin-left:8px">
+            {{ T "page.settings.tls.ca.download" }}
+          </a>
+        </div>
+        {{ end }}{{ end }}{{ end }}
+
+        <div style="text-align:right">
+          <button type="submit" class="btn btn-primary" data-testid="tls-apply-btn">
+            {{ T "page.settings.tls.apply_btn" }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {{ end }}{{/* end tls tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── Logs tab ────────────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "logs" }}
+  <h2 class="section-title" data-testid="logs-section-title">{{ T "page.settings.logs.title" }}</h2>
+  <p class="section-sub">{{ T "page.settings.logs.sub" }}</p>
+
+  <div class="card" id="logs-card">
+    <div class="card-head">
+      <h3 class="card-title">{{ T "page.settings.logs.title" }}</h3>
+      <div style="display:flex;gap:8px;align-items:center">
+        <form style="display:flex;gap:6px" hx-get="/ui/admin/settings?tab=logs"
+              hx-target="#logs-card" hx-swap="outerHTML" hx-push-url="false">
+          <select name="source" class="input" style="width:120px" data-testid="logs-source-filter">
+            <option value="">{{ T "page.settings.logs.source.label" }}</option>
+            <option value="kuraos"{{ if .Extra }}{{ if eq .Extra.Source "kuraos" }} selected{{ end }}{{ end }}>kuraos</option>
+            <option value="journald"{{ if .Extra }}{{ if eq .Extra.Source "journald" }} selected{{ end }}{{ end }}>journald</option>
+          </select>
+          <select name="level" class="input" style="width:100px" data-testid="logs-level-filter">
+            <option value="">{{ T "page.settings.logs.level.label" }}</option>
+            <option value="debug">debug</option>
+            <option value="info">info</option>
+            <option value="warn">warn</option>
+            <option value="error">error</option>
+          </select>
+          <input name="search" class="input" type="text" style="width:140px"
+                 placeholder="{{ T "page.settings.logs.search.hint" }}"
+                 value="{{ if .Extra }}{{ .Extra.Search }}{{ end }}"
+                 data-testid="logs-search-input" />
+          <button type="submit" class="btn btn-sm">{{ T "page.settings.logs.filter_btn" }}</button>
+        </form>
+        <button class="btn btn-sm" data-testid="logs-live-btn"
+                onclick="startLogSSE(this)"
+                style="margin-left:4px">{{ T "page.settings.logs.live_btn" }}</button>
+      </div>
+    </div>
+
+    <table class="tbl" data-testid="logs-table">
+      <thead>
+        <tr>
+          <th>{{ T "page.settings.logs.col.time" }}</th>
+          <th>{{ T "page.settings.logs.col.level" }}</th>
+          <th>{{ T "page.settings.logs.col.source" }}</th>
+          <th>{{ T "page.settings.logs.col.message" }}</th>
+        </tr>
+      </thead>
+      <tbody id="logs-tbody" data-testid="logs-tbody">
+        {{ if .Extra }}{{ with .Extra }}{{ if .Entries }}
+        {{ range .Entries }}
+        <tr class="log-row" data-testid="log-row">
+          <td class="td-mono">{{ .TimeFmt }}</td>
+          <td><span class="badge {{ .LvlClass }}">{{ .Level }}</span></td>
+          <td><span class="badge">{{ .Source }}</span></td>
+          <td>{{ .Message }}</td>
+        </tr>
+        {{ end }}
+        {{ else }}
+        <tr><td colspan="4" style="text-align:center;color:var(--text-3);padding:24px" data-testid="logs-empty">{{ T "page.settings.logs.empty" }}</td></tr>
+        {{ end }}{{ end }}{{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <script>
+  function startLogSSE(btn) {
+    btn.disabled = true;
+    var source = document.querySelector('[name=source]')?.value || '';
+    var level = document.querySelector('[name=level]')?.value || '';
+    var search = document.querySelector('[name=search]')?.value || '';
+    var url = '/ui/admin/settings/logs/stream?source=' + encodeURIComponent(source) +
+              '&level=' + encodeURIComponent(level) +
+              '&search=' + encodeURIComponent(search);
+    var es = new EventSource(url);
+    var tbody = document.getElementById('logs-tbody');
+    es.onmessage = function(e) {
+      tbody.insertAdjacentHTML('afterbegin', e.data);
+    };
+    es.onerror = function() { es.close(); btn.disabled = false; };
+  }
+  </script>
+  {{ end }}{{/* end logs tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── Self-update tab ────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "self_update" }}
+  <h2 class="section-title" data-testid="self-update-section-title">{{ T "page.settings.self_update.title" }}</h2>
+  <p class="section-sub">{{ T "page.settings.self_update.sub" }}</p>
+
+  {{ if .Extra }}{{ with .Extra }}
+  {{ if .SuccessMsg }}
+  <div class="banner ok" data-testid="self-update-success" style="margin-bottom:16px">
+    <span>{{ .SuccessMsg }}</span>
+  </div>
+  {{ end }}
+  {{ if .ErrorMsg }}
+  <div class="banner crit" data-testid="self-update-error" style="margin-bottom:16px">
+    <span>{{ .ErrorMsg }}</span>
+  </div>
+  {{ end }}
+  {{ end }}{{ end }}
+
+  <div class="card" id="self-update-card">
+    <div class="card-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <p class="label">{{ T "page.settings.self_update.current" }}</p>
+          <p class="td-mono" data-testid="current-version">{{ if .Extra }}{{ .Extra.CurrentVersion }}{{ end }}</p>
+        </div>
+        {{ if .Extra }}{{ with .Extra }}{{ if .LatestVersion }}
+        <div>
+          <p class="label">{{ T "page.settings.self_update.latest" }}</p>
+          <p class="td-mono" data-testid="latest-version">{{ .LatestVersion }}</p>
+        </div>
+        {{ end }}{{ end }}{{ end }}
+      </div>
+
+      {{ if .Extra }}{{ with .Extra }}
+      {{ if .Available }}
+      <div class="banner warn" style="margin-bottom:16px" data-testid="update-available-banner">
+        <span>{{ T "page.settings.self_update.available" .LatestVersion }}</span>
+      </div>
+      {{ else if .LatestVersion }}
+      <div class="banner ok" style="margin-bottom:16px" data-testid="up-to-date-banner">
+        <span>{{ T "page.settings.self_update.up_to_date" }}</span>
+      </div>
+      {{ end }}
+      {{ end }}{{ end }}
+
+      <div style="display:flex;gap:8px">
+        <form method="POST" action="/ui/admin/settings/self-update/check"
+              hx-post="/ui/admin/settings/self-update/check"
+              hx-target="#self-update-card"
+              hx-swap="outerHTML">
+          <button type="submit" class="btn" data-testid="check-update-btn">
+            {{ T "page.settings.self_update.check_btn" }}
+          </button>
+        </form>
+        {{ if .Extra }}{{ with .Extra }}{{ if .Available }}
+        <form method="POST" action="/ui/admin/settings/self-update/apply"
+              hx-post="/ui/admin/settings/self-update/apply"
+              hx-target="#self-update-card"
+              hx-swap="outerHTML"
+              hx-confirm="{{ T "page.settings.self_update.confirm" .LatestVersion }}">
+          <button type="submit" class="btn btn-primary" data-testid="apply-update-btn">
+            {{ T "page.settings.self_update.apply_btn" }}
+          </button>
+        </form>
+        {{ end }}{{ end }}{{ end }}
+      </div>
+    </div>
+  </div>
+  {{ end }}{{/* end self-update tab */}}
 
   </div>
 </div>

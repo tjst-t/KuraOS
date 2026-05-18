@@ -63,6 +63,9 @@ type Config struct {
 
 	// Logging holds JSONL retention settings.
 	Logging *LoggingConfig `json:"logging,omitempty"`
+
+	// SelfUpdate holds kura binary self-update settings.
+	SelfUpdate *SelfUpdateConfig `json:"self_update,omitempty"`
 }
 
 // Sub-section structs. Fields are populated in subsequent sprints — the
@@ -165,7 +168,52 @@ type UserEntry struct {
 	Disabled        bool   `json:"disabled,omitempty"`
 	CredentialState string `json:"credential_state"`
 }
-type NetworkConfig struct{}
+// NetworkConfig is the declarative shape of "network" in config.json.
+// Private keys, TLS certs, and Cloudflare API tokens are NOT here
+// (DESIGN_PRINCIPLES priority #1: no secrets in config.json).
+type NetworkConfig struct {
+	// TLS holds TLS certificate mode and options.
+	TLS *TLSConfig `json:"tls,omitempty"`
+	// Netplan holds the network interface configuration.
+	Netplan *NetplanConfig `json:"netplan,omitempty"`
+}
+
+// TLSConfig is the declarative TLS configuration.
+// mode: "none" | "self_signed" | "acme"
+// Private keys live on disk at KURA_TLS_DIR (/var/lib/kura/tls by default).
+type TLSConfig struct {
+	// Mode is "none" | "self_signed" | "acme".
+	Mode string `json:"mode,omitempty"`
+	// Port is the TLS listener port. Default 8443 (dev) or 443 (prod).
+	Port int `json:"port,omitempty"`
+	// Provider is the ACME DNS provider name (e.g. "cloudflare"). Required when Mode=acme.
+	Provider string `json:"provider,omitempty"`
+	// Domains is the list of domain names for ACME certificates. Required when Mode=acme.
+	Domains []string `json:"domains,omitempty"`
+	// SANs is the list of SANs for self-signed certificates (default: hostname + localhost).
+	SANs []string `json:"sans,omitempty"`
+}
+
+// NetplanConfig is the declarative network configuration stored in config.json.
+// engine/network owns writing /etc/netplan/99-kura.yaml from this struct.
+type NetplanConfig struct {
+	// Hostname is the desired system hostname.
+	Hostname string `json:"hostname,omitempty"`
+	// Interfaces maps NIC names to their static config.
+	Interfaces map[string]InterfaceConfig `json:"interfaces,omitempty"`
+	// DNSServers is the global list of DNS resolvers.
+	DNSServers []string `json:"dns_servers,omitempty"`
+}
+
+// InterfaceConfig is the config for one NIC in config.json.
+type InterfaceConfig struct {
+	// Addresses is a list of CIDR addresses, e.g. ["192.168.1.10/24"].
+	Addresses []string `json:"addresses,omitempty"`
+	// Gateway4 is the IPv4 default route.
+	Gateway4 string `json:"gateway4,omitempty"`
+	// DHCP4 enables DHCP on this interface.
+	DHCP4 bool `json:"dhcp4,omitempty"`
+}
 
 // AppsConfig is the declarative shape of "apps" in config.json. v1
 // declares the trusted app registries (design.md §7.9) and the list of
@@ -321,7 +369,30 @@ type AlertRuleEntry struct {
 	CooldownMinutes int     `json:"cooldown_minutes,omitempty"`
 }
 
-type LoggingConfig struct{}
+// LoggingConfig is the declarative shape of "logging" in config.json.
+// Controls JSONL log storage and retention.
+type LoggingConfig struct {
+	// Dir is the directory for JSONL log files. Default: /var/log/kuraos.
+	Dir string `json:"dir,omitempty"`
+	// RetentionDays is the maximum number of daily JSONL files to keep.
+	// 0 means unlimited.
+	RetentionDays int `json:"retention_days,omitempty"`
+}
+
+// SelfUpdateConfig is the declarative shape of "self_update" in config.json.
+type SelfUpdateConfig struct {
+	// AutoCheck enables automatic version checks (e.g. every 24h).
+	AutoCheck bool `json:"auto_check,omitempty"`
+	// AutoApply enables automatic update application when auto_check finds a new version.
+	// Requires AutoCheck to be true.
+	AutoApply bool `json:"auto_apply,omitempty"`
+	// ReleaseURL is the GitHub Releases API URL.
+	// Default: https://api.github.com/repos/kuraos-org/kura/releases/latest
+	ReleaseURL string `json:"release_url,omitempty"`
+	// PubKeyHex is the hex-encoded ed25519 public key used to verify release signatures.
+	// When empty, signature verification is skipped.
+	PubKeyHex string `json:"pub_key_hex,omitempty"`
+}
 
 // New returns an empty Config with SchemaVersion set. Always use New rather
 // than `&Config{}` so the version field is never accidentally zero.

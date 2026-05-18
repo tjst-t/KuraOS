@@ -15,8 +15,11 @@ import (
 	"github.com/kuraos-org/kura/engine/auth/oidc"
 	"github.com/kuraos-org/kura/engine/auth/session"
 	backupEngine "github.com/kuraos-org/kura/engine/backup"
+	"github.com/kuraos-org/kura/engine/logging"
 	"github.com/kuraos-org/kura/engine/monitor"
+	networkEngine "github.com/kuraos-org/kura/engine/network"
 	"github.com/kuraos-org/kura/engine/notify"
+	"github.com/kuraos-org/kura/engine/selfupdate"
 	"github.com/kuraos-org/kura/engine/share"
 	"github.com/kuraos-org/kura/engine/storage"
 	"github.com/kuraos-org/kura/engine/system"
@@ -26,6 +29,9 @@ import (
 	"github.com/kuraos-org/kura/internal/gateway"
 	"github.com/kuraos-org/kura/internal/store"
 	"github.com/kuraos-org/kura/internal/ui"
+
+	// Register Cloudflare DNS provider (Sf92666-1). Import triggers init().
+	_ "github.com/kuraos-org/kura/engine/network/acme/providers"
 )
 
 // Version is overridable at link time: -ldflags "-X main.Version=v0.1.0".
@@ -353,6 +359,43 @@ func run() error {
 		RootDataset: upgradeRootDS,
 	})
 	// ── End backup wiring ───────────────────────────────────────────────────
+
+	// ── Network wiring (Sf92666-2) ──────────────────────────────────────────
+	netMgr := networkEngine.NewManager(cmdexec.NewReal(), "")
+	uiRenderer.SetNetworkHandler(ui.NetworkDeps{Manager: netMgr})
+	// ── End network wiring ──────────────────────────────────────────────────
+
+	// ── Logging wiring (Sf92666-3) ──────────────────────────────────────────
+	logDir := envOr("KURA_LOG_DIR", "/var/log/kuraos")
+	logRetention := 30
+	logStore := logging.NewStore(logDir, logRetention)
+	uiRenderer.SetLogViewerHandler(ui.LogsDeps{Store: logStore})
+	// ── End logging wiring ──────────────────────────────────────────────────
+
+	// ── TLS wiring (Sf92666-1) ──────────────────────────────────────────────
+	tlsDir := envOr("KURA_TLS_DIR", "/var/lib/kura/tls")
+	uiRenderer.SetTLSHandler(ui.TLSDeps{
+		StorageDir:  tlsDir,
+		CurrentMode: "self_signed",
+		CurrentPort: 8443,
+	})
+	// ── End TLS wiring ──────────────────────────────────────────────────────
+
+	// ── Self-update wiring (Sf92666-4) ──────────────────────────────────────
+	releaseURL := envOr("KURA_RELEASE_URL",
+		"https://api.github.com/repos/kuraos-org/kura/releases/latest")
+	healthURL := fmt.Sprintf("http://localhost:%s/healthz", port)
+	githubChecker := &selfupdate.GitHubReleaseChecker{RepoURL: releaseURL}
+	currentExe, _ := os.Executable()
+	if currentExe == "" {
+		currentExe = "/home/ubuntu/kuraos/kura"
+	}
+	updater := selfupdate.NewUpdater(currentExe, githubChecker, healthURL)
+	uiRenderer.SetSelfUpdateHandler(ui.SelfUpdateDeps{
+		Updater:        updater,
+		CurrentVersion: Version,
+	})
+	// ── End self-update wiring ──────────────────────────────────────────────
 
 	// /metrics OpenMetrics handler — admin-only via gateway auth middleware.
 	var metricsHandler http.Handler
