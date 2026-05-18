@@ -69,11 +69,13 @@ func dispatch(args []string) error {
 		return backupCmd(args[1:])
 	case "restore":
 		return restoreCmd(args[1:])
+	case "init":
+		return initCmd(args[1:])
 	case "version", "--version", "-v":
 		fmt.Println(Version)
 		return nil
 	default:
-		return fmt.Errorf("unknown command %q (try: config | storage | system | user | share | app | backup | restore | version)", args[0])
+		return fmt.Errorf("unknown command %q (try: config | storage | system | user | share | app | backup | restore | init | version)", args[0])
 	}
 }
 
@@ -144,6 +146,7 @@ func run() error {
 	// to recreate pools/volumes the UI created. The storage adapter is
 	// registered against the global config.registry once per process.
 	storage.RegisterApplyAdapter(storageEngine)
+	storage.RegisterExportAdapter(storageEngine)
 
 	// Share engine — SQLite-backed, regenerates /etc/samba/conf.d/kura.conf
 	// + /etc/exports.d/kura.exports on every Apply, then reloads via
@@ -153,6 +156,7 @@ func run() error {
 	shareStore := share.NewStore(st.DB())
 	shareEngine := share.NewManager(shareStore, cmdexec.NewReal(), share.Options{})
 	share.RegisterApplyAdapter(shareEngine)
+	share.RegisterExportAdapter(shareEngine)
 
 	hasher := user.NewHasher()
 	users := user.NewStore(st.DB(), hasher)
@@ -211,11 +215,18 @@ func run() error {
 		// when federation isn't configured.
 		Providers: &providersListAdapter{db: st.DB()},
 	})
-	setupH := uiRenderer.SetupHandler(ui.SetupDeps{
+	setupDeps := ui.SetupDeps{
 		Users:         users,
 		Sessions:      sessions,
 		SecureCookies: secureCookies,
-	})
+		Storage:       storageEngine,
+		Shares:        shareEngine,
+	}
+	setupH := uiRenderer.SetupHandler(setupDeps)
+	// wizardMux holds the authenticated wizard steps (2-5). The gateway
+	// wraps it in requireAnySession so only the logged-in admin can reach them.
+	wizardMux := http.NewServeMux()
+	uiRenderer.SetupWizardRoutes(wizardMux, setupDeps)
 
 	// engine/app wiring (S65b510). Falls back to FakeDockerClient on dev
 	// boxes where /var/run/docker.sock isn't reachable; production VMs use
@@ -295,6 +306,11 @@ func run() error {
 		SharePathLister: sharePathListerFromEngine(shareEngine),
 	}
 	uiRenderer.SetAppsHandler(appsDeps)
+	// User portal (S99702c-1): shows installed apps + Files shortcut + stats.
+	uiRenderer.SetPortalDeps(ui.PortalDeps{
+		Lifecycle: lifecycle,
+		Routes:    routeRegistry,
+	})
 
 	// ── Monitor + Notify wiring (S8a756d) ──────────────────────────────────
 	// Ring buffer path: /var/lib/kura/metrics/raw.bin (or KURA_METRICS_PATH).
@@ -426,7 +442,8 @@ func run() error {
 		StartedAt:      startedAt,
 		UIHandler:      uiRenderer.Routes(),
 		AuthHandler:    authH,
-		SetupHandler:   setupH,
+		SetupHandler:        setupH,
+		SetupWizardHandler: wizardMux,
 		Sessions:       sessions,
 		Users:          users,
 		AppRoutes:      routeRegistry,

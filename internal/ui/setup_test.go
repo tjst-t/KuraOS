@@ -111,8 +111,9 @@ func TestSetup_POSTCreatesAdminAndIssuesSession(t *testing.T) {
 	if resp.StatusCode != http.StatusFound {
 		t.Fatalf("status = %d, want 302", resp.StatusCode)
 	}
-	if loc := resp.Header.Get("Location"); loc != "/ui/admin/dashboard" {
-		t.Fatalf("Location = %q, want /ui/admin/dashboard", loc)
+	// After admin creation the wizard starts at /setup/welcome (S99702c-2).
+	if loc := resp.Header.Get("Location"); loc != "/setup/welcome" {
+		t.Fatalf("Location = %q, want /setup/welcome", loc)
 	}
 	if n, _ := users.CountByRole(context.Background(), user.RoleAdmin); n != 1 {
 		t.Fatalf("admin count = %d, want 1", n)

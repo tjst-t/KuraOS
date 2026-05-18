@@ -1,0 +1,81 @@
+{{- /*
+portal_home.tmpl — user portal landing at /ui (S99702c-1).
+Visual SSOT: prototype/claude_design/Portal.html.
+Layout: greeting / storage stats / apps grid / recent activity.
+Rendered by portal.tmpl layout (not admin layout — no sidebar).
+*/ -}}
+{{ define "content" }}
+<h1 class="portal-greet" data-testid="portal-greeting">{{ T "page.portal.greeting" .Extra.DisplayName }}</h1>
+<p class="portal-sub" data-testid="portal-subtitle">{{ T "page.portal.subtitle" }}</p>
+
+<div class="grid grid-3" style="margin-bottom:36px">
+  {{/* Storage usage card */}}
+  <div class="card">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.portal.storage.label" }}</div>
+      {{ if .Extra.StorageQuota }}
+      <div class="stat-value" style="margin:8px 0">
+        {{ .Extra.StorageUsedHuman }}<span class="unit"> / {{ .Extra.StorageQuotaHuman }}</span>
+      </div>
+      <div class="bar"><span style="width:{{ .Extra.StoragePct }}%"></span></div>
+      <div class="muted" style="font-size:12px;margin-top:8px">{{ .Extra.StoragePct }}% 使用中</div>
+      {{ else }}
+      <div class="stat-value" style="margin:8px 0">{{ .Extra.StorageUsedHuman }}<span class="unit"> 使用中</span></div>
+      {{ end }}
+    </div>
+  </div>
+  {{/* Accessible shares card */}}
+  <div class="card">
+    <div class="card-body">
+      <div class="stat-label">{{ T "page.portal.shares.label" }}</div>
+      <div class="stat-value" style="margin:8px 0">{{ len .Extra.Shares }}<span class="unit"> shares</span></div>
+      {{ if .Extra.Shares }}
+      <div class="muted" style="font-size:12px">{{ .Extra.ShareNames }}</div>
+      {{ end }}
+    </div>
+  </div>
+  {{/* Files shortcut */}}
+  <div class="card" data-testid="portal-files-shortcut" style="cursor:pointer" onclick="location.href='/ui/files'">
+    <div class="card-body" style="display:flex;flex-direction:column;gap:8px">
+      <div class="stat-label">{{ T "page.portal.files_shortcut" }}</div>
+      <div style="display:flex;align-items:center;gap:10px;margin-top:4px">
+        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="color:var(--accent)">
+          <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V7z"/>
+        </svg>
+        <span class="muted" style="font-size:13px">ファイルを参照</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{/* Apps section */}}
+<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+  <h2 style="font-size:18px;font-weight:600;margin:0" data-testid="portal-apps-heading">{{ T "page.portal.apps.heading" }}</h2>
+  {{ if .Extra.Apps }}
+  <span class="muted" style="font-size:13px">{{ T "page.portal.apps.count" (len .Extra.Apps) }}</span>
+  {{ end }}
+</div>
+
+<div data-testid="portal-apps-grid" style="margin-bottom:36px">
+{{ if .Extra.Apps }}
+<div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(220px,1fr))">
+  {{ range .Extra.Apps }}
+  <a href="{{ .ExternalURL }}" class="app-tile" target="_blank" rel="noopener" data-testid="app-tile-{{ .Name }}" style="text-decoration:none;color:inherit">
+    <div class="app-tile-icon">{{ slice .DisplayName 0 1 }}</div>
+    <div>
+      <div style="font-weight:600;font-size:15px">{{ .DisplayName }}</div>
+      <div class="mono" style="font-size:11px;color:var(--text-3);margin-top:2px">{{ .Name }}</div>
+    </div>
+    <div class="muted" style="font-size:12px">{{ .Description }}</div>
+  </a>
+  {{ end }}
+</div>
+{{ else }}
+<div class="card">
+  <div class="card-body" style="text-align:center;padding:32px;color:var(--text-3)" data-testid="portal-apps-empty">
+    <p>{{ T "page.portal.apps.empty" }}</p>
+  </div>
+</div>
+{{ end }}
+</div>
+{{ end }}

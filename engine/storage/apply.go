@@ -253,3 +253,38 @@ func parseHumanBytes(s string) (int64, error) {
 	}
 	return n * mult, nil
 }
+
+// RegisterExportAdapter installs the storage export adapter into the global
+// config export registry (S99702c-3). It snapshots live pool / volume state
+// into config.Storage so export → import restores ZFS structure.
+func RegisterExportAdapter(eng Engine) {
+	config.RegisterExporter(&storageExporter{eng: eng})
+}
+
+type storageExporter struct{ eng Engine }
+
+func (e *storageExporter) Snapshot(ctx context.Context, cfg *config.Config) error {
+	pools, err := e.eng.ListPools(ctx)
+	if err != nil {
+		// Non-fatal: ZFS may not be available on dev boxes.
+		return nil
+	}
+	var poolEntries []config.PoolEntry
+	for _, p := range pools {
+		entry := config.PoolEntry{Name: p.Name}
+		// Reconstruct topology from the pool's vdev tree.
+		if len(p.Topology) > 0 {
+			top := &config.TopologyEntry{Type: string(p.Topology[0].Type)}
+			for _, child := range p.Topology[0].Children {
+				top.Disks = append(top.Disks, child.Name)
+			}
+			entry.Topology = top
+		}
+		poolEntries = append(poolEntries, entry)
+	}
+	if cfg.Storage == nil {
+		cfg.Storage = &config.StorageConfig{}
+	}
+	cfg.Storage.Pools = poolEntries
+	return nil
+}

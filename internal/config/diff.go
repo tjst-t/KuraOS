@@ -234,3 +234,47 @@ func Adapters() []ApplyAdapter {
 // production code. Exported under a deliberately ugly name so misuse is
 // obvious.
 func resetRegistryForTest() { registry = map[string]ApplyAdapter{} }
+
+// ExportAdapter is the contract engines implement to contribute their current
+// runtime state to a `kura config export`. Engines that manage declarative
+// state (pools, shares, apps, backup policies) register via RegisterExporter
+// so the export pipeline collects them without manual wiring.
+//
+// Snapshot must be idempotent and non-destructive — it only reads state,
+// never modifies it. Credentials must not appear in the export; use
+// credential_state placeholders or env-var references per SSOT rules.
+//
+// Added in S99702c-3 to close the export side of the round-trip invariant
+// (DESIGN_PRINCIPLES priority #1: SSOT).
+type ExportAdapter interface {
+	// Snapshot writes the engine's current state into cfg. Multiple adapters
+	// each fill their own section; the resulting cfg is then marshalled and
+	// served as config.json.
+	Snapshot(ctx context.Context, cfg *Config) error
+}
+
+var exportRegistry []ExportAdapter
+
+// RegisterExporter adds an export adapter. Unlike ApplyAdapter, exporters
+// are ordered by registration order (import-time registration via init()).
+func RegisterExporter(a ExportAdapter) {
+	if a == nil {
+		panic("config.RegisterExporter: nil adapter")
+	}
+	exportRegistry = append(exportRegistry, a)
+}
+
+// Export builds a complete Config by calling every registered ExportAdapter
+// in registration order, then returns the marshalled JSON.
+func Export(ctx context.Context) ([]byte, error) {
+	cfg := New()
+	for _, a := range exportRegistry {
+		if err := a.Snapshot(ctx, cfg); err != nil {
+			return nil, fmt.Errorf("config export (%T): %w", a, err)
+		}
+	}
+	return Marshal(cfg)
+}
+
+// resetExportRegistryForTest clears exporters between tests.
+func resetExportRegistryForTest() { exportRegistry = nil }

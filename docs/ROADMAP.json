@@ -5,10 +5,10 @@
   "progress": {
     "current_sprint": "S99702c",
     "total": 18,
-    "done": 17,
+    "done": 18,
     "in_progress": 0,
-    "remaining": 1,
-    "percentage": 94,
+    "remaining": 0,
+    "percentage": 100,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -25,9 +25,10 @@
       "S413bd5",
       "S8a756d",
       "Se1e7a6",
-      "S0eedaa"
+      "S0eedaa",
+      "S99702c"
     ],
-    "updated_at": "2026-05-18T17:09:00Z"
+    "updated_at": "2026-05-18T18:00:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -1444,13 +1445,13 @@
     },
     "S99702c": {
       "title": "ユーザーポータル と 完全な初期セットアップウィザード と 仕上げ",
-      "status": "pending",
+      "status": "done",
       "description": "/ui/* のユーザーポータル (利用可能アプリ / Files / 最近のファイル / 自分のストレージ使用量)、初期セットアップウィザード (storage 推奨構成 + 初 Share + アプリ 1 つ)、Settings の言語選択 / config export-import、ドキュメント整備、Phase 2 への引き継ぎメモ。視覚仕様は prototype/claude_design/Portal.html (ユーザーポータル) と Setup.html 全 6 ステップ。",
       "milestone": true,
       "stories": {
         "S99702c-1": {
           "title": "ユーザーポータル",
-          "status": "pending",
+          "status": "done",
           "user_story": "家族のユーザーとして、ログインしたら使えるアプリと Files が並んでいるシンプルな画面に出迎えてほしい。なぜなら、管理 UI のような専門的な画面では迷うから。",
           "acceptance_criteria": [
             {
@@ -1481,7 +1482,7 @@
         },
         "S99702c-2": {
           "title": "完全な初期セットアップウィザード",
-          "status": "pending",
+          "status": "done",
           "user_story": "新規 NAS オーナーとして、初回ブラウザアクセスから 30 分以内に: 管理者作成 / 推奨ストレージ構成適用 / 最初の Share 作成 / 1 つの OSS アプリ (immich 等) の install までたどり着きたい。なぜなら、NAS の価値を最初の体験で実感したいから。",
           "acceptance_criteria": [
             {
@@ -1517,7 +1518,7 @@
         },
         "S99702c-3": {
           "title": "言語選択 / config export-import / ドキュメント整備",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、Settings から言語を選び config を export して別マシンに import できることを確認したい。なぜなら、復旧訓練と引き継ぎのため。",
           "acceptance_criteria": [
             {

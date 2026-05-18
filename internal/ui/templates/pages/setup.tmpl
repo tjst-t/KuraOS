@@ -1,9 +1,9 @@
 {{- /*
-setup.tmpl — first-run wizard. Step 1 (admin creation) is the only step in
-S1e7eeb's scope; the remaining sidebar entries are rendered as todo so users
-see where the storage / share configuration will land in S99702c. Layout is
-the prototype's wizard-shell verbatim (sidebar progress + main column),
-ported from prototype/claude_design/Setup.html.
+setup.tmpl — full 6-step initial setup wizard (S99702c-2).
+Step 1 (admin) was implemented in S1e7eeb; Steps 2-6 added in S99702c.
+Visual SSOT: prototype/claude_design/Setup.html.
+The server drives step transitions via form POST → redirect to /setup?step=N.
+The step indicator in the aside shows active/done/todo state.
 */ -}}
 {{ define "content" }}
 <div class="wizard-shell">
@@ -16,18 +16,24 @@ ported from prototype/claude_design/Setup.html.
       </div>
     </div>
     <h2>{{ T "page.setup.title" }}</h2>
-    <div style="display:flex;flex-direction:column;gap:0;">
-      <div class="wizard-step" data-state="active"><span class="num">1</span><span>{{ T "page.setup.step.admin" }}</span></div>
-      <div class="wizard-step" data-state="todo"><span class="num">2</span><span>{{ T "page.setup.step.storage" }}</span></div>
-      <div class="wizard-step" data-state="todo"><span class="num">3</span><span>{{ T "page.setup.step.share" }}</span></div>
-      <div class="wizard-step" data-state="todo"><span class="num">4</span><span>{{ T "page.setup.step.done" }}</span></div>
+    {{ $step := 1 }}{{ if .Extra.Step }}{{ $step = .Extra.Step }}{{ end }}
+    <div style="display:flex;flex-direction:column;gap:0;" data-testid="wizard-steps">
+      <div class="wizard-step" data-state="{{ if eq $step 1 }}active{{ else if gt $step 1 }}done{{ else }}todo{{ end }}" data-testid="wizard-step-1"><span class="num">{{ if gt $step 1 }}✓{{ else }}1{{ end }}</span><span>{{ T "page.setup.step.admin" }}</span></div>
+      <div class="wizard-step" data-state="{{ if eq $step 2 }}active{{ else if gt $step 2 }}done{{ else }}todo{{ end }}" data-testid="wizard-step-2"><span class="num">{{ if gt $step 2 }}✓{{ else }}2{{ end }}</span><span>{{ T "page.setup.step.welcome" }}</span></div>
+      <div class="wizard-step" data-state="{{ if eq $step 3 }}active{{ else if gt $step 3 }}done{{ else }}todo{{ end }}" data-testid="wizard-step-3"><span class="num">{{ if gt $step 3 }}✓{{ else }}3{{ end }}</span><span>{{ T "page.setup.step.storage" }}</span></div>
+      <div class="wizard-step" data-state="{{ if eq $step 4 }}active{{ else if gt $step 4 }}done{{ else }}todo{{ end }}" data-testid="wizard-step-4"><span class="num">{{ if gt $step 4 }}✓{{ else }}4{{ end }}</span><span>{{ T "page.setup.step.share" }}</span></div>
+      <div class="wizard-step" data-state="{{ if eq $step 5 }}active{{ else if gt $step 5 }}done{{ else }}todo{{ end }}" data-testid="wizard-step-5"><span class="num">{{ if gt $step 5 }}✓{{ else }}5{{ end }}</span><span>{{ T "page.setup.step.done" }}</span></div>
     </div>
     <div style="flex:1"></div>
     <div class="muted" style="font-size:11px;">v{{ .Version }}</div>
   </aside>
 
   <main class="wizard-main">
-    <div class="wizard-eyebrow">STEP 1 / 4</div>
+    {{ $step2 := 1 }}{{ if .Extra.Step }}{{ $step2 = .Extra.Step }}{{ end }}
+
+    {{/* ─────────────────────────── Step 1: Admin ──────────────────────────── */}}
+    {{ if eq $step2 1 }}
+    <div class="wizard-eyebrow">STEP 1 / 5</div>
     <h1 class="wizard-title">{{ T "page.setup.admin.title" }}</h1>
     <p class="wizard-lead">{{ T "page.setup.admin.lead" }}</p>
 
@@ -59,15 +65,177 @@ ported from prototype/claude_design/Setup.html.
         <input id="setup-password2" class="input mono" type="password" name="password_confirm"
                autocomplete="new-password" required />
       </div>
-
       <div class="hr"></div>
-      <div class="muted" style="font-size:12px;">{{ T "page.setup.deferred_note" }}</div>
-
       <div class="wizard-foot">
         <span></span>
-        <button type="submit" class="btn btn-accent">{{ T "page.setup.admin.submit" }}</button>
+        <button type="submit" class="btn btn-accent" data-testid="setup-submit">{{ T "page.setup.admin.submit" }}</button>
       </div>
     </form>
+    {{ end }}
+
+    {{/* ─────────────────────────── Step 2: Welcome ────────────────────────── */}}
+    {{ if eq $step2 2 }}
+    <div class="wizard-eyebrow" data-testid="step-eyebrow">STEP 2 / 5</div>
+    <h1 class="wizard-title" data-testid="setup-welcome-heading">{{ T "page.setup.welcome.title" }}</h1>
+    <p class="wizard-lead">{{ T "page.setup.welcome.lead" }}</p>
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-body" style="display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="12" rx="10" ry="3"/><path d="M2 12c0 5.52 4.48 10 10 10S22 17.52 22 12"/><path d="M2 12C2 6.48 6.48 2 12 2s10 4.48 10 10"/></svg>
+          <div>
+            <div style="font-weight:550">{{ T "page.setup.welcome.hw_detected" }}</div>
+            <div class="muted" style="font-size:12px">
+              {{ if .Extra.DiskCount }}{{ .Extra.DiskCount }} 個のディスク検出済み{{ else }}ディスクを検出中...{{ end }}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+          <div>
+            <div style="font-weight:550">{{ T "page.setup.welcome.net_detected" }}</div>
+            <div class="muted mono" style="font-size:12px">{{ .Extra.IPAddress }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <form method="post" action="/setup/next">
+      <input type="hidden" name="from_step" value="2" />
+      <div class="wizard-foot">
+        <span></span>
+        <button type="submit" class="btn btn-accent" data-testid="setup-next">{{ T "page.setup.welcome.next" }}</button>
+      </div>
+    </form>
+    {{ end }}
+
+    {{/* ─────────────────────────── Step 3: Storage ────────────────────────── */}}
+    {{ if eq $step2 3 }}
+    <div class="wizard-eyebrow" data-testid="step-eyebrow">STEP 3 / 5</div>
+    <h1 class="wizard-title" data-testid="wizard-step-title">{{ T "page.setup.storage.title" }}</h1>
+    <p class="wizard-lead">{{ T "page.setup.storage.lead" }}</p>
+
+    {{ if .Extra.Recommendation }}
+    <div class="banner ok" style="margin-bottom:20px" data-testid="storage-recommendation">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0"><path d="M20 6L9 17l-5-5"/></svg>
+      <div>
+        <strong>{{ T "page.setup.storage.recommend" }}</strong>:
+        HDD {{ len .Extra.Recommendation.DataDisks }} 本で <span class="mono">{{ .Extra.Recommendation.DataTopology }}</span> プール ({{ .Extra.Recommendation.Name }})
+        {{ if .Extra.Recommendation.SpecialTopology }}
+        + SSD {{ len .Extra.Recommendation.SpecialDisks }} 本で <span class="mono">{{ .Extra.Recommendation.SpecialTopology }}</span> special vdev
+        {{ end }}
+      </div>
+    </div>
+
+    <form method="post" action="/setup/storage" data-testid="setup-storage-form">
+      <input type="hidden" name="pool_name" value="{{ .Extra.Recommendation.Name }}" />
+      <input type="hidden" name="topology" value="{{ .Extra.Recommendation.DataTopology }}" />
+      {{ range .Extra.Recommendation.DataDisks }}
+      <input type="hidden" name="data_disks" value="{{ . }}" />
+      {{ end }}
+      {{ if .Extra.Recommendation.SpecialTopology }}
+      <input type="hidden" name="special_topology" value="{{ .Extra.Recommendation.SpecialTopology }}" />
+      {{ range .Extra.Recommendation.SpecialDisks }}
+      <input type="hidden" name="special_disks" value="{{ . }}" />
+      {{ end }}
+      {{ end }}
+
+      {{ if .Extra.StorageError }}
+      <div class="banner crit" style="margin-bottom:16px" data-testid="storage-error">{{ .Extra.StorageError }}</div>
+      {{ end }}
+
+      <div class="wizard-foot">
+        <form method="post" action="/setup/next" style="display:inline">
+          <input type="hidden" name="from_step" value="3" />
+          <input type="hidden" name="skip" value="1" />
+          <button type="submit" class="btn btn-ghost" data-testid="setup-skip">{{ T "page.setup.storage.skip" }}</button>
+        </form>
+        <button type="submit" class="btn btn-accent" data-testid="setup-apply-storage">{{ T "page.setup.storage.apply" }}</button>
+      </div>
+    </form>
+    {{ else }}
+    {{/* No free disks — skip storage step */}}
+    <div class="card" style="margin-bottom:16px">
+      <div class="card-body">
+        <p class="muted">利用可能な空きディスクが見つかりませんでした。あとで Storage ページから設定できます。</p>
+      </div>
+    </div>
+    <form method="post" action="/setup/next">
+      <input type="hidden" name="from_step" value="3" />
+      <input type="hidden" name="skip" value="1" />
+      <div class="wizard-foot">
+        <span></span>
+        <button type="submit" class="btn btn-accent" data-testid="setup-next">{{ T "page.setup.next" }}</button>
+      </div>
+    </form>
+    {{ end }}
+    {{ end }}
+
+    {{/* ─────────────────────────── Step 4: Share ──────────────────────────── */}}
+    {{ if eq $step2 4 }}
+    <div class="wizard-eyebrow" data-testid="step-eyebrow">STEP 4 / 5</div>
+    <h1 class="wizard-title" data-testid="wizard-step-title">{{ T "page.setup.share.title" }}</h1>
+    <p class="wizard-lead">{{ T "page.setup.share.lead" }}</p>
+
+    {{ if .Extra.ShareError }}
+    <div class="banner crit" style="margin-bottom:16px" data-testid="share-error">{{ .Extra.ShareError }}</div>
+    {{ end }}
+
+    <form method="post" action="/setup/share" data-testid="setup-share-form" style="display:flex;flex-direction:column;gap:14px;max-width:480px">
+      <div class="field">
+        <label>{{ T "page.setup.share.name" }}</label>
+        <input class="input mono" type="text" name="share_name" value="{{ if .Extra.ShareName }}{{ .Extra.ShareName }}{{ else }}documents{{ end }}" data-testid="share-name-input" />
+      </div>
+      <div class="field">
+        <label>{{ T "page.setup.share.preset" }}</label>
+        <select class="select" name="preset" data-testid="share-preset-select">
+          <option value="general" selected>{{ T "page.shares.preset.general" }}</option>
+          <option value="media">{{ T "page.shares.preset.media" }}</option>
+          <option value="time_machine">{{ T "page.shares.preset.time_machine" }}</option>
+        </select>
+      </div>
+      <div class="hr"></div>
+      <div class="wizard-foot">
+        <form method="post" action="/setup/next" style="display:inline">
+          <input type="hidden" name="from_step" value="4" />
+          <input type="hidden" name="skip" value="1" />
+          <button type="submit" class="btn btn-ghost" data-testid="setup-skip-share">{{ T "page.setup.share.skip" }}</button>
+        </form>
+        <button type="submit" class="btn btn-accent" data-testid="setup-create-share">{{ T "page.setup.share.create" }}</button>
+      </div>
+    </form>
+    {{ end }}
+
+    {{/* ─────────────────────────── Step 5: Done ───────────────────────────── */}}
+    {{ if eq $step2 5 }}
+    <div class="wizard-eyebrow" data-testid="step-eyebrow">STEP 5 / 5</div>
+    <h1 class="wizard-title" data-testid="setup-done-heading">{{ T "page.setup.done.title" }}</h1>
+    <p class="wizard-lead" data-testid="wizard-done-lead">{{ T "page.setup.done.lead" }}</p>
+
+    <div class="card" style="margin-bottom:24px">
+      <div class="card-body" style="display:flex;flex-direction:column;gap:12px">
+        {{ if .Extra.PoolCreated }}
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span>ストレージプール <span class="mono">{{ .Extra.PoolCreated }}</span> を作成しました</span>
+        </div>
+        {{ end }}
+        {{ if .Extra.ShareCreated }}
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span>共有 <span class="mono">{{ .Extra.ShareCreated }}</span> を作成しました</span>
+        </div>
+        {{ end }}
+        <div style="display:flex;align-items:center;gap:10px">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--ok)" stroke-width="2"><path d="M20 6L9 17l-5-5"/></svg>
+          <span>管理者アカウントを作成しました</span>
+        </div>
+      </div>
+    </div>
+
+    <a href="/ui/admin/dashboard" class="btn btn-accent" data-testid="setup-done-dashboard-link">
+      {{ T "page.setup.done.go_to_dashboard" }}
+    </a>
+    {{ end }}
+
   </main>
 </div>
 {{ end }}

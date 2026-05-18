@@ -819,6 +819,83 @@ const (
 	MsgFilesAccessDenied    MessageID = "page.files.access_denied"
 )
 
+// User portal (S99702c-1). Visual SSOT: prototype/claude_design/Portal.html.
+const (
+	MsgPortalTitle          MessageID = "page.portal.title"
+	MsgPortalGreeting       MessageID = "page.portal.greeting"
+	MsgPortalSubtitle       MessageID = "page.portal.subtitle"
+	MsgPortalAppsHeading    MessageID = "page.portal.apps.heading"
+	MsgPortalAppsCount      MessageID = "page.portal.apps.count"
+	MsgPortalAppsEmpty      MessageID = "page.portal.apps.empty"
+	MsgPortalFilesShortcut  MessageID = "page.portal.files_shortcut"
+	MsgPortalStorageLabel   MessageID = "page.portal.storage.label"
+	MsgPortalStorageUsed    MessageID = "page.portal.storage.used"
+	MsgPortalSharesLabel    MessageID = "page.portal.shares.label"
+	MsgPortalRecentLabel    MessageID = "page.portal.recent.label"
+	MsgPortalRecentEmpty    MessageID = "page.portal.recent.empty"
+	MsgPortalAppOpen        MessageID = "page.portal.app.open"
+)
+
+// Setup wizard full 6-step flow (S99702c-2).
+const (
+	MsgSetupStepWelcomeLabel   MessageID = "page.setup.step.welcome.label"
+	MsgSetupWelcomeTitle       MessageID = "page.setup.welcome.title"
+	MsgSetupWelcomeLead        MessageID = "page.setup.welcome.lead"
+	MsgSetupWelcomeHWDetected  MessageID = "page.setup.welcome.hw_detected"
+	MsgSetupWelcomeNetDetected MessageID = "page.setup.welcome.net_detected"
+	MsgSetupWelcomeNext        MessageID = "page.setup.welcome.next"
+
+	MsgSetupStorageTitle    MessageID = "page.setup.storage.title"
+	MsgSetupStorageLead     MessageID = "page.setup.storage.lead"
+	MsgSetupStorageRecommend MessageID = "page.setup.storage.recommend"
+	MsgSetupStorageManual   MessageID = "page.setup.storage.manual"
+	MsgSetupStoragePoolName MessageID = "page.setup.storage.pool_name"
+	MsgSetupStorageTopology MessageID = "page.setup.storage.topology"
+	MsgSetupStorageDisks    MessageID = "page.setup.storage.disks"
+	MsgSetupStorageApply    MessageID = "page.setup.storage.apply"
+	MsgSetupStorageSkip     MessageID = "page.setup.storage.skip"
+
+	MsgSetupShareTitle    MessageID = "page.setup.share.title"
+	MsgSetupShareLead     MessageID = "page.setup.share.lead"
+	MsgSetupShareName     MessageID = "page.setup.share.name"
+	MsgSetupSharePath     MessageID = "page.setup.share.path"
+	MsgSetupSharePreset   MessageID = "page.setup.share.preset"
+	MsgSetupShareCreate   MessageID = "page.setup.share.create"
+	MsgSetupShareSkip     MessageID = "page.setup.share.skip"
+
+	MsgSetupDoneTitle     MessageID = "page.setup.done.title"
+	MsgSetupDoneLead      MessageID = "page.setup.done.lead"
+	MsgSetupDoneGoToDash  MessageID = "page.setup.done.go_to_dashboard"
+
+	MsgSetupNext         MessageID = "page.setup.next"
+	MsgSetupBack         MessageID = "page.setup.back"
+	MsgSetupSkip         MessageID = "page.setup.skip"
+	MsgSetupStepOf       MessageID = "page.setup.step_of"
+)
+
+// Settings — Language tab (S99702c-3).
+const (
+	MsgSettingsTabLanguage      MessageID = "page.settings.tab.language"
+	MsgSettingsLanguageTitle    MessageID = "page.settings.language.title"
+	MsgSettingsLanguageSub      MessageID = "page.settings.language.sub"
+	MsgSettingsLanguageSaved    MessageID = "page.settings.language.saved"
+	MsgSettingsLanguageJa       MessageID = "page.settings.language.ja"
+	MsgSettingsLanguageEn       MessageID = "page.settings.language.en"
+	MsgSettingsLanguageEnHint   MessageID = "page.settings.language.en_hint"
+)
+
+// Settings — Config export/import tab (S99702c-3).
+const (
+	MsgSettingsTabConfig        MessageID = "page.settings.tab.config"
+	MsgSettingsConfigTitle      MessageID = "page.settings.config.title"
+	MsgSettingsConfigSub        MessageID = "page.settings.config.sub"
+	MsgSettingsConfigExportBtn  MessageID = "page.settings.config.export_btn"
+	MsgSettingsConfigImportBtn  MessageID = "page.settings.config.import_btn"
+	MsgSettingsConfigImportHint MessageID = "page.settings.config.import_hint"
+	MsgSettingsConfigImportOK   MessageID = "page.settings.config.import_ok"
+	MsgSettingsConfigImportErr  MessageID = "page.settings.config.import_err"
+)
+
 // Settings — Self-update tab (Sf92666-4).
 const (
 	MsgSettingsTabSelfUpdate       MessageID = "page.settings.tab.self_update"

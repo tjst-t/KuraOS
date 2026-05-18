@@ -118,6 +118,11 @@ type Renderer struct {
 	filesHandler http.Handler
 	// filesDeps holds the wired dependencies for the Files page renderer.
 	filesDeps FilesDeps
+
+	// portalDeps wires the user portal (/ui landing, S99702c-1).
+	// nil until SetPortalDeps is called; when nil the portal renders with
+	// empty sections.
+	portalDeps *PortalDeps
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -448,29 +453,15 @@ func (r *Renderer) Routes() http.Handler {
 		mux.Handle("/ui/files/download/", r.filesHandler)
 	}
 
-	// /ui — user-portal landing. The portal proper is built out in a later
-	// sprint; for S1e7eeb this is a tiny stub so role-user accounts have a
-	// 200 OK landing page that the auth middleware can permit.
-	mux.HandleFunc("/ui", func(w http.ResponseWriter, req *http.Request) {
-		if req.URL.Path != "/ui" {
-			http.NotFound(w, req)
-			return
-		}
-		if req.Method != http.MethodGet {
-			w.Header().Set("Allow", "GET")
-			http.Error(w, http.StatusText(http.StatusMethodNotAllowed), http.StatusMethodNotAllowed)
-			return
-		}
-		w.Header().Set("Content-Type", "text/html; charset=utf-8")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`<!doctype html><html lang="ja"><head>` +
-			`<meta charset="utf-8"><title>KuraOS</title>` +
-			`<link rel="stylesheet" href="/ui/static/kura.css"></head>` +
-			`<body><div class="center-shell"><div class="card"><div class="card-body">` +
-			`<h1 class="page-title">` + r.tr.T(i18n.MsgBrandName) + `</h1>` +
-			`<p class="page-sub">` + r.tr.T(i18n.MsgDashboardSubtitle) + `</p>` +
-			`</div></div></div></body></html>`))
-	})
+	// /ui — user-portal landing (S99702c-1). PortalHandler serves the full
+	// portal with app tiles, storage stats, and Files shortcut. When
+	// portalDeps is nil (acceptance tests that don't exercise the portal)
+	// the handler renders with empty sections.
+	var pd PortalDeps
+	if r.portalDeps != nil {
+		pd = *r.portalDeps
+	}
+	mux.Handle("/ui", r.PortalHandler(pd))
 
 	return mux
 }

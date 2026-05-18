@@ -1,0 +1,76 @@
+{
+  "sprint_id": "S99702c",
+  "title": "Phase 1 Final Sprint — User Portal, Setup Wizard Steps 2-5, Phase 1 Wrap",
+  "decisions": [
+    {
+      "id": "D-S99702c-1",
+      "story": "S99702c-1",
+      "title": "User portal at /ui uses admin renderer, not a separate layout",
+      "decision": "Render /ui with the existing Renderer.PortalHandler, using a dedicated portal_home.tmpl that inherits from the base layout. No separate portal layout engine.",
+      "rationale": "DESIGN_PRINCIPLES #4 (thin, composable layers) — reuse the existing renderer pattern rather than duplicating layout infrastructure. The admin sidebar is simply hidden on the portal view via CSS; this avoids a second HTML layout with identical nav/footer boilerplate.",
+      "alternatives_considered": [
+        "Separate portal layout with no sidebar",
+        "Redirect /ui to /ui/admin/dashboard for admin users only"
+      ],
+      "chosen_because": "Minimal surface: PortalDeps wires Lifecycle+RouteRegistry and the handler builds the view; no new template inheritance machinery required."
+    },
+    {
+      "id": "D-S99702c-2",
+      "story": "S99702c-1",
+      "title": "App ExternalURL derived from route registry ListAppRoutes, not LookupByName",
+      "decision": "Iterate ListAppRoutes() and match by AppID to derive /apps/<name>/ URL.",
+      "rationale": "RouteRegistry interface (engine/app/lifecycle.go) does not expose LookupByName. ListAppRoutes() is the only available read path — O(n) per portal render, acceptable for v1 (few apps).",
+      "alternatives_considered": [
+        "Add LookupByName to RouteRegistry interface"
+      ],
+      "chosen_because": "Zero interface surface change; portal render is not hot-path; v1 app count is small."
+    },
+    {
+      "id": "D-S99702c-3",
+      "story": "S99702c-2",
+      "title": "Setup wizard steps 2-5 use PRG pattern with query-param state",
+      "decision": "Each wizard step is a separate GET page. POST handlers redirect to the next step, passing pool/share names as URL query params (?pool=tank&share=media).",
+      "rationale": "DESIGN_PRINCIPLES #6 (no hidden state) — wizard state must be visible in the URL so back-button navigation is safe. SQLite-based session state would require a migration and lifetime management.",
+      "alternatives_considered": [
+        "Store wizard state in SQLite session row",
+        "POST/redirect chain with server-side state"
+      ],
+      "chosen_because": "PRG is stateless, works without JS, trivially testable with plain HTTP assertions."
+    },
+    {
+      "id": "D-S99702c-4",
+      "story": "S99702c-2",
+      "title": "kura init does not start HTTP server or apply storage/share config",
+      "decision": "`kura init` only seeds the admin user row in KURA_STATE_DB. Storage and share setup happen via the web wizard or `kura config apply`.",
+      "rationale": "DESIGN_PRINCIPLES priority #1 (SSOT): config.json is the source of truth for storage and shares. kura init's job is auth bootstrapping only; conflating it with ZFS pool creation would violate SSOT by creating state not tracked in config.json.",
+      "alternatives_considered": [
+        "kura init --config=file.json to apply full config headlessly"
+      ],
+      "chosen_because": "Minimal scope: init seeds auth, daemon applies config. CI pipelines can chain: kura init && kura config apply file.json."
+    },
+    {
+      "id": "D-S99702c-5",
+      "story": "S99702c-3",
+      "title": "Config export uses ExportAdapter registry, not ApplyAdapter reverse-read",
+      "decision": "Added a separate ExportAdapter interface with Snapshot(ctx, *Config). Storage and share engines register via RegisterExporter(). Export() calls all adapters.",
+      "rationale": "DESIGN_PRINCIPLES #3 (interface seam at every engine boundary) — ApplyAdapter is write-only; reading state back through it would violate single-responsibility. A separate Snapshot interface is the correct seam.",
+      "alternatives_considered": [
+        "Add ReadState() to ApplyAdapter",
+        "Export reads directly from SQLite without engine involvement"
+      ],
+      "chosen_because": "Engine-owned Snapshot keeps the export logic co-located with the engine that understands its own state. The storage engine knows how to reconstruct TopologyEntry from LivePools; the share engine knows its ACL shape."
+    },
+    {
+      "id": "D-S99702c-6",
+      "story": "S99702c-3",
+      "title": "Language tab shows en as disabled with v1.x badge — no locale switching in v1",
+      "decision": "POST /ui/admin/settings/language/save always returns 200 with ja confirmed. en radio is disabled client-side and rejected server-side. No i18n switching code path.",
+      "rationale": "VISION.json: v1 ships ja only. DESIGN_PRINCIPLES #8 (ship what works, not what's planned). A fake save that claims to switch locale and then doesn't would be a lie to the user.",
+      "alternatives_considered": [
+        "Hide en option entirely",
+        "Implement en locale stub"
+      ],
+      "chosen_because": "Visible badge 'v1.x' communicates the roadmap intent without implementing it prematurely. The 'saved' banner confirms the round-trip works for future extension."
+    }
+  ]
+}
