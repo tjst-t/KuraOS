@@ -15,17 +15,16 @@ echo "==> metrics-endpoint.sh: GET /metrics at $BASE"
 COOKIE_JAR=$(mktemp)
 trap 'rm -f "$COOKIE_JAR"' EXIT
 
-LOGIN_RESP=$(curl -s -w "\n%{http_code}" -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
+# POST /login — expect 302 redirect; capture cookie but don't follow redirect.
+LOGIN_CODE=$(curl -s -o /dev/null -w "%{http_code}" -c "$COOKIE_JAR" -b "$COOKIE_JAR" \
   -X POST "$BASE/login" \
   -d "username=$ADMIN_USER&password=$ADMIN_PASS" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  --location)
-LOGIN_CODE=$(echo "$LOGIN_RESP" | tail -1)
-if [ "$LOGIN_CODE" != "200" ]; then
-  echo "FAIL: login returned $LOGIN_CODE (expected 200 after redirect)"
+  -H "Content-Type: application/x-www-form-urlencoded")
+if [ "$LOGIN_CODE" != "302" ]; then
+  echo "FAIL: login returned $LOGIN_CODE (expected 302 redirect)"
   exit 1
 fi
-echo "  login: ok ($LOGIN_CODE)"
+echo "  login: ok ($LOGIN_CODE -> redirect)"
 
 # 2. GET /metrics with the session cookie.
 METRICS_RESP=$(curl -s -w "\n%{http_code}" -b "$COOKIE_JAR" "$BASE/metrics")

@@ -89,16 +89,16 @@ test.describe("[AC-S8a756d-3-1] Notification channel CRUD", () => {
     await page.fill('[data-testid="channel-url-input"]', "https://example.com/hook");
     await page.click('[data-testid="channel-form-save"]');
 
+    // Register dialog handler BEFORE clicking delete (must be before the trigger).
+    page.on('dialog', dialog => dialog.accept());
+
     // Find the row and click delete
     const rows = page.locator('[data-testid="channels-table"] tbody tr');
     const matchingRow = rows.filter({ hasText: name });
     await matchingRow.locator('[data-testid^="delete-channel-"]').click();
 
-    // Confirm the dialog
-    page.on('dialog', dialog => dialog.accept());
-
-    // Row should be gone
-    await expect(matchingRow).not.toBeVisible();
+    // Row should be gone after htmx response
+    await expect(matchingRow).not.toBeVisible({ timeout: 10000 });
   });
 });
 
