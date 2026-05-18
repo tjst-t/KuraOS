@@ -1,0 +1,332 @@
+{{- /*
+files.tmpl — /ui/files page. Visual SSOT: prototype/claude_design/Portal.html.
+Implements S0eedaa-2: list / download / upload (with progress) / delete / rename.
+Uses htmx for dynamic interactions and fetch API for upload progress.
+PageData.Extra is a ui.FilesView.
+*/ -}}
+{{ define "content" }}
+{{ $v := .Extra }}
+<div class="page-head" style="margin-bottom:24px">
+  <div>
+    <h1 class="page-title" data-testid="files-title">{{ T "page.files.title" }}</h1>
+    <p class="page-sub">{{ $v.Subtitle }}</p>
+  </div>
+</div>
+
+{{- /* Share selector tabs */}}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:20px;flex-wrap:wrap">
+  <span style="font-size:13px;color:var(--text-3)">{{ T "page.files.select_share" }}:</span>
+  {{ range $v.Shares }}
+  <a href="/ui/files?share={{ .Name }}&path=/"
+     class="btn btn-sm {{ if eq .Name $v.CurrentShare }}btn-primary{{ else }}btn-ghost{{ end }}"
+     data-testid="share-tab-{{ .Name }}"
+     style="text-decoration:none">
+    {{ .Name }}
+  </a>
+  {{ end }}
+</div>
+
+{{ if not $v.CurrentShare }}
+{{- /* No share selected — show empty placeholder */}}
+<div class="card" data-testid="files-no-share">
+  <div class="card-body" style="padding:48px 24px;text-align:center">
+    <p class="muted">{{ T "page.files.select_share" }}</p>
+  </div>
+</div>
+{{ else }}
+
+{{- /* Breadcrumbs */}}
+<div style="display:flex;align-items:center;gap:4px;margin-bottom:16px;font-size:13px;flex-wrap:wrap" data-testid="files-breadcrumb">
+  <a href="/ui/files?share={{ $v.CurrentShare }}&path=/" style="color:var(--text-2);text-decoration:none">{{ $v.CurrentShare }}</a>
+  {{ range $v.Breadcrumbs }}
+  <span style="color:var(--text-3)">/</span>
+  <a href="{{ .Href }}" style="color:{{ if .Last }}var(--text-1){{ else }}var(--text-2){{ end }};text-decoration:none"
+     data-testid="breadcrumb-{{ .Label }}">{{ .Label }}</a>
+  {{ end }}
+</div>
+
+{{- /* Toolbar */}}
+<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px">
+  <label class="btn btn-primary btn-sm" for="upload-input" data-testid="btn-upload" style="cursor:pointer">
+    {{ T "page.files.btn.upload" }}
+  </label>
+  <input type="file" id="upload-input" multiple style="display:none"
+    data-share="{{ $v.CurrentShare }}" data-path="{{ $v.CurrentPath }}" />
+  <button class="btn btn-ghost btn-sm" data-testid="btn-new-folder"
+    onclick="openNewFolderModal()">{{ T "page.files.btn.new_folder" }}</button>
+</div>
+
+{{- /* Upload progress bar (hidden initially) */}}
+<div id="upload-progress" style="display:none;margin-bottom:12px" data-testid="upload-progress">
+  <div style="font-size:13px;color:var(--text-2);margin-bottom:6px" id="upload-progress-label"></div>
+  <div style="background:var(--surface-2);border-radius:4px;height:6px">
+    <div id="upload-progress-bar" style="background:var(--jade);height:6px;border-radius:4px;width:0%;transition:width .2s"></div>
+  </div>
+</div>
+
+{{- /* Toast area */}}
+<div id="files-toast" style="display:none;margin-bottom:12px" role="alert">
+  <div class="card" style="border-color:var(--jade);padding:10px 16px;font-size:13px" id="files-toast-msg"></div>
+</div>
+<div id="files-error" style="display:none;margin-bottom:12px" role="alert">
+  <div class="card" style="border-color:var(--red,#e53e3e);padding:10px 16px;font-size:13px;color:var(--red,#e53e3e)" id="files-error-msg"></div>
+</div>
+
+{{- /* File table */}}
+<div class="card" data-testid="files-table-card">
+  {{ if not $v.Entries }}
+  <div class="card-body" style="padding:48px 24px;text-align:center" data-testid="files-empty">
+    <p class="muted">{{ T "page.files.empty" }}</p>
+  </div>
+  {{ else }}
+  <table style="width:100%;border-collapse:collapse;font-size:13px" data-testid="files-table">
+    <thead>
+      <tr style="border-bottom:1px solid var(--border)">
+        <th style="text-align:left;padding:10px 18px;font-weight:500;color:var(--text-3)">{{ T "page.files.col.name" }}</th>
+        <th style="text-align:right;padding:10px 12px;font-weight:500;color:var(--text-3)">{{ T "page.files.col.size" }}</th>
+        <th style="text-align:left;padding:10px 12px;font-weight:500;color:var(--text-3)">{{ T "page.files.col.modified" }}</th>
+        <th style="text-align:right;padding:10px 18px;font-weight:500;color:var(--text-3)">{{ T "page.files.col.actions" }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range $v.Entries }}
+      <tr style="border-bottom:1px solid var(--border)" data-testid="file-row" data-name="{{ .Name }}" data-is-dir="{{ .IsDir }}">
+        <td style="padding:10px 18px">
+          <div style="display:flex;align-items:center;gap:8px">
+            {{ if .IsDir }}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--text-3)"><path d="M1.5 3.5A1.5 1.5 0 013 2h3.586a1 1 0 01.707.293L8 3h5a1.5 1.5 0 011.5 1.5v7A1.5 1.5 0 0113 13H3a1.5 1.5 0 01-1.5-1.5v-8z"/></svg>
+            <a href="/ui/files?share={{ $v.CurrentShare }}&path={{ $v.CurrentPath }}/{{ .Name }}"
+               style="font-weight:500;color:var(--text-1);text-decoration:none"
+               data-testid="dir-link">{{ .Name }}</a>
+            {{ else }}
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="var(--text-3)"><path d="M4 1a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V5.414a2 2 0 00-.586-1.414l-2.414-2.414A2 2 0 009.586 1H4z"/></svg>
+            <span data-testid="file-name">{{ .Name }}</span>
+            {{ end }}
+          </div>
+        </td>
+        <td style="padding:10px 12px;text-align:right;color:var(--text-3);font-family:var(--mono)">
+          {{ if not .IsDir }}{{ $v.FormatSize .Size }}{{ end }}
+        </td>
+        <td style="padding:10px 12px;color:var(--text-3);white-space:nowrap">{{ $v.FormatTime .ModTime }}</td>
+        <td style="padding:10px 18px;text-align:right">
+          <div style="display:flex;gap:6px;justify-content:flex-end">
+            {{ if not .IsDir }}
+            <a href="/ui/files/download/{{ $v.CurrentShare }}{{ $v.CurrentPath }}/{{ .Name }}"
+               class="btn btn-ghost btn-xs"
+               data-testid="btn-download-{{ .Name }}">{{ T "page.files.btn.download" }}</a>
+            {{ end }}
+            <button class="btn btn-ghost btn-xs"
+              data-testid="btn-rename-{{ .Name }}"
+              onclick="openRenameModal({{ safeJS .Name }}, {{ safeJS $v.CurrentShare }}, {{ safeJS $v.CurrentPath }})">{{ T "page.files.btn.rename" }}</button>
+            <button class="btn btn-ghost btn-xs btn-danger"
+              data-testid="btn-delete-{{ .Name }}"
+              onclick="confirmDelete({{ safeJS .Name }}, {{ safeJS $v.CurrentShare }}, {{ safeJS $v.CurrentPath }})">{{ T "page.files.btn.delete" }}</button>
+          </div>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+
+{{- /* Rename modal */}}
+<div id="rename-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;display:none;align-items:center;justify-content:center" data-testid="rename-modal">
+  <div class="card" style="width:380px;padding:24px">
+    <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">{{ T "page.files.rename.title" }}</h2>
+    <form id="rename-form" onsubmit="submitRename(event)">
+      <input type="hidden" id="rename-share" name="share" />
+      <input type="hidden" id="rename-path" name="path" />
+      <input type="hidden" id="rename-old" name="old_name" />
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:500;color:var(--text-2);display:block;margin-bottom:4px">{{ T "page.files.rename.new_name" }}</label>
+        <input type="text" id="rename-new-name" class="input" style="width:100%;box-sizing:border-box"
+          data-testid="rename-input" required />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeRenameModal()">{{ T "btn.cancel" }}</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="rename-submit">{{ T "page.files.rename.submit" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+{{- /* New folder modal */}}
+<div id="mkdir-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:100;align-items:center;justify-content:center" data-testid="mkdir-modal">
+  <div class="card" style="width:380px;padding:24px">
+    <h2 style="font-size:16px;font-weight:600;margin:0 0 16px">{{ T "page.files.new_folder.title" }}</h2>
+    <form id="mkdir-form" onsubmit="submitMkdir(event)">
+      <div style="margin-bottom:12px">
+        <label style="font-size:12px;font-weight:500;color:var(--text-2);display:block;margin-bottom:4px">{{ T "page.files.new_folder.name" }}</label>
+        <input type="text" id="mkdir-name" class="input" style="width:100%;box-sizing:border-box"
+          data-testid="mkdir-input" required />
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button type="button" class="btn btn-ghost btn-sm" onclick="closeMkdirModal()">{{ T "btn.cancel" }}</button>
+        <button type="submit" class="btn btn-primary btn-sm" data-testid="mkdir-submit">{{ T "page.files.new_folder.submit" }}</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+(function() {
+  var currentShare = {{ safeJS $v.CurrentShare }};
+  var currentPath  = {{ safeJS $v.CurrentPath }};
+
+  // ── Upload with progress ──────────────────────────────────────────────────
+  var uploadInput = document.getElementById('upload-input');
+  if (uploadInput) {
+    uploadInput.addEventListener('change', function(e) {
+      var files = e.target.files;
+      if (!files || !files.length) return;
+      uploadFiles(files, currentShare, currentPath);
+      e.target.value = ''; // allow re-selecting same file
+    });
+  }
+
+  function uploadFiles(files, share, path) {
+    var progressEl = document.getElementById('upload-progress');
+    var barEl = document.getElementById('upload-progress-bar');
+    var labelEl = document.getElementById('upload-progress-label');
+    var idx = 0;
+
+    function uploadNext() {
+      if (idx >= files.length) {
+        progressEl.style.display = 'none';
+        showToast('{{ T "page.files.upload.success" }}');
+        setTimeout(function() { location.reload(); }, 800);
+        return;
+      }
+      var file = files[idx++];
+      var fd = new FormData();
+      fd.append('file', file);
+      var relPath = (path === '/' ? '' : path) + '/' + file.name;
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/ui/files/upload/' + encodeURIComponent(share) + relPath);
+      xhr.upload.onprogress = function(ev) {
+        if (ev.lengthComputable) {
+          var pct = Math.round(ev.loaded * 100 / ev.total);
+          barEl.style.width = pct + '%';
+          labelEl.textContent = file.name + ' — ' + pct + '%';
+        }
+      };
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          uploadNext();
+        } else {
+          progressEl.style.display = 'none';
+          showError('{{ T "page.files.err.upload" }}: ' + xhr.responseText);
+        }
+      };
+      xhr.onerror = function() {
+        progressEl.style.display = 'none';
+        showError('{{ T "page.files.err.upload" }}');
+      };
+      progressEl.style.display = 'block';
+      barEl.style.width = '0%';
+      labelEl.textContent = file.name + ' — 0%';
+      xhr.send(fd);
+    }
+    uploadNext();
+  }
+
+  // ── Delete ────────────────────────────────────────────────────────────────
+  window.confirmDelete = function(name, share, path) {
+    var msg = '{{ T "page.files.delete.confirm" }}'.replace('{0}', name);
+    if (!confirm(msg)) return;
+    var relPath = (path === '/' ? '' : path) + '/' + name;
+    fetch('/ui/files/delete/' + encodeURIComponent(share) + relPath, {method: 'POST'})
+      .then(function(r) {
+        if (r.ok) {
+          showToast('{{ T "page.files.btn.delete" }}');
+          setTimeout(function() { location.reload(); }, 400);
+        } else {
+          r.text().then(function(t) { showError('{{ T "page.files.err.delete" }}: ' + t); });
+        }
+      })
+      .catch(function(e) { showError('{{ T "page.files.err.delete" }}: ' + e); });
+  };
+
+  // ── Rename modal ──────────────────────────────────────────────────────────
+  window.openRenameModal = function(name, share, path) {
+    document.getElementById('rename-share').value = share;
+    document.getElementById('rename-path').value = path;
+    document.getElementById('rename-old').value = name;
+    document.getElementById('rename-new-name').value = name;
+    var modal = document.getElementById('rename-modal');
+    modal.style.display = 'flex';
+    document.getElementById('rename-new-name').focus();
+  };
+  window.closeRenameModal = function() {
+    document.getElementById('rename-modal').style.display = 'none';
+  };
+  window.submitRename = function(e) {
+    e.preventDefault();
+    var share = document.getElementById('rename-share').value;
+    var path = document.getElementById('rename-path').value;
+    var oldName = document.getElementById('rename-old').value;
+    var newName = document.getElementById('rename-new-name').value;
+    var relPath = (path === '/' ? '' : path) + '/' + oldName;
+    fetch('/ui/files/rename/' + encodeURIComponent(share) + relPath, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({new_name: newName})
+    }).then(function(r) {
+      if (r.ok) {
+        closeRenameModal();
+        showToast('{{ T "page.files.rename.submit" }}');
+        setTimeout(function() { location.reload(); }, 400);
+      } else {
+        r.text().then(function(t) { showError('{{ T "page.files.err.rename" }}: ' + t); });
+      }
+    }).catch(function(e) { showError('{{ T "page.files.err.rename" }}: ' + e); });
+  };
+
+  // ── New Folder modal ──────────────────────────────────────────────────────
+  window.openNewFolderModal = function() {
+    document.getElementById('mkdir-name').value = '';
+    var modal = document.getElementById('mkdir-modal');
+    modal.style.display = 'flex';
+    document.getElementById('mkdir-name').focus();
+  };
+  window.closeMkdirModal = function() {
+    document.getElementById('mkdir-modal').style.display = 'none';
+  };
+  window.submitMkdir = function(e) {
+    e.preventDefault();
+    var name = document.getElementById('mkdir-name').value;
+    fetch('/ui/files/mkdir', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({share: currentShare, path: (currentPath === '/' ? '' : currentPath) + '/' + name})
+    }).then(function(r) {
+      if (r.ok) {
+        closeMkdirModal();
+        showToast('{{ T "page.files.new_folder.submit" }}');
+        setTimeout(function() { location.reload(); }, 400);
+      } else {
+        r.text().then(function(t) { showError('{{ T "page.files.err.mkdir" }}: ' + t); });
+      }
+    }).catch(function(e) { showError('{{ T "page.files.err.mkdir" }}: ' + e); });
+  };
+
+  // ── Toast helpers ─────────────────────────────────────────────────────────
+  function showToast(msg) {
+    var el = document.getElementById('files-toast');
+    var msgEl = document.getElementById('files-toast-msg');
+    msgEl.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function() { el.style.display = 'none'; }, 3000);
+  }
+  function showError(msg) {
+    var el = document.getElementById('files-error');
+    var msgEl = document.getElementById('files-error-msg');
+    msgEl.textContent = msg;
+    el.style.display = 'block';
+    setTimeout(function() { el.style.display = 'none'; }, 5000);
+  }
+})();
+</script>
+{{ end }}{{- /* end {{ else }} (if not $v.CurrentShare) */}}
+{{ end }}{{- /* end {{ define "content" }} */}}

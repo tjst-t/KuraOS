@@ -381,6 +381,11 @@ func run() error {
 	})
 	// ── End TLS wiring ──────────────────────────────────────────────────────
 
+	// ── Files wiring (S0eedaa) ────────────────────────────────────────────────
+	filesDeps, fileAPIHandler := buildFilesWiring(shareEngine, sessions, users)
+	uiRenderer.SetFilesHandler(filesDeps)
+	// ── End files wiring ─────────────────────────────────────────────────────
+
 	// ── Self-update wiring (Sf92666-4) ──────────────────────────────────────
 	releaseURL := envOr("KURA_RELEASE_URL",
 		"https://api.github.com/repos/kuraos-org/kura/releases/latest")
@@ -426,6 +431,7 @@ func run() error {
 		Users:          users,
 		AppRoutes:      routeRegistry,
 		MetricsHandler: metricsHandler,
+		FileAPIHandler: fileAPIHandler,
 	}
 	if oidcProvider != nil {
 		depsBuild.OIDCHandler = oidcProvider.Routes()

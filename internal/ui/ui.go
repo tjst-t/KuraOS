@@ -112,6 +112,12 @@ type Renderer struct {
 	// tlsHandler handles /ui/admin/settings/tls/* routes (Sf92666-1).
 	// nil until SetTLSHandler is called.
 	tlsHandler http.Handler
+
+	// filesHandler serves /ui/files/* routes (S0eedaa-2).
+	// nil until SetFilesHandler is called.
+	filesHandler http.Handler
+	// filesDeps holds the wired dependencies for the Files page renderer.
+	filesDeps FilesDeps
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}
@@ -428,6 +434,18 @@ func (r *Renderer) Routes() http.Handler {
 	// Go 1.22 mux selects the most specific path, so this wins over /ui/admin/settings/.
 	if r.logViewerHandler != nil {
 		mux.Handle("/ui/admin/settings/logs/stream", r.logViewerHandler)
+	}
+
+	// /ui/files — built-in filebrowser portal page (S0eedaa-2).
+	// Action endpoints (upload/delete/rename/mkdir/download) are also under /ui/files/*.
+	mux.HandleFunc("/ui/files", r.handleFiles)
+	if r.filesHandler != nil {
+		mux.Handle("/ui/files/list", r.filesHandler)
+		mux.Handle("/ui/files/upload/", r.filesHandler)
+		mux.Handle("/ui/files/delete/", r.filesHandler)
+		mux.Handle("/ui/files/rename/", r.filesHandler)
+		mux.Handle("/ui/files/mkdir", r.filesHandler)
+		mux.Handle("/ui/files/download/", r.filesHandler)
 	}
 
 	// /ui — user-portal landing. The portal proper is built out in a later

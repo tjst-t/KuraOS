@@ -41,7 +41,7 @@ func newServerWithShares(t *testing.T) (*httptest.Server, *user.Store, *share.Ma
 
 	fake := cmdexec.NewFake()
 	fake.RegisterStdout("testparm", []string{"-s", "--suppress-prompt", smbPath}, nil)
-	fake.RegisterStdout("systemctl", []string{"reload", "smbd"}, nil)
+	fake.RegisterStdout("systemctl", []string{"restart", "smbd"}, nil)
 	fake.RegisterStdout("systemctl", []string{"reload", "nfs-server"}, nil)
 	fake.RegisterStdout("exportfs", []string{"-ra"}, nil)
 
@@ -363,7 +363,7 @@ func TestAcceptance_Share_DatasetOwnership(t *testing.T) {
 	expPath := filepath.Join(dir, "kura.exports")
 	fake := cmdexec.NewFake()
 	fake.RegisterStdout("testparm", []string{"-s", "--suppress-prompt", smbConfPath}, nil)
-	fake.RegisterStdout("systemctl", []string{"reload", "smbd"}, nil)
+	fake.RegisterStdout("systemctl", []string{"restart", "smbd"}, nil)
 	fake.RegisterStdout("systemctl", []string{"reload", "nfs-server"}, nil)
 	fake.RegisterStdout("exportfs", []string{"-ra"}, nil)
 	mgr := share.NewManager(share.NewStore(st.DB()), fake, share.Options{

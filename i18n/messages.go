@@ -785,6 +785,40 @@ const (
 	MsgSettingsLogsLiveOff     MessageID = "page.settings.logs.live.off"
 )
 
+// Files portal page (S0eedaa-2). Visual SSOT: prototype/claude_design/Portal.html.
+const (
+	MsgFilesTitle           MessageID = "page.files.title"
+	MsgFilesSubtitle        MessageID = "page.files.subtitle"
+	MsgFilesNavFiles        MessageID = "nav.files"
+	MsgFilesSelectShare     MessageID = "page.files.select_share"
+	MsgFilesEmpty           MessageID = "page.files.empty"
+	MsgFilesColName         MessageID = "page.files.col.name"
+	MsgFilesColSize         MessageID = "page.files.col.size"
+	MsgFilesColModified     MessageID = "page.files.col.modified"
+	MsgFilesColActions      MessageID = "page.files.col.actions"
+	MsgFilesBtnUpload       MessageID = "page.files.btn.upload"
+	MsgFilesBtnNewFolder    MessageID = "page.files.btn.new_folder"
+	MsgFilesBtnDownload     MessageID = "page.files.btn.download"
+	MsgFilesBtnDelete       MessageID = "page.files.btn.delete"
+	MsgFilesBtnRename       MessageID = "page.files.btn.rename"
+	MsgFilesUploadProgress  MessageID = "page.files.upload.progress"
+	MsgFilesUploadSuccess   MessageID = "page.files.upload.success"
+	MsgFilesUploadFailed    MessageID = "page.files.upload.failed"
+	MsgFilesDeleteConfirm   MessageID = "page.files.delete.confirm"
+	MsgFilesRenameTitle     MessageID = "page.files.rename.title"
+	MsgFilesRenameNewName   MessageID = "page.files.rename.new_name"
+	MsgFilesRenameSubmit    MessageID = "page.files.rename.submit"
+	MsgFilesNewFolderTitle  MessageID = "page.files.new_folder.title"
+	MsgFilesNewFolderName   MessageID = "page.files.new_folder.name"
+	MsgFilesNewFolderSubmit MessageID = "page.files.new_folder.submit"
+	MsgFilesErrLoad         MessageID = "page.files.err.load"
+	MsgFilesErrUpload       MessageID = "page.files.err.upload"
+	MsgFilesErrDelete       MessageID = "page.files.err.delete"
+	MsgFilesErrRename       MessageID = "page.files.err.rename"
+	MsgFilesErrMkdir        MessageID = "page.files.err.mkdir"
+	MsgFilesAccessDenied    MessageID = "page.files.access_denied"
+)
+
 // Settings — Self-update tab (Sf92666-4).
 const (
 	MsgSettingsTabSelfUpdate       MessageID = "page.settings.tab.self_update"
