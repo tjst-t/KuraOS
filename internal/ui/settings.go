@@ -32,6 +32,7 @@ type settingsHandler struct {
 
 // settingsExtra is passed as PageData.Extra to settings.tmpl.
 type settingsExtra struct {
+	ActiveTab      string // "notify" | "backup" — drives tab switcher
 	Channels       []channelView
 	Events         []settingsEventView
 	SeverityFilter string
@@ -90,6 +91,14 @@ var allKinds = []string{"ntfy", "webhook", "smtp", "line_notify", "gotify"}
 func (h *settingsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	path := req.URL.Path
 
+	// Delegate backup sub-routes to the backup handler when installed.
+	if strings.HasPrefix(path, "/ui/admin/settings/backup/") || path == "/ui/admin/settings/upgrade/run" {
+		if h.r.backupHandler != nil {
+			h.r.backupHandler.ServeHTTP(w, req)
+			return
+		}
+	}
+
 	switch {
 	case path == "/ui/admin/settings" && req.Method == http.MethodGet:
 		h.handleGet(w, req)
@@ -113,15 +122,32 @@ func (h *settingsHandler) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (h *settingsHandler) handleGet(w http.ResponseWriter, req *http.Request) {
+	tab := req.URL.Query().Get("tab")
+	if tab == "" {
+		tab = "notify"
+	}
+
+	// For the backup tab, delegate to backupHandler if available.
+	if tab == "backup" && h.r.backupHandler != nil {
+		if bh, ok := h.r.backupHandler.(*backupSettingsHandler); ok {
+			extra := bh.buildBackupExtra(req)
+			data := h.r.buildPageData("settings", i18n.MsgNavSettings)
+			data.Extra = extra
+			h.r.render(w, "templates/pages/settings.tmpl", data)
+			return
+		}
+	}
+
 	sevFilter := req.URL.Query().Get("sev")
 	extra := h.buildExtra(req.Context(), sevFilter)
+	extra.ActiveTab = "notify"
 	data := h.r.buildPageData("settings", i18n.MsgNavSettings)
 	data.Extra = extra
 	h.r.render(w, "templates/pages/settings.tmpl", data)
 }
 
 func (h *settingsHandler) buildExtra(ctx context.Context, sevFilter string) *settingsExtra {
-	extra := &settingsExtra{SeverityFilter: sevFilter}
+	extra := &settingsExtra{SeverityFilter: sevFilter, ActiveTab: "notify"}
 
 	if h.deps.NotifyStore != nil {
 		rows, _ := h.deps.NotifyStore.List(ctx)
@@ -358,6 +384,7 @@ func (h *settingsHandler) handleTest(w http.ResponseWriter, req *http.Request) {
 // renderChannelsCard renders just the #channels-card for htmx swap.
 func (h *settingsHandler) renderChannelsCard(w http.ResponseWriter, req *http.Request) {
 	extra := h.buildExtra(req.Context(), "")
+	extra.ActiveTab = "notify"
 	data := h.r.buildPageData("settings", i18n.MsgNavSettings)
 	data.Extra = extra
 	// Full page re-render; htmx targets #channels-card with outerHTML swap.

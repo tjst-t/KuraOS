@@ -1,7 +1,9 @@
 {{- /*
-settings.tmpl — Settings page with notification channels CRUD (S8a756d-3).
-Visual SSOT: prototype/claude_design/Settings.html (通知タブ).
-htmx-driven: add/edit/delete/test channel are hx-post targets.
+settings.tmpl — Settings page: Notification Channels tab (S8a756d-3) +
+Backup tab (Se1e7a6).
+Visual SSOT: prototype/claude_design/Settings.html.
+htmx-driven: tab switching via hx-get to re-render the content area.
+Active tab is determined by Extra.ActiveTab ("notify" | "backup").
 */ -}}
 {{ define "content" }}
 <div class="page-head">
@@ -13,10 +15,30 @@ htmx-driven: add/edit/delete/test channel are hx-post targets.
 
 <div class="settings-layout">
   <nav class="settings-nav" aria-label="設定セクション">
-    <button data-on="true" aria-current="page">{{ T "page.settings.tab.notify" }}</button>
+    {{ $tab := "notify" }}{{ if .Extra }}{{ if .Extra.ActiveTab }}{{ $tab = .Extra.ActiveTab }}{{ end }}{{ end }}
+    <button
+      {{ if eq $tab "notify" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=notify"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.notify" }}</button>
+    <button
+      data-testid="settings-tab-backup"
+      {{ if eq $tab "backup" }}data-on="true" aria-current="page"{{ end }}
+      hx-get="/ui/admin/settings?tab=backup"
+      hx-target="#settings-content"
+      hx-swap="innerHTML"
+      hx-push-url="true">{{ T "page.settings.tab.backup" }}</button>
   </nav>
 
-  <div class="col" style="min-width:0">
+  <div class="col" style="min-width:0" id="settings-content">
+
+  {{ $tab2 := "notify" }}{{ if .Extra }}{{ if .Extra.ActiveTab }}{{ $tab2 = .Extra.ActiveTab }}{{ end }}{{ end }}
+
+  {{/* ======================================================= */}}
+  {{/* ── Notify tab ─────────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "notify" }}
 
     {{/* ── Notification channels table ────────────────────────── */}}
     <h2 class="section-title">{{ T "page.settings.notify.title" }}</h2>
@@ -128,6 +150,154 @@ htmx-driven: add/edit/delete/test channel are hx-post targets.
         </tbody>
       </table>
     </div>
+
+  {{ end }}{{/* end notify tab */}}
+
+  {{/* ======================================================= */}}
+  {{/* ── Backup tab ──────────────────────────────────────────── */}}
+  {{/* ======================================================= */}}
+  {{ if eq $tab2 "backup" }}
+
+    {{/* ── Snapshot schedules ──────────────────────────────── */}}
+    <h2 class="section-title" data-testid="backup-section-title">{{ T "page.settings.backup.title" }}</h2>
+    <p class="section-sub">{{ T "page.settings.backup.sub" }}</p>
+
+    <div class="card" style="margin-bottom:16px" id="schedules-card">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.backup.schedule.title" }}</h3>
+        <button class="btn btn-sm" data-testid="add-schedule-btn"
+                hx-get="/ui/admin/settings/backup/schedules/add-form"
+                hx-target="#schedule-modal-container"
+                hx-swap="innerHTML">{{ T "page.settings.backup.schedule.add_btn" }}</button>
+      </div>
+
+      {{ if .Extra }}{{ with .Extra }}{{ if .Schedules }}
+      <table class="tbl" data-testid="schedules-table">
+        <thead>
+          <tr>
+            <th>{{ T "page.settings.backup.col.name" }}</th>
+            <th>{{ T "page.settings.backup.col.cron" }}</th>
+            <th>{{ T "page.settings.backup.col.datasets" }}</th>
+            <th>{{ T "page.settings.backup.col.retention" }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Schedules }}
+          <tr data-testid="schedule-row-{{ .ID }}">
+            <td class="td-mono">{{ .Name }}</td>
+            <td class="td-mono">{{ .CronExpr }}</td>
+            <td>
+              {{ range .Datasets }}
+              <span class="badge">{{ . }}</span>
+              {{ end }}
+            </td>
+            <td style="font-size:12px">
+              {{ if .RetHourly }}<span class="badge">{{ T "page.backup.retention.hourly" .RetHourly }}</span>{{ end }}
+              {{ if .RetDaily }}<span class="badge">{{ T "page.backup.retention.daily" .RetDaily }}</span>{{ end }}
+              {{ if .RetMonthly }}<span class="badge">{{ T "page.backup.retention.monthly" .RetMonthly }}</span>{{ end }}
+            </td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn btn-ghost btn-sm" data-testid="edit-schedule-{{ .ID }}"
+                      hx-get="/ui/admin/settings/backup/schedules/{{ .ID }}/edit-form"
+                      hx-target="#schedule-modal-container"
+                      hx-swap="innerHTML">{{ T "page.settings.backup.edit_btn" }}</button>
+              <button class="btn btn-ghost btn-sm" data-testid="delete-schedule-{{ .ID }}"
+                      hx-post="/ui/admin/settings/backup/schedules/{{ .ID }}/delete"
+                      hx-confirm="{{ T "page.settings.backup.delete.confirm" }}"
+                      hx-target="#schedules-card"
+                      hx-swap="outerHTML">{{ T "page.settings.backup.delete_btn" }}</button>
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+      {{ else }}
+      <div class="card-body" data-testid="schedules-empty">
+        <p class="muted" style="font-size:13px;margin:0">{{ T "page.settings.backup.schedule.empty" }}</p>
+      </div>
+      {{ end }}{{ end }}{{ end }}
+    </div>
+
+    <div id="schedule-modal-container"></div>
+
+    {{/* ── Offsite backends ─────────────────────────────────── */}}
+    <div class="card" style="margin-bottom:16px" id="backends-card">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.backend.title" }}</h3>
+        <button class="btn btn-sm" data-testid="add-backend-btn"
+                hx-get="/ui/admin/settings/backup/backends/add-form"
+                hx-target="#backend-modal-container"
+                hx-swap="innerHTML">{{ T "page.settings.backend.add_btn" }}</button>
+      </div>
+
+      {{ if .Extra }}{{ with .Extra }}{{ if .Backends }}
+      <table class="tbl" data-testid="backends-table">
+        <thead>
+          <tr>
+            <th>{{ T "page.settings.backend.col.name" }}</th>
+            <th>{{ T "page.settings.backend.col.kind" }}</th>
+            <th>{{ T "page.settings.backend.col.status" }}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Backends }}
+          <tr data-testid="backend-row-{{ .ID }}">
+            <td class="td-mono">{{ .Name }}</td>
+            <td><span class="badge">{{ .Kind }}</span></td>
+            <td>
+              {{ if eq .CredentialState "set" }}
+              <span class="badge ok"><span class="badge-dot"></span>設定済み</span>
+              {{ else }}
+              <span class="badge warn"><span class="badge-dot"></span>未設定</span>
+              {{ end }}
+            </td>
+            <td style="text-align:right;white-space:nowrap">
+              <button class="btn btn-ghost btn-sm" data-testid="edit-backend-{{ .ID }}"
+                      hx-get="/ui/admin/settings/backup/backends/{{ .ID }}/edit-form"
+                      hx-target="#backend-modal-container"
+                      hx-swap="innerHTML">{{ T "page.settings.backend.edit_btn" }}</button>
+              <button class="btn btn-ghost btn-sm" data-testid="delete-backend-{{ .ID }}"
+                      hx-post="/ui/admin/settings/backup/backends/{{ .ID }}/delete"
+                      hx-confirm="{{ T "page.settings.backend.delete.confirm" }}"
+                      hx-target="#backends-card"
+                      hx-swap="outerHTML">{{ T "page.settings.backend.delete_btn" }}</button>
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+      {{ else }}
+      <div class="card-body" data-testid="backends-empty">
+        <p class="muted" style="font-size:13px;margin:0">{{ T "page.settings.backend.empty" }}</p>
+      </div>
+      {{ end }}{{ end }}{{ end }}
+    </div>
+
+    <div id="backend-modal-container"></div>
+
+    {{/* ── System upgrade ───────────────────────────────────── */}}
+    <div class="card" id="upgrade-card">
+      <div class="card-head">
+        <h3 class="card-title">{{ T "page.settings.upgrade.title" }}</h3>
+      </div>
+      <div class="card-body" style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <p style="margin:0;font-size:13px;color:var(--text-2)">{{ T "page.settings.upgrade.sub" }}</p>
+        <button class="btn btn-primary" data-testid="upgrade-btn"
+                hx-post="/ui/admin/settings/upgrade/run"
+                hx-confirm="{{ T "page.settings.upgrade.confirm" }}"
+                hx-target="#upgrade-result"
+                hx-swap="innerHTML"
+                hx-indicator="#upgrade-spinner">{{ T "page.settings.upgrade.btn" }}</button>
+      </div>
+      <div id="upgrade-result" style="padding:0 16px 16px;font-size:13px"></div>
+      <div id="upgrade-spinner" class="htmx-indicator" style="padding:0 16px 8px;font-size:13px;color:var(--text-3)">
+        {{ T "page.settings.upgrade.running" }}
+      </div>
+    </div>
+
+  {{ end }}{{/* end backup tab */}}
 
   </div>
 </div>

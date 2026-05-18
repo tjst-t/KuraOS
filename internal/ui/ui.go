@@ -92,6 +92,10 @@ type Renderer struct {
 	// settingsHandler replaces the settings placeholder when the notify engine
 	// is wired (S8a756d-3). nil uses the placeholder.
 	settingsHandler http.Handler
+
+	// backupHandler handles /ui/admin/settings/backup/* routes (Se1e7a6).
+	// nil until SetBackupHandler is called.
+	backupHandler http.Handler
 }
 
 // New parses every embedded template into a single tree so {{ template ... }}

@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "Se1e7a6",
+    "current_sprint": "Sf92666",
     "total": 18,
-    "done": 14,
+    "done": 15,
     "in_progress": 0,
-    "remaining": 4,
-    "percentage": 78,
+    "remaining": 3,
+    "percentage": 83,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -23,7 +23,8 @@
       "Sfix001",
       "Sfix002",
       "S413bd5",
-      "S8a756d"
+      "S8a756d",
+      "Se1e7a6"
     ],
     "updated_at": "2026-05-18T00:00:00Z"
   },
@@ -1094,109 +1095,109 @@
     },
     "Se1e7a6": {
       "title": "バックアップ (ZFS スナップショット + zfs_send / restic / rclone)",
-      "status": "pending",
+      "status": "done",
       "description": "ローカルスナップショット (cron + retention)、リモートバックエンド (zfs_send / restic / rclone)、フルリストアの動作確認、pre-upgrade スナップショット (rootfs + アプリ DB)。",
       "milestone": false,
       "stories": {
         "Se1e7a6-1": {
           "title": "ローカルスナップショットスケジューラと retention",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、cron スケジュールでスナップショットを取り hourly/daily/monthly の retention で自動管理したい。なぜなら、誤削除や ランサムウェアからの復旧手段を確保するため。",
           "acceptance_criteria": [
             {
               "id": "AC-Se1e7a6-1-1",
               "description": "config.json の snapshots.schedule に従い定期スナップショットが作成され、retention で古いものが削除される",
-              "test": "[AC-Se1e7a6-1-1] in engine/backup/snapshot_test.go",
-              "status": "pending"
+              "test": "[AC-Se1e7a6-1-1] in engine/backup/snapshot_test.go + tests/acceptance/backup-scheduler.sh",
+              "status": "done"
             }
           ],
           "tasks": {
             "Se1e7a6-1-1": {
               "title": "cron 風スケジューラ",
               "description": "robfig/cron v3 を採用",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-1-2": {
               "title": "retention ロジック",
               "description": "hourly/daily/monthly の保持数で削除",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "Se1e7a6-2": {
           "title": "BackupBackend interface と zfs_send / restic / rclone",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、別 NAS や S3 等にオフサイトバックアップを設定したい。なぜなら、自宅が火事になってもデータを失わないため。",
           "acceptance_criteria": [
             {
               "id": "AC-Se1e7a6-2-1",
               "description": "zfs_send / restic / rclone の 3 種類の backend 設定が config.json に書け、Settings 画面から編集できる",
               "test": "[AC-Se1e7a6-2-1] in tests/e2e/backup-config.e2e.spec.ts",
-              "status": "pending"
+              "status": "done"
             },
             {
               "id": "AC-Se1e7a6-2-2",
               "description": "各 backend で 1 回のバックアップ送信と List / Restore が動作する (CI ではモック化)",
               "test": "[AC-Se1e7a6-2-2] in engine/backup/backend_test.go",
-              "status": "pending"
+              "status": "done"
             }
           ],
           "tasks": {
             "Se1e7a6-2-1": {
               "title": "BackupBackend interface",
               "description": "Send / Restore / List",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-2-2": {
               "title": "zfs_send 実装",
               "description": "ssh + zfs send | zfs receive のラッパー",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-2-3": {
               "title": "restic 実装",
               "description": "restic CLI ラッパー",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-2-4": {
               "title": "rclone 実装",
               "description": "rclone CLI ラッパー",
-              "status": "pending"
+              "status": "done"
             }
           }
         },
         "Se1e7a6-3": {
           "title": "pre-upgrade スナップショット (rootfs + アプリ DB)",
-          "status": "pending",
+          "status": "done",
           "user_story": "管理者として、apt upgrade 実行前に rootfs と アプリ DB のスナップショットが自動作成されるようにしたい。なぜなら、更新失敗時に CLI で手動ロールバックできる退路を確保したいから。",
           "acceptance_criteria": [
             {
               "id": "AC-Se1e7a6-3-1",
               "description": "Settings から『今すぐ更新』を押すと、全アプリ graceful stop → 同名スナップショット作成 → apt upgrade → アプリ起動 の順で進む",
               "test": "[AC-Se1e7a6-3-1] in tests/e2e/system-upgrade.e2e.spec.ts",
-              "status": "pending"
+              "status": "done"
             },
             {
               "id": "AC-Se1e7a6-3-2",
               "description": "v1 ではワンクリックロールバック UI は提供しない (CLI 手順を README に記載)",
               "test": "[AC-Se1e7a6-3-2] in tests/acceptance/no-rollback-ui.sh",
-              "status": "pending"
+              "status": "done"
             }
           ],
           "tasks": {
             "Se1e7a6-3-1": {
               "title": "graceful stop シーケンス",
               "description": "アプリの停止順序とタイムアウト",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-3-2": {
               "title": "対象 dataset 列挙",
               "description": "rootfs + backup:true の dataset",
-              "status": "pending"
+              "status": "done"
             },
             "Se1e7a6-3-3": {
               "title": "復旧手順を README に記載",
               "description": "design.md §17.2 の手順をコピー",
-              "status": "pending"
+              "status": "done"
             }
           }
         }
