@@ -3,12 +3,12 @@
   "project": "KuraOS",
   "description": "Linux ベースの自作 NAS OS。Phase 1 で kura バイナリ (UI/API/Engine) を ansible-nas 上に構築する。",
   "progress": {
-    "current_sprint": "S99702c",
-    "total": 18,
+    "current_sprint": "S9a6670",
+    "total": 19,
     "done": 18,
     "in_progress": 0,
-    "remaining": 0,
-    "percentage": 100,
+    "remaining": 1,
+    "percentage": 94,
     "completed_sprints": [
       "S0ff37f",
       "S464e47",
@@ -25,10 +25,11 @@
       "S413bd5",
       "S8a756d",
       "Se1e7a6",
+      "Sf92666",
       "S0eedaa",
       "S99702c"
     ],
-    "updated_at": "2026-05-18T18:00:00Z"
+    "updated_at": "2026-05-19T02:30:00Z"
   },
   "execution_order": [
     "S0ff37f",
@@ -48,7 +49,8 @@
     "Se1e7a6",
     "Sf92666",
     "S0eedaa",
-    "S99702c"
+    "S99702c",
+    "S9a6670"
   ],
   "sprints": {
     "S0ff37f": {
@@ -2019,6 +2021,131 @@
           }
         }
       }
+    },
+    "S9a6670": {
+      "title": "UI Polish — prototype 通りの完成度に引き上げ",
+      "status": "pending",
+      "milestone": false,
+      "description": "Phase 1 milestone (S99702c) 完了時点で機能は揃ったが、Dashboard・Portal・Settings の 3 画面が prototype/claude_design/ の完成度より情報密度・整理が不足。エンジン (storage / monitor / event_log / app / share) の既存データを使って prototype のレイアウトを埋め、Phase 1 リリース前の最終整え。新機能追加は無し — 既存データソースから取得した値を整えて見せる UI 統合作業。",
+      "stories": {
+        "S9a6670-1": {
+          "title": "Dashboard を prototype/claude_design/Dashboard.html まで仕上げ",
+          "user_story": "NAS 管理者として、Dashboard を開いた瞬間にプール容量 / 健康 / イベント / アプリ / 共有 / 最近の動きが一目で分かるようにしたい。なぜなら、毎朝の状況把握が現状のシンプル sparkline 3 枚では足りないから。",
+          "status": "pending",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9a6670-1-1",
+              "description": "上部に 4 stat card (ストレージ総容量 / 健康スコア / 最高ディスク温度 / 直近 24h イベント数) が表示される",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-1-2",
+              "description": "プール毎の使用量バー、共有リスト、アプリリスト、最近のイベントの 4 セクションが prototype 通りの密度で表示される",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-1-3",
+              "description": "下部にネットワーク / システム / ZFS スタータスの 3 帯が表示される",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-1-4",
+              "description": "全データソースは既存 Engine (storage / monitor / event_log / app / share) からの取得のみ — 新エンドポイント追加なし",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9a6670-1-1": {
+              "title": "dashboard handler を ViewModel 拡張",
+              "status": "pending"
+            },
+            "S9a6670-1-2": {
+              "title": "dashboard.tmpl を prototype レイアウトで書き直し",
+              "status": "pending"
+            },
+            "S9a6670-1-3": {
+              "title": "stat card 用 i18n + 計算 (健康スコア etc.)",
+              "status": "pending"
+            },
+            "S9a6670-1-4": {
+              "title": "実機 (192.168.1.42) で実データで描画確認",
+              "status": "pending"
+            }
+          }
+        },
+        "S9a6670-2": {
+          "title": "Portal を prototype/claude_design/Portal.html まで仕上げ",
+          "user_story": "家族のユーザーとして、ログインした瞬間に『自分が使えるアプリと自分のファイル』が並んでいるホーム画面に出迎えてほしい。なぜなら、admin の Dashboard のような専門的な数字は要らないから。",
+          "status": "pending",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9a6670-2-1",
+              "description": "/ui に prototype Portal レイアウト (利用可能アプリ tile / Files カード / 最近のファイル / 自分のストレージ使用量) が並ぶ",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-2-2",
+              "description": "アプリ tile は visibility.groups で本人に見えるものだけ表示 (S99702c-1 のフィルタを継続)",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-2-3",
+              "description": "最近のファイルは fileapi の readdir 履歴か modification time 上位 N 件を引く (新テーブル不要)",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9a6670-2-1": {
+              "title": "portal_home.tmpl を prototype レイアウトで書き直し",
+              "status": "pending"
+            },
+            "S9a6670-2-2": {
+              "title": "最近のファイル取得ロジック (mtime 上位 N)",
+              "status": "pending"
+            },
+            "S9a6670-2-3": {
+              "title": "自分のストレージ使用量計算 (du 風 or quota baseline)",
+              "status": "pending"
+            }
+          }
+        },
+        "S9a6670-3": {
+          "title": "Settings タブ群の整理 (情報密度 + 分類)",
+          "user_story": "管理者として、Settings タブを開いた時に通知 / TLS / バックアップ / 更新 / ログ / 言語 / config が散らかってない情報設計に整えたい。なぜなら、Phase 1 で多くの sprint が Settings に新タブを追加してきたので、いまや密度が低く散漫だから。",
+          "status": "pending",
+          "acceptance_criteria": [
+            {
+              "id": "AC-S9a6670-3-1",
+              "description": "タブ間の視覚的トリートメント (見出し / カード / フィールド余白) が prototype/Settings.html と一致する",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-3-2",
+              "description": "関連項目はカードでグループ化される (例: 通知 = ルール + チャンネル、TLS = mode + 証明書情報、Backup = スケジュール + バックエンド)",
+              "status": "pending"
+            },
+            {
+              "id": "AC-S9a6670-3-3",
+              "description": "言語タブ・config タブ等の 1 セクションものは『付加機能』として最後にまとめられる",
+              "status": "pending"
+            }
+          ],
+          "tasks": {
+            "S9a6670-3-1": {
+              "title": "Settings 各タブの card レイアウト統一",
+              "status": "pending"
+            },
+            "S9a6670-3-2": {
+              "title": "関連項目のグルーピング (通知 / TLS / Backup)",
+              "status": "pending"
+            },
+            "S9a6670-3-3": {
+              "title": "実機で各タブを実 click で確認 (priority #2 賢いデフォルト視点)",
+              "status": "pending"
+            }
+          }
+        }
+      }
     }
   },
   "dependencies": {
@@ -2128,6 +2255,12 @@
         "S822961"
       ],
       "reason": "federation の完成形 (Sfix002) と engine/system の SSOT projection (Ssys001) と OIDC Provider (S822961) を直接拡張する。S8a756d より前に入れる根拠: pending ロールが入ると engine/user の Role 型と session middleware が変わるので、monitoring の event 配線より前に固めたほうが回帰検出しやすい"
+    },
+    "S9a6670": {
+      "depends_on": [
+        "S99702c"
+      ],
+      "reason": "prototype/claude_design/ を最終形として整える polish sprint。Phase 1 milestone (S99702c) の機能群が全部 main に乗ってから着手する"
     }
   },
   "backlog": [
